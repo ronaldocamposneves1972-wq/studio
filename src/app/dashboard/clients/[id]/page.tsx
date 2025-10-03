@@ -74,6 +74,7 @@ import {
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { doc, collection, query, where } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/hooks/use-toast"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -127,6 +128,7 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const clientRef = useMemoFirebase(() => {
     if (!firestore || !params.id) return null
@@ -141,6 +143,21 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   const docRg = PlaceHolderImages.find(i => i.id === 'document-rg');
   const docCnh = PlaceHolderImages.find(i => i.id === 'document-cnh');
   const docProof = PlaceHolderImages.find(i => i.id === 'document-proof');
+
+  const copyToClipboard = (text: string, message: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+        toast({ title: 'Sucesso!', description: message });
+    }).catch(err => {
+        toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível copiar o link.' });
+    });
+  };
+
+  const handleGenerateDocLink = () => {
+    // TODO: This should fetch the quiz with placement 'client_link' and use its ID.
+    // For now, we'll use the client's ID as a placeholder for the link, assuming a quiz page exists at /q/[id]
+    const quizLink = `${window.location.origin}/q/${client?.id}`;
+    copyToClipboard(quizLink, "Link para envio de documentos copiado!");
+  }
 
 
   if (isLoadingClient) {
@@ -183,6 +200,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
       </div>
     )
   }
+
+  const initialQuizLink = `${window.location.origin}/q/${client.id.slice(0,8)}`
 
   return (
     <div className="grid flex-1 items-start gap-4 md:gap-8">
@@ -243,7 +262,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                     Object.entries(client.answers).map(([key, value]) => {
                                       // Find the question text from the original quiz if available
                                       // This part is complex without fetching the quiz definition itself
-                                      const questionLabel = key.replace('q-', '').replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                      const questionLabel = key.replace('q-', '').replace(/-/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                                       return(
                                         <div className="grid gap-1" key={key}>
                                           <p className="font-medium">{questionLabel}</p>
@@ -256,8 +275,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                   )}
                                 </CardContent>
                                 <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
-                                    <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">/q/{client.id.slice(0,8)}</span></p>
-                                    <Button variant="outline" size="sm"><Copy className="h-3 w-3 mr-2" /> Copiar Link</Button>
+                                    <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">{initialQuizLink}</span></p>
+                                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(initialQuizLink, "Link do quiz inicial copiado!")}><Copy className="h-3 w-3 mr-2" /> Copiar Link</Button>
                                 </CardFooter>
                             </Card>
                         </TabsContent>
@@ -281,7 +300,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                               <Upload className="h-12 w-12 text-muted-foreground" />
                               <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
                               <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
-                              <Button>
+                              <Button onClick={handleGenerateDocLink}>
                                 <Link2 className="mr-2 h-4 w-4" />
                                 Gerar Link de Documentos
                               </Button>
