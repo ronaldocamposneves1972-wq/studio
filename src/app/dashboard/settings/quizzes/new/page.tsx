@@ -7,6 +7,7 @@ import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
+import { collection } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -26,8 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useFirestore, addDocumentNonBlocking, useUser } from "@/firebase"
-import { collection } from "firebase/firestore"
+import { useFirestore, useUser, addDocumentNonBlocking } from "@/firebase"
 import { QuizPlacement } from "@/lib/types"
 
 const questionSchema = z.object({
@@ -50,7 +50,7 @@ export default function NewQuizPage() {
   const { toast } = useToast()
   const firestore = useFirestore()
   const { user, isUserLoading } = useUser()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const {
     register,
@@ -82,7 +82,7 @@ export default function NewQuizPage() {
       return;
     }
 
-    setIsLoading(true)
+    setIsSubmitting(true)
 
     const quizData = {
       ...data,
@@ -97,7 +97,9 @@ export default function NewQuizPage() {
     try {
       if (!firestore) throw new Error("Firestore not available");
       const quizzesCollection = collection(firestore, 'quizzes');
-      await addDocumentNonBlocking(quizzesCollection, quizData);
+      
+      // This function is non-blocking and handles its own errors
+      addDocumentNonBlocking(quizzesCollection, quizData);
       
       toast({
         title: "Quiz criado com sucesso!",
@@ -111,7 +113,7 @@ export default function NewQuizPage() {
         title: "Erro ao criar quiz",
         description: "Não foi possível salvar o quiz. Verifique as permissões do Firestore.",
       })
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -160,12 +162,13 @@ export default function NewQuizPage() {
                     id="name"
                     {...register("name")}
                     className={errors.name ? "border-destructive" : ""}
+                    disabled={isSubmitting}
                   />
                   {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                  <div>
                     <Label>Localização</Label>
-                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} defaultValue="landing_page">
+                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} defaultValue="landing_page" disabled={isSubmitting}>
                         <SelectTrigger className={errors.placement ? "border-destructive" : ""}>
                             <SelectValue placeholder="Selecione onde o quiz será usado" />
                         </SelectTrigger>
@@ -188,6 +191,7 @@ export default function NewQuizPage() {
                     size="icon"
                     className="absolute top-2 right-2 h-7 w-7"
                     onClick={() => remove(index)}
+                    disabled={isSubmitting}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -197,6 +201,7 @@ export default function NewQuizPage() {
                         <Input
                         {...register(`questions.${index}.id`)}
                         placeholder="ex: q-email"
+                        disabled={isSubmitting}
                         />
                         {errors.questions?.[index]?.id && <p className="text-sm text-destructive mt-1">{errors.questions?.[index]?.id?.message}</p>}
                     </div>
@@ -205,12 +210,13 @@ export default function NewQuizPage() {
                         <Input
                         {...register(`questions.${index}.text`)}
                         placeholder="Ex: Qual o seu e-mail?"
+                        disabled={isSubmitting}
                         />
                          {errors.questions?.[index]?.text && <p className="text-sm text-destructive mt-1">{errors.questions?.[index]?.text?.message}</p>}
                     </div>
                      <div>
                         <Label>Tipo da Pergunta</Label>
-                        <Select onValueChange={(value) => setValue(`questions.${index}.type`, value as any)} defaultValue={field.type}>
+                        <Select onValueChange={(value) => setValue(`questions.${index}.type`, value as any)} defaultValue={field.type} disabled={isSubmitting}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecione o tipo" />
                             </SelectTrigger>
@@ -231,6 +237,7 @@ export default function NewQuizPage() {
                     <Input
                       {...register(`questions.${index}.options`)}
                       placeholder="Opção 1, Opção 2, Opção 3"
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -243,15 +250,16 @@ export default function NewQuizPage() {
                 size="sm"
                 className="mt-2"
                 onClick={() => append({ id: "", text: "", type: "text", options: "" })}
+                disabled={isSubmitting}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Adicionar Pergunta
               </Button>
             </div>
             <div className="mt-6 flex justify-end gap-2">
-                 <Button variant="outline" type="button" onClick={() => router.back()}>Cancelar</Button>
-                <Button type="submit" disabled={isLoading}>
-                    {isLoading ? "Salvando..." : "Salvar Quiz"}
+                 <Button variant="outline" type="button" onClick={() => router.back()} disabled={isSubmitting}>Cancelar</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Salvando..." : "Salvar Quiz"}
                 </Button>
             </div>
           </CardContent>

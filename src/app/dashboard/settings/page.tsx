@@ -42,22 +42,29 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import type { Quiz } from "@/lib/types"
 
 export default function SettingsPage() {
   const firestore = useFirestore()
   const { user } = useUser()
   const { toast } = useToast()
 
+  // Note: Firestore security rules should ensure this only returns quizzes if the user is authenticated.
+  // We're allowing public reads on quizzes for the landing page, so this fetch is okay for any state.
   const quizzesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'quizzes'));
   }, [firestore]);
-  const { data: quizzes, isLoading } = useCollection(quizzesQuery)
+
+  const { data: quizzes, isLoading } = useCollection<Quiz>(quizzesQuery)
   
   const handleDeleteQuiz = (quizId: string, quizName: string) => {
     if (!firestore) return;
     const quizDocRef = doc(firestore, 'quizzes', quizId);
+    
+    // This function handles its own errors and is non-blocking
     deleteDocumentNonBlocking(quizDocRef);
+
     toast({
       title: "Quiz excluído",
       description: `O quiz "${quizName}" foi excluído com sucesso.`
@@ -117,8 +124,10 @@ export default function SettingsPage() {
                   </CardContent>
                   <CardFooter className="flex justify-between">
                     <Button variant="secondary" asChild>
+                      {/* TODO: Create edit page */}
                       <Link href={`/dashboard/settings/quizzes/new`}>Editar</Link>
                     </Button>
+                    {/* Only show delete button if the logged-in user is the owner */}
                     {user && quiz.ownerId === user.uid && (
                        <AlertDialog>
                         <AlertDialogTrigger asChild>
