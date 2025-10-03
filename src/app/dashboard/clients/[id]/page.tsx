@@ -153,8 +153,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   };
 
   const handleGenerateDocLink = () => {
-    // TODO: This should fetch the quiz with placement 'client_link' and use its ID.
-    // For now, we'll use the client's ID as a placeholder for the link, assuming a quiz page exists at /q/[id]
+    // This generates a link to the standalone quiz page, passing the client's ID.
+    // The page at /q/[id] will then fetch the quiz with placement 'client_link'.
     const quizLink = `${window.location.origin}/q/${client?.id}`;
     copyToClipboard(quizLink, "Link para envio de documentos copiado!");
   }
@@ -201,7 +201,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     )
   }
 
-  const initialQuizLink = `${window.location.origin}/q/${client.id.slice(0,8)}`
+  const initialQuizLink = client.quizId ? `${window.location.origin}/q/${client.quizId}` : "N/A"
 
   return (
     <div className="grid flex-1 items-start gap-4 md:gap-8">

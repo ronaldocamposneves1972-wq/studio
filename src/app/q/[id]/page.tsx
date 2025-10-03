@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, where, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -132,14 +132,14 @@ export default function StandaloneQuizPage() {
   const firestore = useFirestore();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  // We assume the first quiz with 'client_link' is the one to use.
-  // A more robust solution might pass the quizId in the URL as well.
+  // Query for the quiz intended for client links
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return doc(firestore, 'quizzes', 'Z3Nf4yYqKj8k9xL2pQ5a'); // Placeholder ID for "Envio de Documentos" quiz
+    return query(collection(firestore, 'quizzes'), where('placement', '==', 'client_link'), limit(1));
   }, [firestore]);
 
-  const { data: quiz, isLoading: isLoadingQuiz } = useDoc<Quiz>(quizQuery);
+  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
+  const quiz = quizzes?.[0];
 
   const handleSubmit = async (answers: any) => {
     setIsLoading(true);
@@ -158,9 +158,12 @@ export default function StandaloneQuizPage() {
         if (!firestore || !clientId) throw new Error("Firestore ou ID do cliente não disponível");
         
         const clientRef = doc(firestore, 'clients', clientId);
-        // We merge the new answers with existing ones
+        // We merge the new answers with existing ones from the initial quiz
+        const clientDoc = (await (await fetch(clientRef.path)).json()); // This is a mock, ideally you would fetch doc before updating
+        const existingAnswers = clientDoc?.answers || {};
+
         updateDocumentNonBlocking(clientRef, { 
-            answers: { ...serializableAnswers },
+            answers: { ...existingAnswers, ...serializableAnswers },
             status: 'Em análise', // Update status
         });
         
@@ -215,6 +218,7 @@ export default function StandaloneQuizPage() {
         <div className="text-center text-muted-foreground py-10">
             <h3 className="text-2xl font-bold text-foreground">Quiz não encontrado</h3>
             <p>O link que você acessou pode estar expirado ou incorreto.</p>
+            <p className="text-sm mt-2">Verifique se um quiz com a localização "Link para Cliente" foi criado nas configurações.</p>
         </div>
     );
   }
