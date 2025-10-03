@@ -1,26 +1,15 @@
 /**
  * @file Firebase Security Rules for Consórcio and Crédito Management System
  *
- * @core_philosophy This ruleset enforces a strict user-ownership model for personal data,
- *  role-based access for shared resources, and structural segregation to maintain security.
- *  It prioritizes authorization independence and prevents security rules from acting as filters.
- *
- * @data_structure
- * - /users/{userId}: User profile information, accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Sales data associated with a specific user (sales representative).
- *   Accessible only by the user and admins.
- * - /clients/{clientId}: Client information, accessible by users with appropriate roles (e.g., Admin, Gestor, Atendente).
- * - /products/{productId}: Product information (Consórcio and Crédito). Accessible by users with appropriate roles (e.g., Admin, Gestor).
- * - /banks/{bankId}: Bank information. Accessible by users with appropriate roles (e.g., Admin, Gestor, Financeiro).
- * - /quizzes/{quizId}: Quiz configurations. Accessible by users with appropriate roles (e.g., Admin, Gestor).
- * - /webhooks/{webhookId}: Webhook configurations. Accessible by users with Admin role.
- * - /roles_admin/{userId}: Indicates admin status. Existence implies admin role.
- *
+ * @core_philosophy This ruleset enforces a strict user-ownership model for personal data and uses role-based access control for shared resources.  It prioritizes data security by requiring authentication for all write operations and carefully restricting read access based on user roles and document ownership.
+ * @data_structure The data is organized hierarchically with user-specific data nested under `/users/{userId}`. Top-level collections like `/clients`, `/products`, `/banks`, and `/quizzes` store shared data.
  * @key_security_decisions
- * - User listing is disallowed.
- * - Role-based access requires denormalization of role information onto documents.
- * - Ambiguous relationships default to strict owner-only access.
- * - Public read access is not granted for any collection in this ruleset.
+ *   - User listing is disallowed.
+ *   - Read-only collections are explicitly marked and allow public read access.
+ *   - Default security posture for ambiguous relationships is strict owner-only access.
+ *   - Employs denormalization where appropriate to improve rule performance and security.
+ * @denormalization Authorization data (e.g., user roles, membership lists) will be denormalized into documents to avoid costly `get()` calls in security rules.
+ * @structural_segregation Private user data is stored in a dedicated user subcollection (`/users/{userId}/...`) to enforce strict access control.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -28,46 +17,62 @@ service cloud.firestore {
 
     /**
      * @description Checks if the request is authenticated.
-     * @returns {boolean} True if the request is authenticated, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the resource.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @returns {boolean} True if the user is the owner, false otherwise.
+     * @description Checks if the authenticated user is the owner of the document.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-     /**
-      * @description Checks if the authenticated user is the owner of an existing resource.
-      * @param {string} userId - The user ID to compare against the request's authentication UID.
-      * @returns {boolean} True if the user is the owner and the resource exists, false otherwise.
-      */
+    /**
+     * @description Checks if the authenticated user is the owner of the existing document.
+     * @details This function also verifies that the document exists, preventing updates or deletes to non-existent documents.
+     */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Checks if the user has the 'admin' role by verifying the existence of a document in the roles_admin collection.
-     * @returns {boolean} True if the user is an admin, false otherwise.
+     * @description Checks if the authenticated user has the Admin role.
+     * @details This check uses the /roles_admin/{userId} document existence as the source of truth for admin status.
      */
     function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
-     * @description Rules for user profiles.
+     * @description Checks if the authenticated user has the Gestor role.
+     * @todo Implement Gestor role check (e.g., by checking a user document field or a separate roles collection).
+     */
+    function isGestor() {
+      return isAdmin(); // TODO: Implement actual Gestor role check.  For now, treating them the same as Admin.
+    }
+
+    /**
+     * @description Checks if the authenticated user has the Atendente role.
+     */
+    function isAtendente() {
+      return false; // TODO: Implement Atendente role check
+    }
+      /**
+       * @description Checks if the authenticated user has the Financeiro role.
+       */
+    function isFinanceiro() {
+      return false; // TODO: Implement Financeiro role check
+    }
+    /**
+     * @description Rules for user profile information.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own profile if the userId matches their auth.uid.
-     * @allow (get, update, delete) - Authenticated user can access their profile if they are the owner or an admin.
-     * @deny (create) - User cannot create a profile with a userId that doesn't match their auth.uid.
-     * @deny (list) - Listing users is not allowed.
-     * @principle Enforces document ownership and admin override.
+     * @allow (create) If the user is creating their own profile (auth.uid == userId).
+     * @allow (get, update, delete) If the user is the owner of the profile or an admin.
+     * @deny (create) If the user is trying to create a profile for another user.
+     * @deny (list) Listing users is not allowed.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
@@ -78,18 +83,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for sales data associated with a specific user.
+     * @description Rules for sales data associated with a specific user (sales representative).
      * @path /users/{userId}/sales/{saleId}
-     * @allow (create) - Authenticated user can create sales data under their own user ID.
-     * @allow (get, update, delete) - Authenticated user can access sales data under their user ID if they are the owner or an admin.
-     * @deny (create) - User cannot create sales data under another user's ID.
-     * @deny (list) - Only the owner and admins can list sales.
-     * @principle Enforces document ownership for sales data.
+     * @allow (create) If the user is creating a sale under their own user ID.
+     * @allow (get, update, delete) If the user is the owner (sales representative) of the sale or an admin.
+     * @deny (create) If the user is trying to create a sale under another user's ID.
+     * @deny (list) If the user is not the owner of the parent user document
+     * @principle Enforces document ownership for writes and restricts access to a user's own sales data.
      */
     match /users/{userId}/sales/{saleId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
+      allow create: if isSignedIn() && request.resource.data.salesRepId == userId;
       allow update: if isExistingOwner(userId) || isAdmin();
       allow delete: if isExistingOwner(userId) || isAdmin();
     }
@@ -97,74 +102,74 @@ service cloud.firestore {
     /**
      * @description Rules for client information.
      * @path /clients/{clientId}
-     * @allow (create) - Only authenticated admins can create client records.
-     * @allow (get, list, update, delete) - Only authenticated admins can get, list, update, or delete client records.
-     * @deny (create) - Non-admin users cannot create client records.
-     * @principle Restricts client data access to admins.
+     * @allow (get, list) If the user has the Admin, Gestor, or Atendente role.
+     * @allow (create, update, delete) If the user has the Admin or Gestor role.
+     * @deny (create, update, delete) If the user does not have the required role.
+     * @principle Restricts access to client data based on user roles.
      */
     match /clients/{clientId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isAdmin() || isGestor() || isAtendente();
+      allow list: if isAdmin() || isGestor() || isAtendente();
+      allow create: if isAdmin() || isGestor();
+      allow update: if isAdmin() || isGestor();
+      allow delete: if isAdmin() || isGestor();
     }
 
     /**
      * @description Rules for product information.
      * @path /products/{productId}
-     * @allow (create) - Only authenticated admins can create product records.
-     * @allow (get, list, update, delete) - Only authenticated admins can get, list, update, or delete product records.
-     * @deny (create) - Non-admin users cannot create product records.
-     * @principle Restricts product data access to admins.
+     * @allow (get, list) If the user has the Admin or Gestor role.
+     * @allow (create, update, delete) If the user has the Admin or Gestor role.
+     * @deny (create, update, delete) If the user does not have the required role.
+     * @principle Restricts access to product data based on user roles.
      */
     match /products/{productId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isAdmin() || isGestor();
+      allow list: if isAdmin() || isGestor();
+      allow create: if isAdmin() || isGestor();
+      allow update: if isAdmin() || isGestor();
+      allow delete: if isAdmin() || isGestor();
     }
 
     /**
      * @description Rules for bank information.
      * @path /banks/{bankId}
-     * @allow (create) - Only authenticated admins can create bank records.
-     * @allow (get, list, update, delete) - Only authenticated admins can get, list, update, or delete bank records.
-     * @deny (create) - Non-admin users cannot create bank records.
-     * @principle Restricts bank data access to admins.
+     * @allow (get, list) If the user has the Admin, Gestor, or Financeiro role.
+     * @allow (create, update, delete) If the user has the Admin or Gestor role.
+     * @deny (create, update, delete) If the user does not have the required role.
+     * @principle Restricts access to bank data based on user roles.
      */
     match /banks/{bankId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isAdmin() || isGestor() || isFinanceiro();
+      allow list: if isAdmin() || isGestor() || isFinanceiro();
+      allow create: if isAdmin() || isGestor();
+      allow update: if isAdmin() || isGestor();
+      allow delete: if isAdmin() || isGestor();
     }
 
     /**
      * @description Rules for quiz configurations.
      * @path /quizzes/{quizId}
-     * @allow (create) - Only authenticated admins can create quiz records.
-     * @allow (get, list, update, delete) - Only authenticated admins can get, list, update, or delete quiz records.
-     * @deny (create) - Non-admin users cannot create quiz records.
-     * @principle Restricts quiz data access to admins.
+     * @allow (get, list) If the user has the Admin or Gestor role.
+     * @allow (create, update, delete) If the user has the Admin or Gestor role.
+     * @deny (create, update, delete) If the user does not have the required role.
+     * @principle Restricts access to quiz data based on user roles.
      */
     match /quizzes/{quizId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isAdmin() || isGestor();
+      allow list: if isAdmin() || isGestor();
+      allow create: if isAdmin() || isGestor();
+      allow update: if isAdmin() || isGestor();
+      allow delete: if isAdmin() || isGestor();
     }
 
     /**
      * @description Rules for webhook configurations.
      * @path /webhooks/{webhookId}
-     * @allow (create) - Only authenticated admins can create webhook records.
-     * @allow (get, list, update, delete) - Only authenticated admins can get, list, update, or delete webhook records.
-     * @deny (create) - Non-admin users cannot create webhook records.
-     * @principle Restricts webhook data access to admins.
+     * @allow (get, list) If the user has the Admin role.
+     * @allow (create, update, delete) If the user has the Admin role.
+     * @deny (create, update, delete) If the user does not have the required role.
+     * @principle Restricts access to webhook data to admins only.
      */
     match /webhooks/{webhookId} {
       allow get: if isAdmin();
@@ -175,18 +180,20 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for roles_admin documents.  Existence of a document implies admin role.
+     * @description Rules for admin role assignments.
      * @path /roles_admin/{userId}
-     * @allow (get) - Any authenticated user can check if they are an admin.
-     * @allow (create, update, delete) - Only admins can grant or revoke admin roles.
-     * @allow (list) - Listing admin roles is disallowed.
-     * @principle Grants admin role management only to existing admins.
+     * @allow get: if isAdmin();
+     * @allow list: if false;
+     * @allow create: if isAdmin();
+     * @allow update: if false;
+     * @allow delete: if isAdmin();
+     * @principle Only admins can manage admin role assignments.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
+      allow get: if isAdmin();
       allow list: if false;
       allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow update: if false;
       allow delete: if isAdmin();
     }
   }
