@@ -10,7 +10,7 @@ export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'R
 
 export type Client = {
   id: string;
-  name: string;
+  name: string; // Full name
   email: string;
   phone: string;
   status: ClientStatus;
@@ -21,6 +21,14 @@ export type Client = {
   timeline: TimelineEvent[];
   quizId?: string; // Optional: ID of the quiz the client took
   answers?: Record<string, any>; // Optional: Client's answers to the quiz
+  cpf?: string;
+  birthDate?: string;
+  motherName?: string;
+  cep?: string;
+  address?: string;
+  complement?: string;
+  firstName?: string; // Kept for backward compatibility if needed
+  lastName?: string; // Kept for backward compatibility if needed
 };
 
 export type TimelineEvent = {

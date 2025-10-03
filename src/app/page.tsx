@@ -144,10 +144,15 @@ export default function LandingPage() {
     setIsLoading(true);
 
     const newClient = {
-      firstName: answers['q-name']?.split(' ')[0] || 'Novo',
-      lastName: answers['q-name']?.split(' ').slice(1).join(' ') || 'Cliente',
+      name: answers['q-name'] || 'Novo Cliente',
       email: answers['q-email'] || '',
       phone: answers['q-phone'] || '',
+      cpf: answers['q-cpf'] || '',
+      birthDate: answers['q-birthdate'] || '',
+      motherName: answers['q-mother'] || '',
+      cep: answers['q-cep'] || '',
+      address: answers['q-address'] || '',
+      complement: answers['q-complement'] || '',
       status: 'Novo',
       quizId: quiz?.id,
       answers,
@@ -155,19 +160,20 @@ export default function LandingPage() {
     };
 
     try {
+        if (!firestore) throw new Error("Firestore not available");
         const clientsCollection = collection(firestore, 'clients');
         await addDocumentNonBlocking(clientsCollection, newClient);
         
         toast({
-            title: 'Simulação recebida!',
-            description: 'Obrigado por preencher. Em breve nossa equipe entrará em contato.',
+            title: 'Cadastro recebido!',
+            description: 'Obrigado por se cadastrar. Em breve nossa equipe entrará em contato.',
         });
         setIsSubmitted(true);
     } catch(error) {
          toast({
             variant: 'destructive',
             title: 'Ops! Algo deu errado.',
-            description: 'Não foi possível enviar sua simulação. Tente novamente.',
+            description: 'Não foi possível enviar seu cadastro. Tente novamente.',
         });
     }
 
@@ -177,7 +183,7 @@ export default function LandingPage() {
   
   const renderQuizContent = () => {
     if (isLoadingQuiz) {
-      return <p>Carregando simulação...</p>;
+      return <p>Carregando formulário...</p>;
     }
 
     if (isSubmitted) {
@@ -185,7 +191,7 @@ export default function LandingPage() {
         <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500" />
             <h3 className="text-2xl font-bold">Obrigado!</h3>
-            <p className="text-muted-foreground">Sua simulação foi enviada com sucesso. Nossa equipe entrará em contato em breve.</p>
+            <p className="text-muted-foreground">Seu cadastro foi enviado com sucesso. Nossa equipe entrará em contato em breve.</p>
             <Button onClick={() => setIsSubmitted(false)}>Voltar ao Início</Button>
         </div>
       );
@@ -196,7 +202,7 @@ export default function LandingPage() {
       return <QuizForm quiz={quiz} onComplete={handleSubmit} />;
     }
 
-    return <p>Nenhum formulário de simulação disponível no momento.</p>;
+    return <p>Nenhum formulário de cadastro disponível no momento.</p>;
   }
 
   return (

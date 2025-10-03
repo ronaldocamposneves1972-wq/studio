@@ -61,9 +61,19 @@ export default function NewQuizPage() {
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
     defaultValues: {
-      name: "",
+      name: "Cadastro Inicial de Cliente",
       placement: "landing_page",
-      questions: [{ id: "q-name", text: "Qual o seu nome completo?", type: "text", options: "" }],
+      questions: [
+        { id: "q-cpf", text: "CPF*", type: "text", options: "" },
+        { id: "q-name", text: "Nome Completo*", type: "text", options: "" },
+        { id: "q-birthdate", text: "Data de Nascimento", type: "text", options: "" },
+        { id: "q-phone", text: "Telefone Celular*", type: "tel", options: "" },
+        { id: "q-email", text: "Email*", type: "email", options: "" },
+        { id: "q-mother", text: "Nome da Mãe", type: "text", options: "" },
+        { id: "q-cep", text: "CEP", type: "text", options: "" },
+        { id: "q-address", text: "Endereço", type: "text", options: "" },
+        { id: "q-complement", text: "Complemento", type: "text", options: "" },
+      ],
     },
   })
 

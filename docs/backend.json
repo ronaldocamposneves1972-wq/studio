@@ -50,13 +50,9 @@
           "type": "string",
           "description": "Unique identifier for the client."
         },
-        "firstName": {
+        "name": {
           "type": "string",
-          "description": "The first name of the client."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the client."
+          "description": "The full name of the client."
         },
         "email": {
           "type": "string",
@@ -74,14 +70,40 @@
         "quizId": {
           "type": "string",
           "description": "Reference to Quiz. (Relationship: Quiz 1:N Client)"
+        },
+        "cpf": {
+          "type": "string",
+          "description": "The client's CPF."
+        },
+        "birthDate": {
+          "type": "string",
+          "description": "The client's date of birth.",
+          "format": "date"
+        },
+        "motherName": {
+          "type": "string",
+          "description": "The name of the client's mother."
+        },
+        "cep": {
+          "type": "string",
+          "description": "The client's postal code (CEP)."
+        },
+        "address": {
+          "type": "string",
+          "description": "The client's full address."
+        },
+        "complement": {
+          "type": "string",
+          "description": "The client's address complement."
         }
       },
       "required": [
         "id",
-        "firstName",
-        "lastName",
+        "name",
         "email",
-        "status"
+        "phone",
+        "status",
+        "cpf"
       ]
     },
     "Product": {
