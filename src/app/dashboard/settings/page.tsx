@@ -115,7 +115,7 @@ export default function SettingsPage() {
               <CardDescription>
                 Conecte a ConsorciaTech com suas ferramentas favoritas.
               </CardDescription>
-            </Header>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">API Key do WhatsApp</label>
@@ -138,7 +138,7 @@ export default function SettingsPage() {
               <CardDescription>
                 Configure URLs para receber eventos da plataforma em tempo real.
               </CardDescription>
-            </Header>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">URL para Validação de Documentos</label>
