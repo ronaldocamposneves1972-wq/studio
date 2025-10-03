@@ -53,10 +53,7 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex h-9 w-9 items-center justify-start gap-4 rounded-lg px-2 transition-colors hover:text-foreground',
-                    (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)))
-                      ? 'text-foreground' 
-                      : 'text-foreground/70',
+                    'flex h-9 w-9 items-center justify-start gap-4 rounded-lg px-2 text-foreground transition-colors hover:text-foreground',
                     isCollapsed ? "w-9 justify-center" : "w-full"
                   )}
                 >
@@ -76,10 +73,7 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
               <Link
                 href="/dashboard/settings"
                 className={cn(
-                  'flex h-9 w-9 items-center justify-start gap-4 rounded-lg px-2 transition-colors hover:text-foreground',
-                  pathname.startsWith('/dashboard/settings') 
-                    ? 'text-foreground' 
-                    : 'text-foreground/70',
+                  'flex h-9 w-9 items-center justify-start gap-4 rounded-lg px-2 text-foreground transition-colors hover:text-foreground',
                   isCollapsed ? "w-9 justify-center" : "w-full"
                 )}
               >
