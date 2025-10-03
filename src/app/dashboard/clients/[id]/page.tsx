@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -214,19 +215,31 @@ export default function ClientDetailPage() {
 
   const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
-    const requiredFields = [
-      'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'cep', 'address', 'complement'
-    ];
     
-    return requiredFields.every(fieldKey => {
-      const directValue = (client as any)[fieldKey];
-      const answerKey = `q-${fieldKey.toLowerCase()}`;
-      const answerValue = client.answers ? (client.answers as any)[answerKey] : undefined;
+    // Lista de campos obrigatórios e suas possíveis chaves no objeto do cliente ou no quiz
+    const requiredFieldsMap = {
+        name: ['name', 'q-name'],
+        cpf: ['cpf', 'q-cpf'],
+        birthDate: ['birthDate', 'q-birthdate'],
+        phone: ['phone', 'q-phone'],
+        email: ['email', 'q-email'],
+        motherName: ['motherName', 'q-mothername'],
+        cep: ['cep', 'q-cep'],
+        address: ['address', 'q-address'],
+        complement: ['complement', 'q-complement'], // complement is optional in logic, but required here for button
+    };
 
-      // Check if either the direct field or the answer field has a non-empty value
-      const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
+    const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
 
-      return isFilled(directValue) || isFilled(answerValue);
+    // Verifica se todos os campos obrigatórios estão preenchidos
+    return Object.values(requiredFieldsMap).every(possibleKeys => {
+        // Verifica se pelo menos uma das chaves possíveis tem um valor preenchido
+        return possibleKeys.some(key => {
+            if (key.startsWith('q-')) {
+                return isFilled(client.answers?.[key]);
+            }
+            return isFilled((client as any)[key]);
+        });
     });
   }
 
@@ -242,9 +255,13 @@ export default function ClientDetailPage() {
     'cep': 'CEP',
     'address': 'Endereço',
     'complement': 'Complemento',
+    'number': 'Número',
+    'neighborhood': 'Bairro',
+    'city': 'Cidade',
+    'state': 'Estado',
   };
 
-  const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'complement'];
+  const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'number', 'complement', 'neighborhood', 'city', 'state'];
 
 
   if (isLoadingClient) {
@@ -393,7 +410,7 @@ export default function ClientDetailPage() {
                                         const value = client.answers![answerKey];
                                         if (value === undefined) return null;
 
-                                        const questionLabel = translatedLabels[fieldKey.toLowerCase()] || fieldKey;
+                                        const questionLabel = translatedLabels[fieldKey.toLowerCase() as keyof typeof translatedLabels] || fieldKey;
                                         return (
                                           <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
                                             <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
