@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { Quiz, Client } from '@/lib/types';
 
 
-function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, clientId: string, onComplete: (answers: any) => void }) {
+function StandaloneQuizForm({ quiz, clientId, onComplete, isSubmitting }: { quiz: Quiz, clientId: string, onComplete: (answers: any) => void, isSubmitting: boolean }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<any>({});
   const totalSteps = quiz.questions.length;
@@ -237,7 +237,7 @@ export default function StandaloneQuizPage() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <StandaloneQuizForm quiz={quiz} clientId={clientId} onComplete={handleSubmit} />;
+      return <StandaloneQuizForm quiz={quiz} clientId={clientId} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
     }
 
     return (
