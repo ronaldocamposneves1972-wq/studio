@@ -163,16 +163,16 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
+      <DashboardSidebar isCollapsed={isSidebarCollapsed} />
+       <div className={cn("flex flex-col", isSidebarCollapsed ? "sm:pl-14" : "sm:pl-52")}>
         <DashboardHeader 
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
-        <div className="flex flex-1">
-            <DashboardSidebar isCollapsed={isSidebarCollapsed} />
-            <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
-                {children}
-            </main>
-        </div>
+        <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
+            {children}
+        </main>
+      </div>
     </div>
   );
 }

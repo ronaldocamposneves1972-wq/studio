@@ -57,21 +57,15 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
-       <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-                <AppLogo className="h-8 w-8" />
-                <span className="">ConsorciaTech</span>
-            </Link>
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="h-8 w-8"
-            >
-                {isSidebarCollapsed ? <PanelRightClose /> : <PanelLeftClose />}
-                <span className="sr-only">Toggle Menu</span>
-            </Button>
-       </div>
+      <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="h-8 w-8"
+      >
+          {isSidebarCollapsed ? <PanelRightClose /> : <PanelLeftClose />}
+          <span className="sr-only">Toggle Menu</span>
+      </Button>
       <Sheet>
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
