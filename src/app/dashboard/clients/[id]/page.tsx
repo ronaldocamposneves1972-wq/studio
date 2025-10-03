@@ -214,22 +214,19 @@ export default function ClientDetailPage() {
 
   const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
-    const requiredFields: { clientKey: keyof Client, answerKey: string }[] = [
-        { clientKey: 'name', answerKey: 'q-name' },
-        { clientKey: 'cpf', answerKey: 'q-cpf' },
-        { clientKey: 'birthDate', answerKey: 'q-birthdate' },
-        { clientKey: 'phone', answerKey: 'q-phone' },
-        { clientKey: 'email', answerKey: 'q-email' },
-        { clientKey: 'motherName', answerKey: 'q-mothername' },
-        { clientKey: 'cep', answerKey: 'q-cep' },
-        { clientKey: 'address', answerKey: 'q-address' },
-        { clientKey: 'complement', answerKey: 'q-complement' },
+    const requiredFields = [
+      'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'cep', 'address', 'complement'
     ];
+    
+    return requiredFields.every(fieldKey => {
+      const directValue = (client as any)[fieldKey];
+      const answerKey = `q-${fieldKey.toLowerCase()}`;
+      const answerValue = client.answers ? (client.answers as any)[answerKey] : undefined;
 
-    return requiredFields.every(field => {
-        const hasDirectField = client[field.clientKey] !== undefined && client[field.clientKey] !== null && client[field.clientKey] !== '';
-        const hasAnswerField = client.answers && (client.answers as any)[field.answerKey] !== undefined && (client.answers as any)[field.answerKey] !== null && (client.answers as any)[field.answerKey] !== '';
-        return hasDirectField || hasAnswerField;
+      // Check if either the direct field or the answer field has a non-empty value
+      const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
+
+      return isFilled(directValue) || isFilled(answerValue);
     });
   }
 
@@ -557,3 +554,5 @@ export default function ClientDetailPage() {
     </div>
   )
 }
+
+    
