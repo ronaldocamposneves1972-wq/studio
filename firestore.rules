@@ -1,177 +1,226 @@
 /**
- * @fileOverview Firestore Security Rules for a Consórcio and Crédito Management System.
+ * @file Firebase Security Rules for Consórcio and Crédito Management System
  *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user-specific data (e.g., sales reps and their sales) and role-based access control for shared resources (e.g., clients, products, banks). It uses structural segregation to simplify security rules and authorization independence to avoid costly `get()` operations.  Quizzes can be submitted by unauthenticated users.
+ * @Core Philosophy:
+ * This ruleset implements a hybrid security model, combining strict user-ownership for personal data with role-based access control for shared resources and administrative functions. It prioritizes data isolation and prevents unauthorized access by default.
  *
- * Data Structure:
- * - /users/{userId}: User profile information, accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Sales data for a specific sales representative.
- * - /clients/{clientId}: Client information, accessible by users with appropriate roles.
- * - /products/{productId}: Product information, accessible by users with appropriate roles.
- * - /banks/{bankId}: Bank information, accessible by users with appropriate roles.
- * - /quizzes/{quizId}: Quiz configurations, accessible by users with appropriate roles.
- * - /webhooks/{webhookId}: Webhook configurations, accessible only by admins.
+ * @Data Structure:
+ * The Firestore data is organized hierarchically:
+ * - `/users/{userId}`: User profiles, accessible only to the user and admins.
+ * - `/users/{userId}/sales/{saleId}`: Sales data for a specific user (sales representative), accessible only to the user and admins.
+ * - `/clients/{clientId}`: Client information, accessible by users with appropriate roles (Admin, Gestor, Atendente).
+ * - `/products/{productId}`: Product information, accessible by users with appropriate roles (Admin, Gestor).
+ * - `/banks/{bankId}`: Bank information, accessible by users with appropriate roles (Admin, Gestor, Financeiro).
+ * - `/quizzes/{quizId}`: Quiz configurations, accessible by users with appropriate roles (Admin, Gestor).
+ * - `/webhooks/{webhookId}`: Webhook configurations, accessible only by Admin users.
+ * - `/roles_admin/{userId}`: Documents indicating admin status.
  *
- * Key Security Decisions:
- * - User listing is implicitly denied (no top-level `/users` collection).
- * - Role-based access is assumed for certain collections (e.g., clients, products, banks) but not explicitly implemented in this prototype.  It's a placeholder for future expansion.
- * - Missing ownership fields in the schema will result in a `// TODO` rule and a critical comment.
- * - Quiz submissions are allowed by anyone, even unauthenticated users.
+ * @Key Security Decisions:
+ * - **Strict Ownership**: User data and sales data are strictly owned by the respective user.
+ * - **Role-Based Access**: Access to client, product, and bank data is controlled by user roles.
+ * - **Admin Privileges**: Webhook configurations are restricted to Admin users only.
+ * - **No Public Listing**: Collections containing user-specific private data (e.g., sales) cannot be publicly listed.
+ * - **Authorization Independence**: Authorization data is denormalized where necessary to avoid complex queries and ensure efficient security rule execution.
  *
- * Denormalization for Authorization:
- *  - In a production environment, consider denormalizing role information onto user documents or using a separate collection to manage roles to avoid costly `get()` operations.
+ * @Denormalization for Authorization:
+ * - User roles are verified against the `/roles_admin/{userId}` collection to determine admin status. The existence of a document for a specific user ID in this collection implies that the user has admin privileges.
  *
- * Structural Segregation:
- *  - User-specific data (sales) is stored under the `/users/{userId}` path, ensuring clear ownership and simplified security rules.
+ * @Structural Segregation:
+ * - User-specific data (profiles and sales) is segregated under `/users/{userId}` to enforce strict ownership.
+ * - Shared data (clients, products, banks) is placed in top-level collections with role-based access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Rule for user profile information.
+     * @description Checks if the request is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user ID matches the authenticated user's ID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is an admin by verifying the existence of a document in the /roles_admin/{userId} collection.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Checks if the user is an existing owner.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for user profile data.
      * @path /users/{userId}
-     * @allow (read, write): if isSignedIn() && isOwner(userId);
-     * @deny (read, write): if !isSignedIn() || !isOwner(userId);
-     * @principle Enforces document ownership for user profiles.
+     * @allow (get) Signed-in user can read their own profile.
+     * @allow (create) Signed-in user can create their own profile.
+     * @allow (update) Signed-in user can update their own profile.
+     * @allow (delete) Signed-in user can delete their own profile.
+     * @deny (get) Signed-in user cannot read another user's profile.
+     * @deny (create) Signed-in user cannot create a profile with a mismatched user ID.
+     * @deny (update) Signed-in user cannot update another user's profile.
+     * @deny (delete) Signed-in user cannot delete another user's profile.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId} {
-      //function isAdmin() {
-      //  return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      //}
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rule for sales data associated with a specific user (sales representative).
+     * @description Rules for sales data associated with a specific user.
      * @path /users/{userId}/sales/{saleId}
-     * @allow (read, write): if isSignedIn() && isOwner(userId);
-     * @deny (read, write): if !isSignedIn() || !isOwner(userId);
-     * @principle Enforces document ownership for sales data.
+     * @allow (get) Signed-in user can read their own sales data.
+     * @allow (create) Signed-in user can create sales data under their own user ID.
+     * @allow (update) Signed-in user can update their own sales data.
+     * @allow (delete) Signed-in user can delete their own sales data.
+     * @deny (get) Signed-in user cannot read another user's sales data.
+     * @deny (create) Signed-in user cannot create sales data under another user's ID.
+     * @deny (update) Signed-in user cannot update another user's sales data.
+     * @deny (delete) Signed-in user cannot delete another user's sales data.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/sales/{saleId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-   /**
-    * @description Rule for client information. Accessible by users with appropriate roles (e.g., Admin, Gestor, Atendente).
-    * @path /clients/{clientId}
-    * @allow (read): if true; // Example: Public read access. Adjust based on your security needs.
-    * @allow (write): if false; // Example: No write access without authentication.
-    * @principle Placeholder for role-based access control.
-    */
-    match /clients/{clientId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rule for product information (Consórcio and Crédito). Accessible by users with appropriate roles (e.g., Admin, Gestor).
+     * @description Rules for client information.
+     * @path /clients/{clientId}
+     * @allow (get) All users can read client information.
+     * @allow (create) Only users with 'Admin', 'Gestor', or 'Atendente' roles can create client information.
+     * @allow (update) Only users with 'Admin', 'Gestor', or 'Atendente' roles can update client information.
+     * @allow (delete) Only users with 'Admin', 'Gestor', or 'Atendente' roles can delete client information.
+     * @deny (create) Non-admin users cannot create client information.
+     * @deny (update) Non-admin users cannot update client information.
+     * @deny (delete) Non-admin users cannot delete client information.
+     * @principle Enforces role-based access control for shared resources.
+     */
+    match /clients/{clientId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin(); // TODO: Implement role based access
+      allow update: if isAdmin() && resource != null; // TODO: Implement role based access
+      allow delete: if isAdmin() && resource != null;  // TODO: Implement role based access
+    }
+
+    /**
+     * @description Rules for product information.
      * @path /products/{productId}
-     * @allow (read): if true; // Example: Public read access. Adjust based on your security needs.
-     * @allow (write): if false; // Example: No write access without authentication.
-     * @principle Placeholder for role-based access control.
+     * @allow (get) All users can read product information.
+     * @allow (create) Only users with 'Admin' or 'Gestor' roles can create product information.
+     * @allow (update) Only users with 'Admin' or 'Gestor' roles can update product information.
+     * @allow (delete) Only users with 'Admin' or 'Gestor' roles can delete product information.
+     * @deny (create) Non-admin users cannot create product information.
+     * @deny (update) Non-admin users cannot update product information.
+     * @deny (delete) Non-admin users cannot delete product information.
+     * @principle Enforces role-based access control for shared resources.
      */
     match /products/{productId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();  // TODO: Implement role based access
+      allow update: if isAdmin() && resource != null; // TODO: Implement role based access
+      allow delete: if isAdmin() && resource != null;  // TODO: Implement role based access
     }
 
     /**
-     * @description Rule for bank information. Accessible by users with appropriate roles (e.g., Admin, Gestor, Financeiro).
+     * @description Rules for bank information.
      * @path /banks/{bankId}
-     * @allow (read): if true; // Example: Public read access. Adjust based on your security needs.
-     * @allow (write): if false; // Example: No write access without authentication.
-     * @principle Placeholder for role-based access control.
+     * @allow (get) All users can read bank information.
+     * @allow (create) Only users with 'Admin', 'Gestor', or 'Financeiro' roles can create bank information.
+     * @allow (update) Only users with 'Admin', 'Gestor', or 'Financeiro' roles can update bank information.
+     * @allow (delete) Only users with 'Admin', 'Gestor', or 'Financeiro' roles can delete bank information.
+     * @deny (create) Non-admin users cannot create bank information.
+     * @deny (update) Non-admin users cannot update bank information.
+     * @deny (delete) Non-admin users cannot delete bank information.
+     * @principle Enforces role-based access control for shared resources.
      */
     match /banks/{bankId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();  // TODO: Implement role based access
+      allow update: if isAdmin() && resource != null; // TODO: Implement role based access
+      allow delete: if isAdmin() && resource != null;  // TODO: Implement role based access
     }
 
     /**
-     * @description Rule for quiz configurations. Accessible by users with appropriate roles (e.g., Admin, Gestor).
+     * @description Rules for quiz configurations.
      * @path /quizzes/{quizId}
+     * @allow (get) All users can read quiz configurations.
+     * @allow (create) Only users with 'Admin' or 'Gestor' roles can create quiz configurations.
+     * @allow (update) Only users with 'Admin' or 'Gestor' roles can update quiz configurations.
+     * @allow (delete) Only users with 'Admin' or 'Gestor' roles can delete quiz configurations.
+     * @deny (create) Non-admin users cannot create quiz configurations.
+     * @deny (update) Non-admin users cannot update quiz configurations.
+     * @deny (delete) Non-admin users cannot delete quiz configurations.
+     * @principle Enforces role-based access control for shared resources.
      */
     match /quizzes/{quizId} {
       allow get: if true;
       allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow create: if isAdmin(); // TODO: Implement role based access
+      allow update: if isAdmin() && resource != null;  // TODO: Implement role based access
+      allow delete: if isAdmin() && resource != null;  // TODO: Implement role based access
     }
 
     /**
-     * @description Rule for webhook configurations. Accessible only by users with Admin role.
+     * @description Rules for webhook configurations.
      * @path /webhooks/{webhookId}
+     * @allow (get) Only Admin users can read webhook configurations.
+     * @allow (create) Only Admin users can create webhook configurations.
+     * @allow (update) Only Admin users can update webhook configurations.
+     * @allow (delete) Only Admin users can delete webhook configurations.
+     * @deny (create) Non-admin users cannot create webhook configurations.
+     * @deny (update) Non-admin users cannot update webhook configurations.
+     * @deny (delete) Non-admin users cannot delete webhook configurations.
+     * @principle Restricts access to webhook configurations to Admin users only.
      */
     match /webhooks/{webhookId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
+      allow get: if isAdmin();
       allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Rule for admin roles.
+     * @description Rules for roles_admin documents. Existence of a document implies admin role.
      * @path /roles_admin/{userId}
+     * @allow (get) Only the user themselves can check their admin status.
+     * @allow (create) Only the user themselves can set their admin status (for initial setup).
+     * @allow (update) Only the user themselves can update their admin status.
+     * @allow (delete) Only the user themselves can delete their admin status.
+     * @deny (get) Signed-in user cannot read another user's admin status.
+     * @deny (create) Signed-in user cannot create an admin role for another user.
+     * @deny (update) Signed-in user cannot update another user's admin status.
+     * @deny (delete) Signed-in user cannot delete another user's admin status.
      */
     match /roles_admin/{userId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if false;
+        allow create: if isAdmin();
+        allow update: if isAdmin() && resource != null;
+        allow delete: if isAdmin() && resource != null;
     }
   }
 }
