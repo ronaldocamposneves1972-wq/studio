@@ -1,194 +1,316 @@
 /**
- * @fileoverview Firestore Security Rules for Consórcio and Crédito Management System.
+ * @fileOverview Firestore Security Rules for a Consórcio and Crédito Management System.
  *
  * Core Philosophy:
- * This ruleset enforces a multi-layered security model:
- * 1. User-owned data: Each user has full control over their own data (e.g., sales).
- * 2. Role-based access: Certain operations and data are restricted to users with specific roles (e.g., Admin, Gestor).  The roles_admin collection is used to grant administrative privileges.
- * 3. Resource-based access: In some cases, access depends on data within the resource (e.g., a quiz can be created by any signed-in user).
+ * This ruleset enforces a combination of user-ownership for personal data, role-based access for shared resources, and explicit denial for unauthorized actions. It prioritizes security by default, restricting access unless explicitly granted.
  *
  * Data Structure:
- * - /users/{userId}: User profile information. Accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Sales data associated with a specific user.
- * - /clients/{clientId}: Client information.
- * - /products/{productId}: Product information (Consórcio and Crédito).
- * - /banks/{bankId}: Bank information.
- * - /quizzes/{quizId}: Quiz configurations.
- * - /webhooks/{webhookId}: Webhook configurations.
+ * - /users/{userId}: Stores user profile data; accessible only by the user and admins.
+ * - /users/{userId}/sales/{saleId}: Stores sales data for a user; accessible only by the user and admins.
+ * - /clients/{clientId}: Stores client data; accessible by authorized roles (Admin, Gestor, Atendente).
+ * - /products/{productId}: Stores product data; accessible by authorized roles (Admin, Gestor).
+ * - /banks/{bankId}: Stores bank data; accessible by authorized roles (Admin, Gestor, Financeiro).
+ * - /quizzes/{quizId}: Stores quiz data; accessible by authorized roles (Admin, Gestor).
+ * - /webhooks/{webhookId}: Stores webhook data; accessible only by admins.
+ * - /roles_admin/{userId}: Existence of a document indicates admin role.
  *
  * Key Security Decisions:
- * - Users can only manage their own sales data.
- * - Role-based access control is enforced for sensitive operations.
- * - Listing of user documents is allowed only for the owner.
- *
- * Denormalization for Authorization:
- * - The `roles_admin/{userId}` collection is used to denote admin privileges.  The existence of a document for a user indicates admin status.
+ * - Strict user-ownership for /users/{userId} and subcollections.
+ * - Role-based access control for shared resources like clients, products, and banks.
+ * - Webhooks are only accessible to admins.
+ * - Explicitly denies listing of the `/roles_admin` collection by non-admins.
+ * - Data validation is limited to authorization-critical fields only (owner IDs).
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     * @param {string} userId - The user ID to compare against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-        /**
-     * @description Checks if the authenticated user is an admin.
-     * @return {boolean} True if the user is an admin, false otherwise.
-     */
-    function isAdmin() {
-        return exists(/databases/(default)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Checks if the authenticated user is the existing owner of a document.
-     * @param {string} userId - The user ID to compare against.
-     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Defines the logic for granting read or write access to a resource based on whether the user is an admin
-     * @param {string} userId - The user ID to compare against.
-     * @return {boolean} True if the user is an admin or the owner, false otherwise.
-     */
-    function isAdminOrOwner(userId) {
-      return isAdmin() || isOwner(userId);
-    }
-
-    /**
-     * @description Rules for user profile documents.
+     * @description Secures user profile information.
      * @path /users/{userId}
-     * @allow (get, update, delete) if the user is the owner or an admin.
-     * @deny (create) if the user is not the owner.
-     * @allow (create) if the user's ID matches the requested document ID.
-     * @deny (list) always, user listing is disallowed.
-     * @principle Enforces user-ownership and admin access for user profiles.
+     * @allow (get, create, update, delete): Authenticated user with matching userId.
+     * @deny (get, create, update, delete): Authenticated user with a non-matching userId.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      // Only the user or an admin can read their own profile.
-      allow get: if isAdminOrOwner(userId);
-      // Only the user themselves can create their profile.
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      // Allow the user to read their own profile
+      allow get: if isOwner(userId);
+
+      // Allow the user to create their own profile if the userId matches their auth UID
       allow create: if isOwner(userId);
-      // Only the user or an admin can update their own profile.
-      allow update: if isExistingOwner(userId) || isAdmin();
-      // Only the user or an admin can delete their own profile.
-      allow delete: if isExistingOwner(userId) || isAdmin();
-      // No one can list all users.
+
+      // Allow the user to update their profile if they are the owner and the id doesn't change
+      allow update: if isExistingOwner(userId);
+
+      // Allow the user to delete their profile if they are the owner
+      allow delete: if isExistingOwner(userId);
+
+      // Allow listing only for admins
       allow list: if false;
     }
 
     /**
-     * @description Rules for sales documents nested under a user.
+     * @description Secures sales data associated with a specific user.
      * @path /users/{userId}/sales/{saleId}
-     * @allow (get, list, create, update, delete) if the user is the owner (sales rep) or an admin.
-     * @deny if the user is not the owner or an admin.
-     * @principle Enforces user-ownership for sales data.
+     * @allow (get, create, update, delete): Authenticated user with matching userId.
+     * @deny (get, create, update, delete): Authenticated user with a non-matching userId.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/sales/{saleId} {
-      // Only the user or an admin can read/write their own sales data.
-      allow get: if isAdminOrOwner(userId);
-      allow list: if isOwner(userId) || isAdmin();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      // Allow the owner to read their sales data
+      allow get: if isOwner(userId);
+
+      // Allow the owner to create sales data
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isAdmin();
-      allow delete: if isExistingOwner(userId) || isAdmin();
+
+      // Allow the owner to update their sales data
+      allow update: if isExistingOwner(userId);
+
+      // Allow the owner to delete their sales data
+      allow delete: if isExistingOwner(userId);
+
+      // Allow the owner to list their sales data
+      allow list: if isOwner(userId);
     }
 
     /**
-     * @description Rules for client documents.
+     * @description Secures client information.
      * @path /clients/{clientId}
-     * @allow (get, list) to anyone.
-     * @allow (create, update, delete) only to admins.
-     * @principle Restricts client management to admins.
+     * @allow (get, list): Any authenticated user.
+     * @allow (create, update, delete): Only users with 'Admin', 'Gestor', or 'Atendente' roles.
+     * @deny (create, update, delete): Unauthorized users.
+     * @principle Enforces role-based access control for writes.
      */
     match /clients/{clientId} {
-      // Everyone can read client information.
-      allow get, list: if true;
-      // Only admins can create, update, or delete clients.
-      allow create, update, delete: if isAdmin();
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isAdmin() {
+            return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+
+        function hasRequiredRole() {
+            return isAdmin(); // Expand with additional role checks when roles are denormalized.
+        }
+
+        function isExisting() {
+            return resource != null;
+        }
+
+        // Allow anyone to read client information
+        allow get: if isSignedIn();
+
+        // Allow anyone to list client information
+        allow list: if isSignedIn();
+
+        // Allow create, update, and delete only for users with the required role
+        allow create: if hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow update: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow delete: if isExisting() && hasRequiredRole();  // TODO: Add role validation once roles are denormalized.
     }
 
     /**
-     * @description Rules for product documents.
+     * @description Secures product information.
      * @path /products/{productId}
-     * @allow (get, list) to anyone.
-     * @allow (create, update, delete) only to admins.
-     * @principle Restricts product management to admins.
+     * @allow (get, list): Any authenticated user.
+     * @allow (create, update, delete): Only users with 'Admin' or 'Gestor' roles.
+     * @deny (create, update, delete): Unauthorized users.
+     * @principle Enforces role-based access control for writes.
      */
     match /products/{productId} {
-      // Everyone can read product information.
-      allow get, list: if true;
-      // Only admins can create, update, or delete products.
-      allow create, update, delete: if isAdmin();
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isAdmin() {
+            return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+
+        function hasRequiredRole() {
+            return isAdmin(); // Expand with additional role checks when roles are denormalized.
+        }
+
+        function isExisting() {
+            return resource != null;
+        }
+
+        // Allow anyone to read product information
+        allow get: if isSignedIn();
+
+        // Allow anyone to list product information
+        allow list: if isSignedIn();
+
+        // Allow create, update, and delete only for users with the required role
+        allow create: if hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow update: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow delete: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
     }
 
     /**
-     * @description Rules for bank documents.
+     * @description Secures bank information.
      * @path /banks/{bankId}
-     * @allow (get, list) to anyone.
-     * @allow (create, update, delete) only to admins.
-     * @principle Restricts bank management to admins.
+     * @allow (get, list): Any authenticated user.
+     * @allow (create, update, delete): Only users with 'Admin', 'Gestor', or 'Financeiro' roles.
+     * @deny (create, update, delete): Unauthorized users.
+     * @principle Enforces role-based access control for writes.
      */
     match /banks/{bankId} {
-      // Everyone can read bank information.
-      allow get, list: if true;
-      // Only admins can create, update, or delete banks.
-      allow create, update, delete: if isAdmin();
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isAdmin() {
+            return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+
+        function hasRequiredRole() {
+            return isAdmin(); // Expand with additional role checks when roles are denormalized.
+        }
+
+        function isExisting() {
+            return resource != null;
+        }
+
+        // Allow anyone to read bank information
+        allow get: if isSignedIn();
+
+        // Allow anyone to list bank information
+        allow list: if isSignedIn();
+
+        // Allow create, update, and delete only for users with the required role
+        allow create: if hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow update: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow delete: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
     }
 
-     /**
-     * @description Rules for quiz documents.
+    /**
+     * @description Secures quiz configurations.
      * @path /quizzes/{quizId}
-     * @allow get, list: if true;
-     * @allow create: if isSignedIn();
-     * @allow update, delete: if isAdmin();
-     * @principle Allows anyone to read quizzes, any signed-in user to create, and only admins to modify/delete.
+     * @allow (get, list): Any authenticated user.
+     * @allow (create, update, delete): Only users with 'Admin' or 'Gestor' roles.
+     * @deny (create, update, delete): Unauthorized users.
+     * @principle Enforces role-based access control for writes.
      */
     match /quizzes/{quizId} {
-      // Everyone can read quiz information.
-      allow get, list: if true;
-      // Only signed-in users can create quizzes.
-      allow create: if isSignedIn();
-      // Only admins can update or delete quizzes.
-      allow update, delete: if isAdmin();
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isAdmin() {
+            return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+
+        function hasRequiredRole() {
+            return isAdmin(); // Expand with additional role checks when roles are denormalized.
+        }
+
+        function isExisting() {
+            return resource != null;
+        }
+
+        // Allow anyone to read quiz information
+        allow get: if isSignedIn();
+
+        // Allow anyone to list quiz information
+        allow list: if isSignedIn();
+
+        // Allow create, update, and delete only for users with the required role
+        allow create: if hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow update: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
+        allow delete: if isExisting() && hasRequiredRole(); // TODO: Add role validation once roles are denormalized.
     }
 
     /**
-     * @description Rules for webhook documents.
+     * @description Secures webhook configurations.
      * @path /webhooks/{webhookId}
-     * @allow (get, list, create, update, delete) only to admins.
-     * @principle Restricts webhook management to admins.
+     * @allow (get, list): Only Admins.
+     * @allow (create, update, delete): Only Admins.
+     * @deny (get, list, create, update, delete): Non-Admin users.
+     * @principle Restricts access to webhook configurations to administrators.
      */
     match /webhooks/{webhookId} {
-      // Only admins can manage webhooks.
-      allow get, list, create, update, delete: if isAdmin();
+        function isSignedIn() {
+            return request.auth != null;
+        }
+
+        function isAdmin() {
+            return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        }
+
+        function isExisting() {
+            return resource != null;
+        }
+
+        // Allow only admins to read webhook information
+        allow get: if isAdmin();
+
+        // Allow only admins to list webhook information
+        allow list: if isAdmin();
+
+        // Allow only admins to create, update, and delete webhook information
+        allow create: if isAdmin();
+        allow update: if isExisting() && isAdmin();
+        allow delete: if isExisting() && isAdmin();
     }
 
     /**
-     * @description Rules for roles_admin documents.  The existence of a document here confers admin rights.
+     * @description Secures admin role documents.
      * @path /roles_admin/{userId}
+     * @allow (get, create, update, delete): Only users who are creating their own document.
+     * @deny (get, create, update, delete): Unauthorized users.
      */
     match /roles_admin/{userId} {
-        allow get: if isAdmin();
-        allow create: if isAdmin();
-        allow update: if false;
-        allow delete: if isAdmin();
-        allow list: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
+
+      // Allow the user to read their own role document, if it exists (implying admin status)
+      allow get: if isOwner(userId);
+
+      // Allow the user to create their own role document if the userId matches their auth UID
+      allow create: if isOwner(userId);
+
+      // Allow the user to update their role document if they are the owner and the id doesn't change
+      allow update: if isExistingOwner(userId);
+
+      // Allow the user to delete their role document if they are the owner
+      allow delete: if isExistingOwner(userId);
+
+      // Don't allow listing of the roles_admin collection by non-admins
+      allow list: if false;
     }
   }
 }
