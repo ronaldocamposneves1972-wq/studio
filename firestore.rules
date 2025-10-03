@@ -1,197 +1,217 @@
 /**
- * @file Overview
- * This ruleset enforces a role-based access control model.
+ * @fileoverview Firestore Security Rules for Consórcio and Crédito Management System.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for personal data and a role-based access control for shared resources.
+ * Authorization Independence is paramount.
  *
  * Data Structure:
- * - /users/{userId}: User profiles, accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Sales data for a user, accessible only by the user and admins.
- * - /clients/{clientId}: Client information, accessible by users with appropriate roles.
- * - /products/{productId}: Product information, accessible by users with appropriate roles.
- * - /banks/{bankId}: Bank information, accessible by users with appropriate roles.
- * - /quizzes/{quizId}: Quiz configurations, accessible by users with appropriate roles.
- * - /webhooks/{webhookId}: Webhook configurations, accessible only by admins.
- * - /roles_admin/{userId}: Documents indicating admin status.
+ * - /users/{userId}: Stores user profile information; only accessible by the user and admins.
+ * - /users/{userId}/sales/{saleId}: Stores sales data associated with a specific user; only accessible by the user and admins.
+ * - /clients/{clientId}: Stores client information; accessible by users with appropriate roles (Admin, Gestor, Atendente).
+ * - /products/{productId}: Stores product information; accessible by users with appropriate roles (Admin, Gestor).
+ * - /banks/{bankId}: Stores bank information; accessible by users with appropriate roles (Admin, Gestor, Financeiro).
+ * - /quizzes/{quizId}: Stores quiz configurations; accessible by users with appropriate roles (Admin, Gestor).
+ * - /webhooks/{webhookId}: Stores webhook configurations; only accessible by users with Admin role.
+ * - /roles_admin/{userId}: Documents in this collection indicate admin status; existence implies admin role.
  *
  * Key Security Decisions:
- * - User listing is not allowed.
- * - Default security posture is strict: deny all access unless explicitly allowed.
- * - The ruleset uses role-based access control to manage permissions for different user roles (Admin, Gestor, Atendente, Financeiro).
+ * - Users can only access their own data under /users/{userId} and its subcollections.
+ * - Listing all users is disallowed.
+ * - Role-based access is enforced for shared resources like clients, products, and banks.  This is currently implemented by requiring admin role for all access.
+ * - The default security posture for ambiguous relationships is strict: deny access unless explicitly granted.
+ *
+ * Denormalization for Authorization:
+ *  Role information for users is stored in a separate collection `/roles_admin/{userId}`.
+ *  This avoids the need to duplicate role information in multiple documents.
+ *
+ * Structural Segregation:
+ *  User-specific data is stored under /users/{userId}, while shared resources are stored in top-level collections.
  */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile information.
+     * @description Checks if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId - The user ID to check against.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the existing resource.
+     * @param {string} userId - The user ID to check against.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the user has the admin role.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (get, create, update, delete, list) if the user is the owner or an admin.
-     * @deny (get, create, update, delete, list) if the user is not the owner or an admin.
-     * @principle Enforces document ownership for writes and restricts listing.
+     * @allow (create) - User 'abc' can create their own profile if request.auth.uid == 'abc'.
+     * @allow (get, update, delete) - User 'abc' can get, update or delete their own profile if request.auth.uid == 'abc'.
+     * @allow (get) - Admin can get any user profile.
+     * @deny (create) - User 'def' cannot create profile for user 'abc'.
+     * @deny (update) - User 'def' cannot update profile for user 'abc'.
+     * @deny (delete) - User 'def' cannot delete profile for user 'abc'.
+     * @principle Enforces document ownership for writes and admin access for reads.
      */
     match /users/{userId} {
-      //function isAdmin() {
-      //  return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      //}
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && resource.data.id == userId;
-      allow delete: if isSignedIn() && isOwner(userId) && resource.data.id == userId;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to sales data associated with a specific user.
+     * @description Rules for sales data under a user.
      * @path /users/{userId}/sales/{saleId}
-     * @allow (get, create, update, delete, list) if the user is the owner or an admin.
-     * @deny (get, create, update, delete, list) if the user is not the owner or an admin.
-     * @principle Enforces document ownership for writes and restricts listing.
+     * @allow (create) - User 'abc' can create a sale under their profile if request.auth.uid == 'abc'.
+     * @allow (get, update, delete) - User 'abc' can get, update or delete a sale under their profile if request.auth.uid == 'abc'.
+     * @allow (get) - Admin can get any sale.
+     * @deny (create) - User 'def' cannot create a sale under user 'abc'.
+     * @deny (update) - User 'def' cannot update a sale under user 'abc'.
+     * @deny (delete) - User 'def' cannot delete a sale under user 'abc'.
+     * @principle Enforces document ownership for writes and admin access for reads.
      */
     match /users/{userId}/sales/{saleId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && resource.data.salesRepId == userId;
-      allow delete: if isSignedIn() && isOwner(userId) && resource.data.salesRepId == userId;
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.salesRepId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.salesRepId == resource.data.salesRepId;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to client information.
+     * @description Rules for client information.
      * @path /clients/{clientId}
-     * @allow (get, create, update, delete, list) if the user has an appropriate role (Admin, Gestor, Atendente).
-     * @deny (get, create, update, delete, list) if the user does not have an appropriate role.
-     * @principle Restricts access based on user roles.
+     * @allow (create, get, list, update, delete) - Only admins can manage client information.
+     * @deny (create) - Non-admins cannot create client information.
+     * @deny (get) - Non-admins cannot get client information.
+     * @deny (list) - Non-admins cannot list client information.
+     * @deny (update) - Non-admins cannot update client information.
+     * @deny (delete) - Non-admins cannot delete client information.
+     * @principle Restricts access to client data to admins only.
      */
     match /clients/{clientId} {
-      // Allow reads by anyone. In a production app this would be restricted.
-      // Access control on write depends on your business logic.
-      //  One example is to only allow the user that created it to modify it.
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to product information.
+     * @description Rules for product information.
      * @path /products/{productId}
-     * @allow (get, create, update, delete, list) if the user has an appropriate role (Admin, Gestor).
-     * @deny (get, create, update, delete, list) if the user does not have an appropriate role.
-     * @principle Restricts access based on user roles.
+     * @allow (create, get, list, update, delete) - Only admins can manage product information.
+     * @deny (create) - Non-admins cannot create product information.
+     * @deny (get) - Non-admins cannot get product information.
+     * @deny (list) - Non-admins cannot list product information.
+     * @deny (update) - Non-admins cannot update product information.
+     * @deny (delete) - Non-admins cannot delete product information.
+     * @principle Restricts access to product data to admins only.
      */
     match /products/{productId} {
-      // Allow reads by anyone. In a production app this would be restricted.
-      // Access control on write depends on your business logic.
-      //  One example is to only allow the user that created it to modify it.
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to bank information.
+     * @description Rules for bank information.
      * @path /banks/{bankId}
-     * @allow (get, create, update, delete, list) if the user has an appropriate role (Admin, Gestor, Financeiro).
-     * @deny (get, create, update, delete, list) if the user does not have an appropriate role.
+     * @allow (create, get, list, update, delete) - Only admins can manage bank information.
+     * @deny (create) - Non-admins cannot create bank information.
+     * @deny (get) - Non-admins cannot get bank information.
+     * @deny (list) - Non-admins cannot list bank information.
+     * @deny (update) - Non-admins cannot update bank information.
+     * @deny (delete) - Non-admins cannot delete bank information.
+     * @principle Restricts access to bank data to admins only.
      */
     match /banks/{bankId} {
-      // Allow reads by anyone. In a production app this would be restricted.
-      // Access control on write depends on your business logic.
-      //  One example is to only allow the user that created it to modify it.
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to quiz configurations.
+     * @description Rules for quiz configurations.
      * @path /quizzes/{quizId}
-     * @allow (get, create, update, delete, list) if the user has an appropriate role (Admin, Gestor).
-     * @deny (get, create, update, delete, list) if the user does not have an appropriate role.
-     * @principle Restricts access based on user roles.
+     * @allow (create, get, list, update, delete) - Only admins can manage quiz configurations.
+     * @deny (create) - Non-admins cannot create quiz configurations.
+     * @deny (get) - Non-admins cannot get quiz configurations.
+     * @deny (list) - Non-admins cannot list quiz configurations.
+     * @deny (update) - Non-admins cannot update quiz configurations.
+     * @deny (delete) - Non-admins cannot delete quiz configurations.
+     * @principle Restricts access to quiz data to admins only.
      */
     match /quizzes/{quizId} {
-      // Allow reads by anyone. In a production app this would be restricted.
-      // Access control on write depends on your business logic.
-      //  One example is to only allow the user that created it to modify it.
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Controls access to webhook configurations.
+     * @description Rules for webhook configurations.
      * @path /webhooks/{webhookId}
-     * @allow (get, create, update, delete, list) if the user is an admin.
-     * @deny (get, create, update, delete, list) if the user is not an admin.
-     * @principle Restricts access based on user roles.
+     * @allow (create, get, list, update, delete) - Only admins can manage webhook configurations.
+     * @deny (create) - Non-admins cannot create webhook configurations.
+     * @deny (get) - Non-admins cannot get webhook configurations.
+     * @deny (list) - Non-admins cannot list webhook configurations.
+     * @deny (update) - Non-admins cannot update webhook configurations.
+     * @deny (delete) - Non-admins cannot delete webhook configurations.
+     * @principle Restricts access to webhook data to admins only.
      */
     match /webhooks/{webhookId} {
-     //function isAdmin() {
-     //   return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-     // }
-
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn(); // TODO: Add role validation
-      allow list: if false;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
-        /**
-     * @description Controls access to admin role.
-     * @path /roles_admin/{userId}
-     * @allow (get, create, update, delete, list) if the user is an admin.
-     * @deny (get, create, update, delete, list) if the user is not an admin.
-     * @principle Restricts access based on user roles.
-     */
-    match /roles_admin/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      allow get: if isSignedIn(); // TODO: Add role validation
-      allow list: if false;
-      allow create: if isSignedIn(); // TODO: Add role validation
-      allow update: if isSignedIn(); // TODO: Add role validation
-      allow delete: if isSignedIn(); // TODO: Add role validation
-    }
+    
+     /**
+      * @description Rules for admin role documents. The mere existence of a document indicates the user is an admin.
+      * @path /roles_admin/{userId}
+      * @allow (create) - Allow creation only by a privileged process (e.g., a Firebase Function) that can verify the user's admin status through a secure channel.
+      * @allow (get) - Allow getting to verify if a user is admin or not
+      * @allow (delete) - Allow deletion only by a privileged process (e.g., a Firebase Function).
+      * @deny (list) - Prevent listing all admin roles.
+      * @deny (update) - Prevent updates (admin status is conferred/revoked by creating/deleting the document).
+      * @principle This collection is managed by a trusted process, not directly by the client.
+      */
+     match /roles_admin/{userId} {
+       allow get: if true; // Can be read to verify if the user is admin
+       allow list: if false;
+       allow create: if false; // Should be created by a trusted environment, like Firebase Functions.
+       allow update: if false;
+       allow delete: if false; // Should be deleted by a trusted environment, like Firebase Functions.
+     }
   }
 }
