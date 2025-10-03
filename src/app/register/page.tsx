@@ -77,14 +77,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-card">
        <div className="mb-8 flex items-center gap-2 text-primary">
         <AppLogo className="h-10 w-auto" />
         <span className="text-2xl font-semibold">ConsorciaTech</span>
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Criar uma conta</CardTitle>
+          <CardTitle className="text-xl">Criar uma conta de Admin</CardTitle>
           <CardDescription>
             Preencha os campos abaixo para se cadastrar.
           </CardDescription>
@@ -144,7 +144,7 @@ export default function RegisterPage() {
           </form>
           <div className="mt-4 text-center text-sm">
             Já tem uma conta?{' '}
-            <Link href="/" className="underline">
+            <Link href="/dashboard" className="underline">
               Faça login
             </Link>
           </div>
