@@ -39,10 +39,10 @@ export default function SettingsPage() {
       <Tabs defaultValue="users" className="mt-4">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Usuários</TabsTrigger>
+          <TabsTrigger value="quizzes"><FileQuestion className="w-4 h-4 mr-2" />Quizzes</TabsTrigger>
           <TabsTrigger value="integrations"><KeyRound className="w-4 h-4 mr-2" />Integrações</TabsTrigger>
           <TabsTrigger value="notifications"><Bell className="w-4 h-4 mr-2" />Notificações</TabsTrigger>
           <TabsTrigger value="branding"><Palette className="w-4 h-4 mr-2" />Marca</TabsTrigger>
-          <TabsTrigger value="quizzes"><FileQuestion className="w-4 h-4 mr-2" />Quizzes</TabsTrigger>
           <TabsTrigger value="webhooks"><Webhook className="w-4 h-4 mr-2" />Webhooks</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
@@ -62,30 +62,7 @@ export default function SettingsPage() {
             </CardFooter>
           </Card>
         </TabsContent>
-        <TabsContent value="integrations">
-          <Card>
-            <CardHeader>
-              <CardTitle>Integrações</CardTitle>
-              <CardDescription>
-                Conecte a ConsorciaTech com suas ferramentas favoritas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">API Key do WhatsApp</label>
-                <Input defaultValue="***************" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">API de Análise de Crédito</label>
-                <Input placeholder="Cole sua API key aqui" />
-              </div>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-              <Button>Salvar</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="quizzes">
+         <TabsContent value="quizzes">
           <Card>
             <CardHeader>
               <CardTitle>Gerenciamento de Quizzes</CardTitle>
@@ -111,6 +88,29 @@ export default function SettingsPage() {
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
               <Button>Criar Novo Quiz</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        <TabsContent value="integrations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Integrações</CardTitle>
+              <CardDescription>
+                Conecte a ConsorciaTech com suas ferramentas favoritas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">API Key do WhatsApp</label>
+                <Input defaultValue="***************" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">API de Análise de Crédito</label>
+                <Input placeholder="Cole sua API key aqui" />
+              </div>
+            </CardContent>
+            <CardFooter className="border-t px-6 py-4">
+              <Button>Salvar</Button>
             </CardFooter>
           </Card>
         </TabsContent>

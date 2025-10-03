@@ -212,7 +212,17 @@
           "type": "array",
           "description": "A list of questions in the quiz.",
           "items": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "type": { "type": "string", "enum": ["text", "number", "email", "tel", "radio", "checkbox", "file"] },
+              "options": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+             "required": ["id", "text", "type"]
           }
         }
       },
