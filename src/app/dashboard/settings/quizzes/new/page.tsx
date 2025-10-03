@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useFirestore, addDocumentNonBlocking } from "@/firebase"
 import { collection } from "firebase/firestore"
+import { QuizPlacement } from "@/lib/types"
 
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
@@ -38,6 +39,7 @@ const questionSchema = z.object({
 
 const quizSchema = z.object({
   name: z.string().min(3, "O nome do quiz é obrigatório"),
+  placement: z.enum(["landing_page", "client_link"]),
   questions: z.array(questionSchema).min(1, "O quiz deve ter pelo menos uma pergunta"),
 })
 
@@ -54,10 +56,12 @@ export default function NewQuizPage() {
     control,
     handleSubmit,
     formState: { errors },
+    setValue
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
     defaultValues: {
       name: "",
+      placement: "landing_page",
       questions: [{ id: "q-name", text: "Qual o seu nome completo?", type: "text", options: "" }],
     },
   })
@@ -122,15 +126,31 @@ export default function NewQuizPage() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
-              <div>
-                <Label htmlFor="name">Nome do Quiz</Label>
-                <Input
-                  id="name"
-                  {...register("name")}
-                  className={errors.name ? "border-destructive" : ""}
-                />
-                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Nome do Quiz</Label>
+                  <Input
+                    id="name"
+                    {...register("name")}
+                    className={errors.name ? "border-destructive" : ""}
+                  />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                </div>
+                 <div>
+                    <Label>Localização</Label>
+                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} defaultValue="landing_page">
+                        <SelectTrigger className={errors.placement ? "border-destructive" : ""}>
+                            <SelectValue placeholder="Selecione onde o quiz será usado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="landing_page">Página Inicial</SelectItem>
+                            <SelectItem value="client_link">Link para Cliente</SelectItem>
+                        </SelectContent>
+                    </Select>
+                     {errors.placement && <p className="text-sm text-destructive mt-1">{errors.placement.message}</p>}
+                </div>
               </div>
+
 
               <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
               {fields.map((field, index) => (
@@ -163,7 +183,7 @@ export default function NewQuizPage() {
                     </div>
                      <div>
                         <Label>Tipo da Pergunta</Label>
-                        <Select onValueChange={(value) => control.setValue(`questions.${index}.type`, value as any)} defaultValue={field.type}>
+                        <Select onValueChange={(value) => setValue(`questions.${index}.type`, value as any)} defaultValue={field.type}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecione o tipo" />
                             </SelectTrigger>

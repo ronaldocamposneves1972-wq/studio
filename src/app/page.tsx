@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, query, limit } from 'firebase/firestore';
+import { collection, query, limit, where } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -131,12 +131,12 @@ export default function LandingPage() {
   const router = useRouter();
   const firestore = useFirestore();
 
-  const firstQuizQuery = useMemoFirebase(() => {
+  const landingPageQuizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'quizzes'), limit(1));
+    return query(collection(firestore, 'quizzes'), where('placement', '==', 'landing_page'), limit(1));
   }, [firestore]);
 
-  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(firstQuizQuery);
+  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(landingPageQuizQuery);
   const quiz = quizzes?.[0];
 
 

@@ -208,6 +208,11 @@
           "type": "string",
           "description": "The name of the quiz."
         },
+        "placement": {
+          "type": "string",
+          "description": "Where the quiz will be displayed.",
+          "enum": ["landing_page", "client_link"]
+        },
         "questions": {
           "type": "array",
           "description": "A list of questions in the quiz.",
