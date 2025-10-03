@@ -3,14 +3,15 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, limit, getDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase, useStorage } from '@/firebase';
+import { doc, collection, query, where, limit, getDoc, arrayUnion } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
-import { CheckCircle, ChevronRight, ChevronLeft, Upload } from 'lucide-react';
+import { CheckCircle, ChevronRight, ChevronLeft, Upload, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
@@ -109,14 +110,15 @@ function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, client
 
       <div className="flex justify-between items-center pt-4">
         {currentStep > 0 ? (
-          <Button variant="outline" onClick={handleBack}>
+          <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
              <ChevronLeft className="mr-2 h-4 w-4" />
             Voltar
           </Button>
         ) : <div></div>}
-        <Button onClick={handleNext}>
-          {currentStep === totalSteps - 1 ? 'Finalizar' : 'Continuar'}
-           <ChevronRight className="ml-2 h-4 w-4" />
+        <Button onClick={handleNext} disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isSubmitting ? 'Enviando...' : (currentStep === totalSteps - 1 ? 'Finalizar' : 'Continuar')}
+          {!isSubmitting && currentStep < totalSteps - 1 && <ChevronRight className="ml-2 h-4 w-4" />}
         </Button>
       </div>
     </div>
@@ -130,9 +132,9 @@ export default function StandaloneQuizPage() {
   const { toast } = useToast();
   const params = useParams();
   const firestore = useFirestore();
+  const storage = useStorage();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-  // Query for the quiz intended for client links
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'quizzes'), where('placement', '==', 'client_link'), limit(1));
@@ -141,53 +143,72 @@ export default function StandaloneQuizPage() {
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
   const quiz = quizzes?.[0];
 
+  const uploadFile = async (file: File, clientId: string) => {
+    if (!storage) throw new Error("Firebase Storage not available");
+    const storageRef = ref(storage, `clients/${clientId}/documents/${Date.now()}-${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    return { name: file.name, url: downloadURL };
+  };
+
   const handleSubmit = async (answers: any) => {
     setIsSubmitting(true);
 
-    // TODO: Handle file uploads to Firebase Storage
-    const serializableAnswers = { ...answers };
-    for (const key in serializableAnswers) {
-        if (serializableAnswers[key] instanceof File) {
-            // For now, we'll just store the file name.
-            // In a real app, you would upload the file and store the URL.
-            serializableAnswers[key] = `(Arquivo) ${serializableAnswers[key].name}`;
-        }
-    }
-
     try {
-        if (!firestore || !clientId) throw new Error("Firestore ou ID do cliente não disponível");
-        
-        const clientRef = doc(firestore, 'clients', clientId);
-        // We merge the new answers with existing ones from the initial quiz
-        const clientSnap = await getDoc(clientRef);
-        const clientData = clientSnap.data() as Client | undefined;
-        const existingAnswers = clientData?.answers || {};
+      if (!firestore || !clientId) throw new Error("Firestore ou ID do cliente não disponível");
 
-        updateDocumentNonBlocking(clientRef, { 
-            answers: { ...existingAnswers, ...serializableAnswers },
-            status: 'Em análise', // Update status
-        });
-        
-        toast({
-            title: 'Respostas recebidas!',
-            description: 'Obrigado por enviar seus dados. Em breve nossa equipe continuará o processo.',
-        });
-        setIsSubmitted(true);
+      const clientRef = doc(firestore, 'clients', clientId);
+      const serializableAnswers: Record<string, any> = {};
+      const newDocuments = [];
+
+      for (const key in answers) {
+        if (answers[key] instanceof File) {
+          const file = answers[key] as File;
+          toast({ title: `Enviando ${file.name}...`, description: 'Por favor, aguarde.' });
+          const newDoc = await uploadFile(file, clientId);
+          newDocuments.push(newDoc);
+          serializableAnswers[key] = { name: newDoc.name, url: newDoc.url };
+        } else {
+          serializableAnswers[key] = answers[key];
+        }
+      }
+
+      const clientSnap = await getDoc(clientRef);
+      const clientData = clientSnap.data() as Client | undefined;
+      const existingAnswers = clientData?.answers || {};
+      const existingDocuments = clientData?.documents || [];
+
+      const updatePayload: any = {
+        answers: { ...existingAnswers, ...serializableAnswers },
+        status: 'Em análise',
+      };
+
+      if (newDocuments.length > 0) {
+        updatePayload.documents = [...existingDocuments, ...newDocuments];
+      }
+
+      updateDocumentNonBlocking(clientRef, updatePayload);
+      
+      toast({
+        title: 'Respostas recebidas!',
+        description: 'Obrigado por enviar seus dados. Em breve nossa equipe continuará o processo.',
+      });
+      setIsSubmitted(true);
 
     } catch(error) {
-        console.error(error);
-         toast({
-            variant: 'destructive',
-            title: 'Ops! Algo deu errado.',
-            description: 'Não foi possível enviar suas respostas. Tente novamente.',
-        });
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Ops! Algo deu errado.',
+        description: 'Não foi possível enviar suas respostas. Tente novamente.',
+      });
     }
 
     setIsSubmitting(false);
   };
   
   const renderContent = () => {
-    if (isLoadingQuiz || isSubmitting) {
+    if (isLoadingQuiz) {
       return (
           <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />

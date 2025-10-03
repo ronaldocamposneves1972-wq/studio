@@ -22,7 +22,9 @@ import {
   Link2,
   Trash2,
   Pencil,
-  Info
+  Info,
+  Download,
+  FileText
 } from "lucide-react"
 import { useState, useEffect } from "react"
 
@@ -65,8 +67,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { proposals as allProposals } from "@/lib/placeholder-data"
-import type { Client, ClientStatus, TimelineEvent, Proposal } from "@/lib/types"
-import { PlaceHolderImages } from "@/lib/placeholder-images"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -92,6 +93,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -172,10 +174,6 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
   // TODO: Fetch proposals from Firestore
   const proposals = allProposals.filter(p => p.clientName === client?.name)
-
-  const docRg = PlaceHolderImages.find(i => i.id === 'document-rg');
-  const docCnh = PlaceHolderImages.find(i => i.id === 'document-cnh');
-  const docProof = PlaceHolderImages.find(i => i.id === 'document-proof');
 
   const copyToClipboard = (text: string, message: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -362,11 +360,11 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                         </div>
                     </CardHeader>
                     <CardContent>
-                       <Tabs defaultValue="quiz">
+                       <Tabs defaultValue="documents">
                         <TabsList className="mb-4">
                           <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
-                          <TabsTrigger value="history">Histórico</TabsTrigger>
                           <TabsTrigger value="documents">Documentos</TabsTrigger>
+                          <TabsTrigger value="history">Histórico</TabsTrigger>
                           <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         </TabsList>
                          <TabsContent value="quiz">
@@ -425,43 +423,81 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                               <CardTitle>Documentos</CardTitle>
                               <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
-                            <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-60">
-                                {!profileComplete && (
-                                    <Alert>
-                                    <Info className="h-4 w-4" />
-                                    <AlertTitle>Dados Incompletos</AlertTitle>
-                                    <AlertDescription>
-                                        É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
-                                    </AlertDescription>
-                                    </Alert>
-                                )}
-                                {generatedLink ? (
-                                <div className="w-full space-y-4 text-left">
-                                    <p className="text-sm text-muted-foreground">O link abaixo foi gerado para o cliente enviar a documentação. Você pode copiá-lo e enviar via WhatsApp ou E-mail.</p>
-                                    <div className="flex items-center space-x-2">
-                                        <Input value={generatedLink} readOnly />
-                                        <Button onClick={() => copyToClipboard(generatedLink, "Link copiado para a área de transferência!")}><Copy className="h-4 w-4" /></Button>
-                                    </div>
-                                    {cooldown > 0 && (
-                                        <p className="text-xs text-muted-foreground text-center">
-                                            Você poderá gerar um novo link em {Math.floor(cooldown / 60)}:{(cooldown % 60).toString().padStart(2, '0')}
-                                        </p>
-                                    )}
-                                </div>
-                                ) : (
-                                    <>
+                            <CardContent className="space-y-4">
+                                {(!client.documents || client.documents.length === 0) && (
+                                    <div className={cn(
+                                        "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6",
+                                        generatedLink && "hidden"
+                                    )}>
                                         <Upload className="h-12 w-12 text-muted-foreground" />
                                         <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
                                         <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
-                                    </>
+                                    </div>
                                 )}
-                                <Button onClick={handleGenerateDocLink} disabled={!profileComplete || cooldown > 0}>
-                                    <Link2 className="mr-2 h-4 w-4" />
-                                    {generatedLink ? 'Gerar Novo Link' : 'Gerar Link de Documentos'}
-                                </Button>
+                                {client.documents && client.documents.length > 0 && (
+                                     <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                            <TableHead>Nome do Arquivo</TableHead>
+                                            <TableHead className="text-right">Ações</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {client.documents.map((doc, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell className="font-medium flex items-center gap-2">
+                                                        <FileText className="h-4 w-4 text-muted-foreground" />
+                                                        {doc.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button variant="outline" size="sm" asChild>
+                                                            <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                                                <Download className="mr-2 h-4 w-4" />
+                                                                Baixar
+                                                            </a>
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                                 <Separator className="my-4" />
+                                 <div className="space-y-4">
+                                    {!profileComplete && (
+                                        <Alert>
+                                        <Info className="h-4 w-4" />
+                                        <AlertTitle>Dados Incompletos</AlertTitle>
+                                        <AlertDescription>
+                                            É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
+                                        </AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {generatedLink ? (
+                                    <div className="w-full space-y-4">
+                                        <p className="text-sm text-muted-foreground">O link abaixo foi gerado para o cliente enviar a documentação. Você pode copiá-lo e enviar via WhatsApp ou E-mail.</p>
+                                        <div className="flex items-center space-x-2">
+                                            <Input value={generatedLink} readOnly />
+                                            <Button onClick={() => copyToClipboard(generatedLink, "Link copiado para a área de transferência!")}><Copy className="h-4 w-4" /></Button>
+                                        </div>
+                                        {cooldown > 0 && (
+                                            <p className="text-xs text-muted-foreground text-center">
+                                                Você poderá gerar um novo link em {Math.floor(cooldown / 60)}:{(cooldown % 60).toString().padStart(2, '0')}
+                                            </p>
+                                        )}
+                                    </div>
+                                    ) : (
+                                        <div className="flex justify-center">
+                                            <Button onClick={handleGenerateDocLink} disabled={!profileComplete || cooldown > 0}>
+                                                <Link2 className="mr-2 h-4 w-4" />
+                                                { 'Gerar Link de Documentos'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                 </div>
                             </CardContent>
                              <CardFooter className="border-t px-6 py-4 flex justify-end">
-                                <Button disabled> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                                <Button disabled={!client.documents || client.documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
                              </CardFooter>
                           </Card>
                         </TabsContent>
@@ -506,5 +542,3 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
-
-    

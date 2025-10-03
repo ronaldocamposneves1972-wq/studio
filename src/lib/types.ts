@@ -8,6 +8,11 @@ export type User = {
 
 export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado';
 
+export type ClientDocument = {
+  name: string;
+  url: string;
+};
+
 export type Client = {
   id: string;
   name: string; // Full name
@@ -21,6 +26,7 @@ export type Client = {
   timeline: TimelineEvent[];
   quizId?: string; // Optional: ID of the quiz the client took
   answers?: Record<string, any>; // Optional: Client's answers to the quiz
+  documents?: ClientDocument[];
   cpf?: string;
   birthDate?: string;
   motherName?: string;
