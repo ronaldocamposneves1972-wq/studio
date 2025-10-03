@@ -206,6 +206,18 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
   const profileComplete = isProfileComplete(client);
 
+  const translatedLabels: { [key: string]: string } = {
+    'name': 'Nome',
+    'email': 'Email',
+    'phone': 'Telefone',
+    'cpf': 'CPF',
+    'birthdate': 'Data de Nascimento',
+    'mother': 'Nome da Mãe',
+    'cep': 'CEP',
+    'address': 'Endereço',
+    'complement': 'Complemento',
+  };
+
 
   if (isLoadingClient) {
      return (
@@ -348,9 +360,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                 <CardContent className="space-y-4">
                                   {client.answers ? (
                                     Object.entries(client.answers).map(([key, value]) => {
-                                      // Find the question text from the original quiz if available
-                                      // This part is complex without fetching the quiz definition itself
-                                      const questionLabel = key.replace('q-', '').replace(/-/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                      const cleanKey = key.replace('q-', '').replace(/-/g, ' ');
+                                      const questionLabel = translatedLabels[cleanKey.toLowerCase()] || cleanKey.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                                       return(
                                         <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={key}>
                                           <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
