@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -223,13 +224,42 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                         </div>
                     </CardHeader>
                     <CardContent>
-                       <Tabs defaultValue="history">
+                       <Tabs defaultValue="quiz">
                         <TabsList className="mb-4">
+                          <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
                           <TabsTrigger value="history">Histórico</TabsTrigger>
                           <TabsTrigger value="documents">Documentos</TabsTrigger>
                           <TabsTrigger value="proposals">Propostas</TabsTrigger>
-                           <TabsTrigger value="quiz">Quiz</TabsTrigger>
                         </TabsList>
+                         <TabsContent value="quiz">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Respostas do Cadastro Inicial</CardTitle>
+                                    <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                  {client.answers ? (
+                                    Object.entries(client.answers).map(([key, value]) => {
+                                      // Find the question text from the original quiz if available
+                                      // This part is complex without fetching the quiz definition itself
+                                      const questionLabel = key.replace('q-', '').replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                      return(
+                                        <div className="grid gap-1" key={key}>
+                                          <p className="font-medium">{questionLabel}</p>
+                                          <p className="text-muted-foreground">{value || "Não informado"}</p>
+                                        </div>
+                                      )
+                                     })
+                                  ) : (
+                                    <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
+                                  )}
+                                </CardContent>
+                                <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
+                                    <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">/q/{client.id.slice(0,8)}</span></p>
+                                    <Button variant="outline" size="sm"><Copy className="h-3 w-3 mr-2" /> Copiar Link</Button>
+                                </CardFooter>
+                            </Card>
+                        </TabsContent>
                         <TabsContent value="history">
                            <Card>
                                <CardHeader>
@@ -298,35 +328,6 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                         <TabsContent value="quiz">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Respostas do Cadastro Inicial</CardTitle>
-                                    <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                  {client.answers ? (
-                                    Object.entries(client.answers).map(([key, value]) => {
-                                      // Find the question text from the original quiz if available
-                                      // This part is complex without fetching the quiz definition itself
-                                      const questionLabel = key.replace('q-', '').replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                      return(
-                                        <div className="grid gap-1" key={key}>
-                                          <p className="font-medium">{questionLabel}</p>
-                                          <p className="text-muted-foreground">{value || "Não informado"}</p>
-                                        </div>
-                                      )
-                                     })
-                                  ) : (
-                                    <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
-                                  )}
-                                </CardContent>
-                                <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
-                                    <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">/q/{client.id.slice(0,8)}</span></p>
-                                    <Button variant="outline" size="sm"><Copy className="h-3 w-3 mr-2" /> Copiar Link</Button>
-                                </CardFooter>
-                            </Card>
-                        </TabsContent>
                       </Tabs>
                     </CardContent>
                 </Card>
@@ -336,5 +337,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
+
+    
 
     
