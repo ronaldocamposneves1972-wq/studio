@@ -181,11 +181,8 @@ export default function StandaloneQuizPage() {
       const updatePayload: any = {
         answers: { ...existingAnswers, ...serializableAnswers },
         status: 'Em análise',
+        documents: [...existingDocuments, ...newDocuments],
       };
-
-      if (newDocuments.length > 0) {
-        updatePayload.documents = [...existingDocuments, ...newDocuments];
-      }
 
       updateDocumentNonBlocking(clientRef, updatePayload);
       

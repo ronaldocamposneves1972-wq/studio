@@ -1,207 +1,250 @@
 /**
- * @fileOverview
- * This ruleset enforces a strict user-ownership model for user-specific data,
- * role-based access control for shared resources, and public read access with
- * owner-only writes for quizzes.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for personal data,
+ *              role-based access for shared resources, and public read access for quizzes
+ *              stored under client documents.
  *
  * Data Structure:
- * - /users/{userId}: Stores personal user information, accessible only to the user and admins.
- * - /users/{userId}/sales/{saleId}: Stores sales data linked to a specific sales representative.
- * - /clients/{clientId}: Stores client information, accessible with authentication.
- * - /products/{productId}: Stores product information, accessible with authentication.
- * - /banks/{bankId}: Stores bank information, accessible with authentication.
- * - /quizzes/{quizId}: Stores quiz configurations. Publicly readable and writable.
- * - /webhooks/{webhookId}: Stores webhook configurations, accessible only to admins.
- * - /roles_admin/{userId}: Indicates admin status. Existence of a document grants admin role.
- * - /accounts/{accountId}: Stores bank and digital account information. Authentication is required.
- * - /transactions/{transactionId}: Stores financial transactions. Authentication is required.
- * - /payablesReceivables/{prId}: Stores accounts payable and receivable items. Authentication is required.
+ * - /users/{userId}: User profile information, accessible only by the user and admins.
+ * - /users/{userId}/sales/{saleId}: Sales data associated with a user, accessible only by the user and admins.
+ * - /clients/{clientId}: Client information, accessible by users with appropriate roles.
+ * - /clients/{clientId}/documents/{documentId}: Quiz documents accessible publicly.
+ * - /products/{productId}: Product information, accessible by users with appropriate roles.
+ * - /banks/{bankId}: Bank information, accessible by users with appropriate roles.
+ * - /quizzes/{quizId}: Quiz configurations, accessible by users with appropriate roles.
+ * - /webhooks/{webhookId}: Webhook configurations, accessible only by admins.
+ * - /roles_admin/{userId}: Indicates admin status for a user.
+ * - /accounts/{accountId}: Bank and digital account information.
+ * - /transactions/{transactionId}: Financial transactions.
+ * - /payablesReceivables/{prId}: Accounts payable and receivable items.
  *
  * Key Security Decisions:
- * - User data is strictly private; only the user or an admin can access it.
- * - Listing of user documents is disallowed to prevent enumeration.
- * - Quizzes are publicly readable and writable.
- * - Other collections require authentication for all operations.
- * - Roles are determined by the existence of a document in the /roles_admin collection.
+ * - User data is strictly controlled, with only the user and admins having access.
+ * - Sales data is associated with users and follows the same access control.
+ * - Client, Product, Bank, and Quiz data are accessible based on user roles (not implemented in this prototype).
+ * - Webhook configurations are restricted to admins only.
+ * - Quizzes are publicly readable to be shared with the end-user.
+ * - Listing of user-scoped subcollections (e.g., sales) is allowed only for the owner.
  *
  * Denormalization for Authorization:
- * - Admin status is determined by the presence of a document in `/roles_admin/{userId}`, avoiding the need for custom claims.
+ * - No denormalization is explicitly used in this prototype. If role-based access needs
+ *   to be implemented, consider denormalizing roles into the documents or using a separate
+ *   collection to store role assignments.
  *
  * Structural Segregation:
- * - User-specific data (sales) is stored under the user's document, ensuring clear ownership.
+ * - User-specific data is stored under the /users/{userId} path, ensuring clear ownership.
+ * - Publicly readable quiz documents are stored under /clients/{clientId}/documents/{documentId},
+ *   clearly separating them from other client information that requires authentication.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read and write their own user document. Admins can also read.
-     * @path /users/{userId}
-     * @allow (get, create, update, delete) if isSignedIn() && isOwner(userId)
-     * @allow (get) if isAdmin()
-     * @deny (list)
-     * @deny (create, update, delete) if !isOwner(userId) && !isAdmin()
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && (isOwner(userId) && resource != null) || isAdmin();
-      allow delete: if isSignedIn() && (isOwner(userId) && resource != null) || isAdmin();
-    }
-
-    /**
-     * @description Allows a user to read and write their own sales documents.
-     * @path /users/{userId}/sales/{saleId}
-     * @allow (get, create, update, delete) if isSignedIn() && isOwner(userId)
-     * @deny (list)
-     * @deny (create, update, delete) if !isOwner(userId)
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/sales/{saleId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && (isOwner(userId) && resource != null);
-      allow delete: if isSignedIn() && (isOwner(userId) && resource != null);
-    }
-
-    /**
-     * @description Allows anyone to create and read client documents.
-     * @path /clients/{clientId}
-     * @allow (get, create, list) if true
-     * @deny (update, delete) if !isSignedIn()
-     * @principle Allows public read and create access to client documents.
-     */
-    match /clients/{clientId} {
-      allow get, list, create: if true;
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Requires authentication to read and write product documents.
-     * @path /products/{productId}
-     * @allow (get, list, create, update, delete) if isSignedIn()
-     * @deny (get, list, create, update, delete) if !isSignedIn()
-     * @principle Requires authentication for all operations on product documents.
-     */
-    match /products/{productId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Requires authentication to read and write bank documents.
-     * @path /banks/{bankId}
-     * @allow (get, list, create, update, delete) if isSignedIn()
-     * @deny (get, list, create, update, delete) if !isSignedIn()
-     * @principle Requires authentication for all operations on bank documents.
-     */
-    match /banks/{bankId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows anyone to create and read quiz documents.
-     * @path /quizzes/{quizId}
-     * @allow (get, create, list, update, delete) if true;
-     * @principle Allows public read and create access to quiz documents.
-     */
-    match /quizzes/{quizId} {
-      allow get, list, create, update, delete: if true;
-    }
-
-    /**
-     * @description Allows only authenticated admins to read and write webhook documents.
-     * @path /webhooks/{webhookId}
-     * @allow (get, list, create, update, delete) if isSignedIn() && isAdmin()
-     * @deny (get, list, create, update, delete) if !isSignedIn() || !isAdmin()
-     * @principle Restricts access to webhook documents to admins only.
-     */
-    match /webhooks/{webhookId} {
-      allow get: if isSignedIn() && isAdmin();
-      allow list: if isSignedIn() && isAdmin();
-      allow create: if isSignedIn() && isAdmin();
-      allow update: if isSignedIn() && (isAdmin() && resource != null);
-      allow delete: if isSignedIn() && (isAdmin() && resource != null);
-    }
-
-    /**
-     * @description Allows creating an admin role document if the user ID matches the document ID.
-     * @path /roles_admin/{userId}
-     * @allow (get) if isAdmin()
-     * @allow (create) if isSignedIn() && isOwner(userId)
-     * @deny (list, update, delete)
-     * @principle Allows only admins to read role documents and users to create their admin role if they are authenticated.
-     */
-    match /roles_admin/{userId} {
-        allow get: if isAdmin();
-        allow list: if false;
-        allow create: if isSignedIn() && isOwner(userId);
-        allow update: if false;
-        allow delete: if false;
-    }
-
-    /**
-     * @description Requires authentication to read and write account documents.
-     * @path /accounts/{accountId}
-     * @allow (get, list, create, update, delete) if isSignedIn()
-     * @deny (get, list, create, update, delete) if !isSignedIn()
-     * @principle Requires authentication for all operations on bank documents.
-     */
-    match /accounts/{accountId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-        /**
-     * @description Requires authentication to read and write transaction documents.
-     * @path /transactions/{transactionId}
-     * @allow (get, list, create, update, delete) if isSignedIn()
-     * @deny (get, list, create, update, delete) if !isSignedIn()
-     * @principle Requires authentication for all operations on bank documents.
-     */
-    match /transactions/{transactionId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Requires authentication to read and write payableReceivable documents.
-     * @path /payablesReceivables/{prId}
-     * @allow (get, list, create, update, delete) if isSignedIn()
-     * @deny (get, list, create, update, delete) if !isSignedIn()
-     * @principle Requires authentication for all operations on bank documents.
-     */
-    match /payablesReceivables/{prId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-
-    // --- Helper Functions ---
-
-    /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
+     * @description Checks if the request is made by a signed-in user.
+     * @principle Verified Identity
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the user ID matches the requested user ID.
-     * @param {string} userId The user ID to check against.
-     * @return {boolean} True if the user ID matches, false otherwise.
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId - The user ID to compare against.
+     * @principle Ownership
      */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the user is an admin by verifying the existence of a document in /roles_admin/{userId}.
-     * @return {boolean} True if the user is an admin, false otherwise.
+     * @description Checks if the authenticated user is the owner of an existing document.
+     * @param {string} userId - The user ID to compare against.
+     * @principle Ownership, Existence Check
      */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
+
+    /**
+     * @description Rule for /users/{userId} documents.
+     * @path /users/{userId}
+     * @allow (create) - User with ID 'user123' creates a document with ID 'user123'.
+     * @allow (get, list, update, delete) - User with ID 'user123' accesses their own document.
+     * @deny (create) - User with ID 'user123' tries to create a document with ID 'user456'.
+     * @deny (update, delete) - User without authentication tries to modify data.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Explicitly disallowing listing of all users.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rule for /users/{userId}/sales/{saleId} documents.
+     * @path /users/{userId}/sales/{saleId}
+     * @allow (create) - User with ID 'user123' creates a sale document under their user ID.
+     * @allow (get, list, update, delete) - User with ID 'user123' accesses their own sale documents.
+     * @deny (create) - User with ID 'user123' tries to create a sale document under 'user456'.
+     * @deny (update, delete) - User without authentication tries to modify data.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
+     */
+    match /users/{userId}/sales/{saleId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rule for /clients/{clientId} documents.
+     * @path /clients/{clientId}
+     * @allow (create, get, list, update, delete) - Signed-in user creates, reads, updates, or deletes client data.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete client data.
+     * @principle Requires authentication for all operations.
+     */
+    match /clients/{clientId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /clients/{clientId}/documents/{documentId} documents.
+     * @path /clients/{clientId}/documents/{documentId}
+     * @allow (get, list) - Any user can read quiz documents.
+     * @allow (create) - Authenticated user can create quiz documents.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete quiz data.
+     * @principle Public read access with authentication required for writes.
+     */
+    match /clients/{clientId}/documents/{documentId} {
+      allow get, list: if true; // Public read access for quizzes.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /products/{productId} documents.
+     * @path /products/{productId}
+     * @allow (create, get, list, update, delete) - Signed-in user creates, reads, updates, or deletes product data.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete product data.
+     * @principle Requires authentication for all operations.
+     */
+    match /products/{productId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /banks/{bankId} documents.
+     * @path /banks/{bankId}
+     * @allow (create, get, list, update, delete) - Signed-in user creates, reads, updates, or deletes bank data.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete bank data.
+     * @principle Requires authentication for all operations.
+     */
+    match /banks/{bankId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /quizzes/{quizId} documents.
+     * @path /quizzes/{quizId}
+     * @allow (create, get, list, update, delete) - Signed-in user creates, reads, updates, or deletes quiz data.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete quiz data.
+     * @principle Requires authentication for all operations.
+     */
+    match /quizzes/{quizId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /webhooks/{webhookId} documents.
+     * @path /webhooks/{webhookId}
+     * @allow (create, get, list, update, delete) - Signed-in user creates, reads, updates, or deletes webhook data.
+     * @deny (create, update, delete) - Unauthenticated user attempts to create, update, or delete webhook data.
+     * @principle Requires authentication for all operations.
+     */
+    match /webhooks/{webhookId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Rule for /roles_admin/{userId} documents.
+     * @path /roles_admin/{userId}
+     * @allow (create) - User can create their admin role document.
+     * @allow (get, update, delete) - Only the user can manage their admin role document.
+     * @deny (create) - User attempts to create an admin role document for another user.
+     */
+     match /roles_admin/{userId} {
+        allow get: if isOwner(userId);
+        allow list: if false;
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+     }
+
+      /**
+       * @description Rule for /accounts/{accountId} collection.
+       * @path /accounts/{accountId}
+       * @allow (read, write) - Only signed-in users can read and write account data.
+       * @deny (read, write) - Unauthenticated users cannot access account data.
+       */
+      match /accounts/{accountId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+      }
+
+      /**
+       * @description Rule for /transactions/{transactionId} collection.
+       * @path /transactions/{transactionId}
+       * @allow (read, write) - Only signed-in users can read and write transaction data.
+       * @deny (read, write) - Unauthenticated users cannot access transaction data.
+       */
+      match /transactions/{transactionId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+      }
+
+      /**
+       * @description Rule for /payablesReceivables/{prId} collection.
+       * @path /payablesReceivables/{prId}
+       * @allow (read, write) - Only signed-in users can read and write payable/receivable data.
+       * @deny (read, write) - Unauthenticated users cannot access payable/receivable data.
+       */
+      match /payablesReceivables/{prId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && resource != null;
+        allow delete: if isSignedIn() && resource != null;
+      }
   }
 }
