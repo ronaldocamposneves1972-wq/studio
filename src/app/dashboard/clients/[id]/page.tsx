@@ -1,3 +1,6 @@
+
+'use client'
+
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -56,8 +59,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { clients, proposals as allProposals } from "@/lib/placeholder-data"
-import type { ClientStatus, TimelineEvent } from "@/lib/types"
+import { proposals as allProposals } from "@/lib/placeholder-data"
+import type { Client, ClientStatus, TimelineEvent, Proposal } from "@/lib/types"
 import { PlaceHolderImages } from "@/lib/placeholder-images"
 import {
   Select,
@@ -66,7 +69,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { doc, collection, query, where } from "firebase/firestore"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -91,30 +96,44 @@ const getTimelineIcon = (activity: string) => {
     return <Activity className="h-4 w-4 text-muted-foreground" />;
 }
 
-const Timeline = ({ events }: { events: TimelineEvent[] }) => (
-    <div className="space-y-8">
-        {events.map((event) => (
-            <div key={event.id} className="flex items-start">
-                <div className="flex-shrink-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                        {getTimelineIcon(event.activity)}
+const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
+    if (!events || events.length === 0) {
+        return <p className="text-sm text-muted-foreground">Nenhuma atividade registrada.</p>
+    }
+    return (
+        <div className="space-y-8">
+            {events.map((event) => (
+                <div key={event.id} className="flex items-start">
+                    <div className="flex-shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                            {getTimelineIcon(event.activity)}
+                        </div>
+                    </div>
+                    <div className="ml-4">
+                        <p className="font-medium text-sm">{event.activity}</p>
+                        <p className="text-sm text-muted-foreground">{event.details}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(event.timestamp).toLocaleString('pt-BR')} por {event.user.name}
+                        </p>
                     </div>
                 </div>
-                <div className="ml-4">
-                    <p className="font-medium text-sm">{event.activity}</p>
-                    <p className="text-sm text-muted-foreground">{event.details}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(event.timestamp).toLocaleString('pt-BR')} por {event.user.name}
-                    </p>
-                </div>
-            </div>
-        ))}
-    </div>
-);
+            ))}
+        </div>
+    );
+};
 
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
-  const client = clients.find(c => c.id === params.id)
+  const firestore = useFirestore();
+
+  const clientRef = useMemoFirebase(() => {
+    if (!firestore || !params.id) return null
+    return doc(firestore, 'clients', params.id)
+  }, [firestore, params.id])
+
+  const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
+
+  // TODO: Fetch proposals from Firestore
   const proposals = allProposals.filter(p => p.clientName === client?.name)
 
   const docRg = PlaceHolderImages.find(i => i.id === 'document-rg');
@@ -122,15 +141,38 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   const docProof = PlaceHolderImages.find(i => i.id === 'document-proof');
 
 
+  if (isLoadingClient) {
+     return (
+       <div className="grid flex-1 items-start gap-4 md:gap-8">
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-16 w-16 rounded-full" />
+                        <div className="grid gap-2">
+                           <Skeleton className="h-6 w-48" />
+                           <Skeleton className="h-4 w-64" />
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Skeleton className="h-96 w-full" />
+            </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (!client) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
+      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-[80vh]">
         <div className="flex flex-col items-center gap-1 text-center">
           <h3 className="text-2xl font-bold tracking-tight">
             Cliente não encontrado
           </h3>
           <p className="text-sm text-muted-foreground">
-            O cliente que você está procurando não existe.
+            O cliente que você está procurando não existe ou você não tem permissão para vê-lo.
           </p>
           <Button className="mt-4" asChild>
             <Link href="/dashboard/clients">Voltar para Clientes</Link>
@@ -153,7 +195,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                     alt="Avatar do Cliente"
                                     className="aspect-square rounded-full object-cover"
                                     height="64"
-                                    src={client.avatarUrl}
+                                    src={`https://picsum.photos/seed/${client.id}/100/100`}
                                     width="64"
                                     data-ai-hint="person portrait"
                                 />
@@ -246,6 +288,11 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                             <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
                                         </TableRow>
                                         ))}
+                                         {proposals.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="text-center">Nenhuma proposta encontrada.</TableCell>
+                                            </TableRow>
+                                        )}
                                     </TableBody>
                                 </Table>
                                 </CardContent>
@@ -254,22 +301,25 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                          <TabsContent value="quiz">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Respostas do Quiz</CardTitle>
+                                    <CardTitle>Respostas do Cadastro Inicial</CardTitle>
                                     <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="grid gap-1">
-                                      <p className="font-medium">Qual seu objetivo com o crédito?</p>
-                                      <p className="text-muted-foreground">Comprar um imóvel para minha família.</p>
-                                    </div>
-                                     <div className="grid gap-1">
-                                      <p className="font-medium">Possui restrição no nome?</p>
-                                      <p className="text-muted-foreground">Não.</p>
-                                    </div>
-                                    <div className="grid gap-1">
-                                      <p className="font-medium">Valor de entrada disponível</p>
-                                      <p className="text-muted-foreground">R$ 50.000,00</p>
-                                    </div>
+                                  {client.answers ? (
+                                    Object.entries(client.answers).map(([key, value]) => {
+                                      // Find the question text from the original quiz if available
+                                      // This part is complex without fetching the quiz definition itself
+                                      const questionLabel = key.replace('q-', '').replace('-', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                                      return(
+                                        <div className="grid gap-1" key={key}>
+                                          <p className="font-medium">{questionLabel}</p>
+                                          <p className="text-muted-foreground">{value || "Não informado"}</p>
+                                        </div>
+                                      )
+                                     })
+                                  ) : (
+                                    <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
+                                  )}
                                 </CardContent>
                                 <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
                                     <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">/q/{client.id.slice(0,8)}</span></p>
@@ -286,3 +336,5 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
+
+    
