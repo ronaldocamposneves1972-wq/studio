@@ -40,6 +40,11 @@ function QuizForm({ quiz, onComplete }: { quiz: Quiz, onComplete: (answers: any)
   
   const currentQuestion = quiz.questions[currentStep];
 
+  // This check prevents rendering if questions are not yet available.
+  if (!currentQuestion) {
+    return <p>Carregando pergunta...</p>;
+  }
+
   return (
     <div className="space-y-4">
       <Progress value={((currentStep + 1) / totalSteps) * 100} className="w-full" />
@@ -169,6 +174,30 @@ export default function LandingPage() {
 
     setIsLoading(false);
   };
+  
+  const renderQuizContent = () => {
+    if (isLoadingQuiz) {
+      return <p>Carregando simulação...</p>;
+    }
+
+    if (isSubmitted) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
+            <CheckCircle className="h-16 w-16 text-green-500" />
+            <h3 className="text-2xl font-bold">Obrigado!</h3>
+            <p className="text-muted-foreground">Sua simulação foi enviada com sucesso. Nossa equipe entrará em contato em breve.</p>
+            <Button onClick={() => setIsSubmitted(false)}>Voltar ao Início</Button>
+        </div>
+      );
+    }
+    
+    // Ensure quiz and quiz.questions are valid before rendering the form
+    if (quiz && quiz.questions && quiz.questions.length > 0) {
+      return <QuizForm quiz={quiz} onComplete={handleSubmit} />;
+    }
+
+    return <p>Nenhum formulário de simulação disponível no momento.</p>;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -196,17 +225,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="mx-auto w-full max-w-lg space-y-4 rounded-lg bg-background p-6 shadow-lg text-center">
-                {isLoadingQuiz && <p>Carregando simulação...</p>}
-                {!isLoadingQuiz && !quiz && <p>Nenhum formulário de simulação disponível no momento.</p>}
-                {quiz && !isSubmitted && <QuizForm quiz={quiz} onComplete={handleSubmit} />}
-                {isSubmitted && (
-                  <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
-                      <CheckCircle className="h-16 w-16 text-green-500" />
-                      <h3 className="text-2xl font-bold">Obrigado!</h3>
-                      <p className="text-muted-foreground">Sua simulação foi enviada com sucesso. Nossa equipe entrará em contato em breve.</p>
-                      <Button onClick={() => router.push('/')}>Voltar ao Início</Button>
-                  </div>
-                )}
+                {renderQuizContent()}
               </div>
             </div>
           </div>
