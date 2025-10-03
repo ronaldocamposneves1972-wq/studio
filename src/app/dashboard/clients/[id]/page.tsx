@@ -214,11 +214,23 @@ export default function ClientDetailPage() {
 
   const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
-    const requiredFields = ['cpf', 'birthDate', 'address', 'phone', 'motherName', 'email', 'cep', 'name', 'complement'];
-    // Check fields from client directly, and also from the answers object
-    return requiredFields.every(field => 
-        (client as any)[field] || (client.answers && (client.answers as any)[`q-${field}`])
-    );
+    const requiredFields: { clientKey: keyof Client, answerKey: string }[] = [
+        { clientKey: 'name', answerKey: 'q-name' },
+        { clientKey: 'cpf', answerKey: 'q-cpf' },
+        { clientKey: 'birthDate', answerKey: 'q-birthdate' },
+        { clientKey: 'phone', answerKey: 'q-phone' },
+        { clientKey: 'email', answerKey: 'q-email' },
+        { clientKey: 'motherName', answerKey: 'q-mothername' },
+        { clientKey: 'cep', answerKey: 'q-cep' },
+        { clientKey: 'address', answerKey: 'q-address' },
+        { clientKey: 'complement', answerKey: 'q-complement' },
+    ];
+
+    return requiredFields.every(field => {
+        const hasDirectField = client[field.clientKey] !== undefined && client[field.clientKey] !== null && client[field.clientKey] !== '';
+        const hasAnswerField = client.answers && (client.answers as any)[field.answerKey] !== undefined && (client.answers as any)[field.answerKey] !== null && (client.answers as any)[field.answerKey] !== '';
+        return hasDirectField || hasAnswerField;
+    });
   }
 
   const profileComplete = isProfileComplete(client);
