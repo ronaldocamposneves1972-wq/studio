@@ -52,8 +52,8 @@ export default function DashboardSidebar() {
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:text-foreground md:h-8 md:w-8',
-                    pathname.startsWith(item.href) && 'text-foreground'
+                    'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:text-foreground md:h-8 md:w-8',
+                    pathname.startsWith(item.href) ? 'text-foreground' : 'text-foreground/70'
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -72,8 +72,8 @@ export default function DashboardSidebar() {
               <Link
                 href="/dashboard/settings"
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:text-foreground md:h-8 md:w-8',
-                  pathname.startsWith('/dashboard/settings') && 'text-foreground'
+                  'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:text-foreground md:h-8 md:w-8',
+                  pathname.startsWith('/dashboard/settings') ? 'text-foreground' : 'text-foreground/70'
                 )}
               >
                 <Settings className="h-5 w-5" />
