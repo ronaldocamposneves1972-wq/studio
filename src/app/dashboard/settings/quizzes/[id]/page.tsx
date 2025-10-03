@@ -2,9 +2,9 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useFieldArray, useForm } from "react-hook-form"
+import { useFieldArray, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
@@ -47,10 +47,9 @@ const quizSchema = z.object({
 
 type QuizFormData = z.infer<typeof quizSchema>
 
-export default function EditQuizPage() {
+export default function EditQuizPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const params = useParams()
-  const quizId = params.id as string
+  const quizId = params.id
   const { toast } = useToast()
   const firestore = useFirestore()
   const { user, isUserLoading } = useUser()
@@ -72,7 +71,15 @@ export default function EditQuizPage() {
     reset,
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
+    defaultValues: {
+      name: "",
+      placement: "landing_page",
+      questions: [],
+    }
   })
+
+  const watchedPlacement = useWatch({ control, name: "placement" });
+
 
   useEffect(() => {
     if (quiz) {
@@ -92,7 +99,7 @@ export default function EditQuizPage() {
     name: "questions",
   })
 
-  const onSubmit = async (data: QuizFormData) => {
+  const onSubmit = (data: QuizFormData) => {
     if (!user) {
        toast({
         variant: "destructive",
@@ -114,23 +121,14 @@ export default function EditQuizPage() {
       })),
     }
 
-    try {
-      updateDocumentNonBlocking(quizDocRef, quizData);
-      
-      toast({
-        title: "Quiz atualizado com sucesso!",
-        description: `O quiz "${data.name}" foi salvo.`,
-      })
-      router.push("/dashboard/settings?tab=quizzes")
-    } catch (error) {
-      console.error("Error updating quiz: ", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao atualizar quiz",
-        description: "Não foi possível salvar as alterações. Verifique as permissões do Firestore.",
-      })
-      setIsSubmitting(false)
-    }
+    // This is non-blocking and handles its own errors
+    updateDocumentNonBlocking(quizDocRef, quizData);
+    
+    toast({
+      title: "Quiz atualizado com sucesso!",
+      description: `O quiz "${data.name}" foi salvo.`,
+    })
+    router.push("/dashboard/settings?tab=quizzes")
   }
 
   if (isUserLoading || isLoadingQuiz) {
@@ -228,7 +226,7 @@ export default function EditQuizPage() {
                 </div>
                  <div>
                     <Label>Localização</Label>
-                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} value={watch("placement")} disabled={isSubmitting}>
+                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} value={watchedPlacement} disabled={isSubmitting}>
                         <SelectTrigger className={errors.placement ? "border-destructive" : ""}>
                             <SelectValue placeholder="Selecione onde o quiz será usado" />
                         </SelectTrigger>
@@ -329,8 +327,4 @@ export default function EditQuizPage() {
   )
 }
 
-// Helper to watch form values
-function watch(name: any) {
-    const { watch } = useForm();
-    return watch(name);
-}
+    
