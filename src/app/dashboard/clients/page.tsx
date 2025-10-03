@@ -84,25 +84,17 @@ const getStatusVariant = (status: ClientStatus) => {
 function ClientRowSkeleton() {
   return (
     <TableRow>
-      <TableCell className="hidden sm:table-cell">
-        <Skeleton className="aspect-square rounded-full h-16 w-16" />
-      </TableCell>
       <TableCell className="font-medium">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-3 w-40 mt-1 md:hidden" />
+        <div className="flex items-center gap-2">
+            <Skeleton className="h-2.5 w-2.5 rounded-full" />
+            <Skeleton className="h-4 w-32" />
+        </div>
       </TableCell>
-      <TableCell>
-        <Skeleton className="h-6 w-20 rounded-full" />
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <Skeleton className="h-4 w-24" />
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <Skeleton className="h-4 w-20" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-8 w-8" />
-      </TableCell>
+      <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
     </TableRow>
   )
 }
@@ -141,6 +133,8 @@ export default function ClientsPage() {
           <ClientRowSkeleton />
           <ClientRowSkeleton />
           <ClientRowSkeleton />
+          <ClientRowSkeleton />
+          <ClientRowSkeleton />
         </>
       )
     }
@@ -157,25 +151,16 @@ export default function ClientsPage() {
     
     return clientList.map(client => (
       <TableRow key={client.id} onClick={() => router.push(`/dashboard/clients/${client.id}`)} className="cursor-pointer">
-        <TableCell className="hidden sm:table-cell">
-          <Image
-            alt="Avatar do cliente"
-            className="aspect-square rounded-full object-cover"
-            height="64"
-            src={`https://picsum.photos/seed/${client.id}/100/100`}
-            width="64"
-            data-ai-hint="person portrait"
-          />
-        </TableCell>
         <TableCell className="font-medium">
-            {client.name}
-          <div className="text-sm text-muted-foreground md:hidden">{client.email}</div>
+          <div className="flex items-center gap-3">
+             <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+             {client.name}
+          </div>
         </TableCell>
+        <TableCell className="hidden sm:table-cell">{client.email}</TableCell>
+        <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
         <TableCell>
           <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
-        </TableCell>
-        <TableCell className="hidden md:table-cell">
-          {/* Placeholder for Sales Rep */}
         </TableCell>
         <TableCell className="hidden md:table-cell">
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
@@ -291,14 +276,10 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="hidden w-[100px] sm:table-cell">
-                    <span className="sr-only">Avatar</span>
-                  </TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead className="hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Telefone</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Atendente
-                  </TableHead>
                   <TableHead className="hidden md:table-cell">
                     Criado em
                   </TableHead>
