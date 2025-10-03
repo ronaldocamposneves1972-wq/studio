@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import {
-  CircleUser,
   KeyRound,
   Bell,
   Palette,
@@ -86,7 +85,7 @@ export default function SettingsPage() {
                   <CardHeader>
                     <CardTitle className="text-base">{quiz.name}</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
+                  <CardContent className="space-y-2 text-sm pt-4">
                     <p>{quiz.questions?.length || 0} perguntas</p>
                   </CardContent>
                   <CardFooter>
