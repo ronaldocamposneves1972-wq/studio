@@ -91,3 +91,24 @@ export type Quiz = {
     placement: QuizPlacement;
     createdAt?: string;
 };
+
+export type Account = {
+  id: string;
+  name: string;
+  bankName: string;
+  balance: number;
+  type: 'checking' | 'savings' | 'digital' | 'cash';
+};
+
+export type Transaction = {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  status: 'pending' | 'paid' | 'overdue';
+  dueDate: string;
+  paymentDate?: string;
+  accountId: string;
+  accountName?: string;
+};
