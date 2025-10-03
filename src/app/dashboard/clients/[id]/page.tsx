@@ -22,7 +22,8 @@ import {
   Activity,
   Link2,
   Trash2,
-  Pencil
+  Pencil,
+  Info
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -89,6 +90,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -192,6 +194,17 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     });
     router.push('/dashboard/clients');
   }
+
+  const isProfileComplete = (client: Client | null): boolean => {
+    if (!client) return false;
+    const requiredFields = ['cpf', 'birthDate', 'address', 'phone', 'motherName', 'email', 'cep', 'name', 'complement'];
+    // Check fields from client directly, and also from the answers object
+    return requiredFields.every(field => 
+        (client as any)[field] || (client.answers && (client.answers as any)[`q-${field}`])
+    );
+  }
+
+  const profileComplete = isProfileComplete(client);
 
 
   if (isLoadingClient) {
@@ -373,10 +386,19 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                               <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-60">
+                              {!profileComplete && (
+                                <Alert>
+                                  <Info className="h-4 w-4" />
+                                  <AlertTitle>Dados Incompletos</AlertTitle>
+                                  <AlertDescription>
+                                    É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
                               <Upload className="h-12 w-12 text-muted-foreground" />
                               <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
                               <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
-                              <Button onClick={handleGenerateDocLink}>
+                              <Button onClick={handleGenerateDocLink} disabled={!profileComplete}>
                                 <Link2 className="mr-2 h-4 w-4" />
                                 Gerar Link de Documentos
                               </Button>
@@ -427,3 +449,5 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
+
+    
