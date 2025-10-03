@@ -33,12 +33,15 @@ import {
   FileText,
   DollarSign,
   Settings,
+  PanelLeftClose,
+  PanelRightClose
 } from 'lucide-react';
 import Image from 'next/image';
 import { AppLogo } from '../logo';
 import React from 'react';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -61,7 +64,7 @@ const BreadcrumbMap: { [key: string]: string } = {
 };
 
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollapsed }: { isSidebarCollapsed: boolean, setIsSidebarCollapsed: (value: boolean) => void }) {
   const pathname = usePathname();
   const { user } = useUser();
   const auth = useAuth();
@@ -76,6 +79,15 @@ export default function DashboardHeader() {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        className="hidden sm:flex"
+      >
+        {isSidebarCollapsed ? <PanelRightClose /> : <PanelLeftClose />}
+        <span className="sr-only">Toggle Menu</span>
+      </Button>
       <Sheet>
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
@@ -83,7 +95,7 @@ export default function DashboardHeader() {
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="sm:max-w-xs">
+        <SheetContent side="left" className="sm:max-w-xs bg-sidebar-custom">
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
@@ -96,7 +108,7 @@ export default function DashboardHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground"
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}

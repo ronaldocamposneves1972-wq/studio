@@ -21,6 +21,7 @@ import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import { AppLogo } from '@/components/logo';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -134,6 +135,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   if (isUserLoading) {
     return (
@@ -158,9 +160,12 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <DashboardSidebar />
-      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-        <DashboardHeader />
+      <DashboardSidebar isCollapsed={isSidebarCollapsed} />
+      <div className={cn("flex flex-col sm:gap-4 sm:py-4 transition-[margin-left]", isSidebarCollapsed ? "sm:ml-14" : "sm:ml-52")}>
+        <DashboardHeader 
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+        />
         <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
           {children}
         </main>
