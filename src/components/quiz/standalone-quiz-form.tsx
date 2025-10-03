@@ -129,6 +129,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                     <FormControl>
                          <Input
                             {...field}
+                            value={field.value || ''}
                             type={currentQuestion.type}
                             placeholder={`Sua resposta para ${currentQuestion.text.toLowerCase().replace('*','')}`}
                             onChange={(e) => {
