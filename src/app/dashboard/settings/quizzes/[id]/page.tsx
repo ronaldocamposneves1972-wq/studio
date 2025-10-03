@@ -17,6 +17,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -128,28 +129,37 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
       title: "Quiz atualizado com sucesso!",
       description: `O quiz "${data.name}" foi salvo.`,
     })
-    router.push("/dashboard/settings?tab=quizzes")
+    router.push("/dashboard/settings/quizzes")
+    setIsSubmitting(false)
   }
 
   if (isUserLoading || isLoadingQuiz) {
     return (
         <div className="grid flex-1 auto-rows-max gap-4">
              <div className="flex items-center gap-4">
-                <Skeleton className="h-7 w-7" />
+                <Skeleton className="h-7 w-7 rounded-md" />
                 <Skeleton className="h-6 w-40" />
             </div>
-            <Card>
+            <Card className="animate-pulse">
                 <CardHeader>
                     <Skeleton className="h-8 w-1/2" />
                     <Skeleton className="h-4 w-3/4" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <Skeleton className="h-10 w-full" />
-                         <Skeleton className="h-20 w-full" />
-                         <Skeleton className="h-20 w-full" />
+                <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                       <Skeleton className="h-10 w-full" />
+                       <Skeleton className="h-10 w-full" />
                     </div>
+                     <Skeleton className="h-8 w-1/3 border-t pt-4" />
+                     <div className="space-y-4">
+                        <Skeleton className="h-32 w-full rounded-lg border" />
+                        <Skeleton className="h-32 w-full rounded-lg border" />
+                     </div>
                 </CardContent>
+                 <CardFooter className="flex justify-end gap-2">
+                    <Skeleton className="h-10 w-24" />
+                    <Skeleton className="h-10 w-32" />
+                </CardFooter>
             </Card>
         </div>
     )
@@ -171,7 +181,7 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
       <div className="text-center py-10">
         <p>Quiz não encontrado ou você não tem permissão para editá-lo.</p>
          <Button asChild className="mt-4">
-          <Link href="/dashboard/settings?tab=quizzes">Voltar</Link>
+          <Link href="/dashboard/settings/quizzes">Voltar</Link>
         </Button>
       </div>
     )
@@ -183,7 +193,7 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
       <div className="text-center py-10">
         <p>Você não tem permissão para editar este quiz.</p>
          <Button asChild className="mt-4">
-          <Link href="/dashboard/settings?tab=quizzes">Voltar</Link>
+          <Link href="/dashboard/settings/quizzes">Voltar</Link>
         </Button>
       </div>
     )
@@ -194,7 +204,7 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
     <div className="grid flex-1 auto-rows-max gap-4">
        <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" className="h-7 w-7" asChild>
-          <Link href="/dashboard/settings?tab=quizzes">
+          <Link href="/dashboard/settings/quizzes">
             <ChevronLeft className="h-4 w-4" />
             <span className="sr-only">Voltar</span>
           </Link>
@@ -314,17 +324,15 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
                 Adicionar Pergunta
               </Button>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
-                 <Button variant="outline" type="button" onClick={() => router.push('/dashboard/settings?tab=quizzes')} disabled={isSubmitting}>Cancelar</Button>
+          </CardContent>
+           <CardFooter className="border-t px-6 py-4 flex justify-end gap-2">
+                 <Button variant="outline" type="button" onClick={() => router.push('/dashboard/settings/quizzes')} disabled={isSubmitting}>Cancelar</Button>
                 <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
-            </div>
-          </CardContent>
+            </CardFooter>
         </Card>
       </form>
     </div>
   )
 }
-
-    

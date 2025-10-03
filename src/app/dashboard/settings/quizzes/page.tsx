@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -36,10 +37,11 @@ export default function QuizzesPage() {
   const { user } = useUser()
   const { toast } = useToast()
 
-  // Note: Firestore security rules should ensure this only returns quizzes if the user is authenticated.
-  // We're allowing public reads on quizzes for the landing page, so this fetch is okay for any state.
   const quizzesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    // For admins/owners, we might show all. For now, let's assume rules handle filtering.
+    // If we wanted to explicitly filter by owner:
+    // return query(collection(firestore, 'quizzes'), where('ownerId', '==', user.uid));
     return query(collection(firestore, 'quizzes'));
   }, [firestore]);
 

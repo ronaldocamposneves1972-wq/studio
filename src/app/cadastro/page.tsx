@@ -151,7 +151,7 @@ export default function CadastroPage() {
       phone: answers['q-phone'] || '',
       cpf: answers['q-cpf'] || '',
       birthDate: answers['q-birthdate'] || '',
-      motherName: answers['q-mother'] || '',
+      motherName: answers['q-mothername'] || '',
       cep: answers['q-cep'] || '',
       address: answers['q-address'] || '',
       complement: answers['q-complement'] || '',
@@ -185,14 +185,17 @@ export default function CadastroPage() {
   const renderContent = () => {
     if (isLoadingQuiz || isSubmitting) {
        return (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-1/2" />
-            <Skeleton className="h-40 w-full" />
+            <div className="space-y-4 py-4 min-h-[150px]">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
             <div className="flex justify-between">
                 <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-32" />
             </div>
         </div>
       );

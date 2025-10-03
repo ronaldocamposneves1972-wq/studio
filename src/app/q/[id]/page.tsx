@@ -188,16 +188,19 @@ export default function StandaloneQuizPage() {
   };
   
   const renderContent = () => {
-    if (isLoadingQuiz) {
+    if (isLoadingQuiz || isLoading) {
       return (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-1/2" />
-            <Skeleton className="h-40 w-full" />
+             <div className="space-y-4 py-4 min-h-[200px]">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
             <div className="flex justify-between">
                 <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-32" />
             </div>
         </div>
       );
