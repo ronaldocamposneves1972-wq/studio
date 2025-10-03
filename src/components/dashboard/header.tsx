@@ -9,14 +9,6 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -41,7 +33,6 @@ import { AppLogo } from '../logo';
 import React from 'react';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -53,19 +44,8 @@ const navItems = [
   { href: '/dashboard/settings', icon: Settings, label: 'Configurações' },
 ];
 
-const BreadcrumbMap: { [key: string]: string } = {
-    'dashboard': 'Dashboard',
-    'clients': 'Clientes',
-    'proposals': 'Propostas',
-    'products': 'Produtos',
-    'banks': 'Bancos',
-    'financials': 'Financeiro',
-    'settings': 'Configurações',
-};
-
 
 export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollapsed }: { isSidebarCollapsed: boolean, setIsSidebarCollapsed: (value: boolean) => void }) {
-  const pathname = usePathname();
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
@@ -75,19 +55,23 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
     router.push('/');
   };
 
-  const pathSegments = pathname.split('/').filter(Boolean);
-
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        className="hidden sm:flex"
-      >
-        {isSidebarCollapsed ? <PanelRightClose /> : <PanelLeftClose />}
-        <span className="sr-only">Toggle Menu</span>
-      </Button>
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
+       <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+                <AppLogo className="h-8 w-8" />
+                <span className="">ConsorciaTech</span>
+            </Link>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="h-8 w-8"
+            >
+                {isSidebarCollapsed ? <PanelRightClose /> : <PanelLeftClose />}
+                <span className="sr-only">Toggle Menu</span>
+            </Button>
+       </div>
       <Sheet>
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden">
@@ -95,7 +79,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="sm:max-w-xs bg-sidebar-custom">
+        <SheetContent side="left" className="sm:max-w-xs bg-sidebar-custom text-foreground">
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
@@ -114,33 +98,17 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
                 {item.label}
               </Link>
             ))}
+             <Link
+                href="/dashboard/settings"
+                className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground"
+              >
+                <Settings className="h-5 w-5" />
+                Configurações
+              </Link>
           </nav>
         </SheetContent>
       </Sheet>
-      <Breadcrumb className="hidden md:flex">
-        <BreadcrumbList>
-          {pathSegments.map((segment, index) => {
-            const href = '/' + pathSegments.slice(0, index + 1).join('/');
-            const isLast = index === pathSegments.length - 1;
-            const label = BreadcrumbMap[segment] || segment;
-
-            return (
-              <React.Fragment key={href}>
-                 <BreadcrumbItem>
-                  {isLast ? (
-                    <BreadcrumbPage>{label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <Link href={href}>{label}</Link>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-                {!isLast && <BreadcrumbSeparator />}
-              </React.Fragment>
-            )
-          })}
-        </BreadcrumbList>
-      </Breadcrumb>
+      
       <div className="relative ml-auto flex-1 md:grow-0">
         {/* Can add a search bar here if needed */}
       </div>

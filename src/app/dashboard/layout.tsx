@@ -140,12 +140,15 @@ export default function DashboardLayout({
   if (isUserLoading) {
     return (
       <div className="flex min-h-screen w-full flex-col">
-        <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-            <Skeleton className="h-8 w-24" />
-            <div className="relative ml-auto flex-1 md:grow-0"></div>
-            <Skeleton className="h-8 w-8 rounded-full" />
-          </header>
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+          <Skeleton className="h-8 w-24" />
+          <div className="relative ml-auto flex-1 md:grow-0"></div>
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </header>
+        <div className="flex flex-1">
+          <aside className="hidden sm:block w-52 bg-muted/40 p-4">
+             <Skeleton className="h-full w-full" />
+          </aside>
           <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
             <Skeleton className="h-96 w-full" />
           </main>
@@ -160,16 +163,16 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <DashboardSidebar isCollapsed={isSidebarCollapsed} />
-      <div className={cn("flex flex-col sm:gap-4 sm:py-4 transition-[margin-left]", isSidebarCollapsed ? "sm:ml-14" : "sm:ml-52")}>
         <DashboardHeader 
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-          {children}
-        </main>
-      </div>
+        <div className="flex flex-1">
+            <DashboardSidebar isCollapsed={isSidebarCollapsed} />
+            <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
+                {children}
+            </main>
+        </div>
     </div>
   );
 }
