@@ -49,12 +49,12 @@ const initialDataCadastro = {
   name: "Cadastro Inicial de Cliente",
   placement: "landing_page" as QuizPlacement,
   questions: [
-    { id: "q-cpf", text: "CPF*", type: "text" as const, options: "" },
     { id: "q-name", text: "Nome Completo*", type: "text" as const, options: "" },
+    { id: "q-cpf", text: "CPF*", type: "text" as const, options: "" },
     { id: "q-birthdate", text: "Data de Nascimento", type: "text" as const, options: "" },
     { id: "q-phone", text: "Telefone Celular*", type: "tel" as const, options: "" },
     { id: "q-email", text: "Email*", type: "email" as const, options: "" },
-    { id: "q-mother", text: "Nome da Mãe", type: "text" as const, options: "" },
+    { id: "q-mothername", text: "Nome da Mãe", type: "text" as const, options: "" },
     { id: "q-cep", text: "CEP", type: "text" as const, options: "" },
     { id: "q-address", text: "Endereço", type: "text" as const, options: "" },
     { id: "q-complement", text: "Complemento", type: "text" as const, options: "" },
@@ -308,3 +308,5 @@ export default function NewQuizPage() {
     </div>
   )
 }
+
+    

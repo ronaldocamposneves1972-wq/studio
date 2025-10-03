@@ -212,11 +212,13 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     'phone': 'Telefone',
     'cpf': 'CPF',
     'birthdate': 'Data de Nascimento',
-    'mother': 'Nome da Mãe',
+    'mothername': 'Nome da Mãe',
     'cep': 'CEP',
     'address': 'Endereço',
     'complement': 'Complemento',
   };
+
+  const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'complement'];
 
 
   if (isLoadingClient) {
@@ -359,23 +361,34 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                   {client.answers ? (
-                                    Object.entries(client.answers).map(([key, value]) => {
-                                      const cleanKey = key.replace('q-', '').replace(/-/g, ' ');
-                                      const questionLabel = translatedLabels[cleanKey.toLowerCase()] || cleanKey.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                      return(
-                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={key}>
-                                          <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
-                                          <p className="text-foreground">{String(value) || "Não informado"}</p>
+                                    <>
+                                      {fieldOrder.map((fieldKey) => {
+                                        const answerKey = `q-${fieldKey.toLowerCase().replace(' ', '')}`;
+                                        const value = client.answers![answerKey];
+                                        if (value === undefined) return null;
+
+                                        const questionLabel = translatedLabels[fieldKey.toLowerCase()] || fieldKey;
+                                        return (
+                                          <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
+                                            <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
+                                            <p className="text-foreground">{String(value) || "Não informado"}</p>
+                                          </div>
+                                        );
+                                      })}
+                                      {client.createdAt && (
+                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center border-t pt-4 mt-4">
+                                          <p className="font-medium text-sm text-muted-foreground">Data do Cadastro</p>
+                                          <p className="text-foreground">{new Date(client.createdAt).toLocaleString('pt-BR')}</p>
                                         </div>
-                                      )
-                                     })
+                                      )}
+                                    </>
                                   ) : (
                                     <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
                                   )}
                                 </CardContent>
                                 {client.quizId && (
                                 <CardFooter className="border-t px-6 py-4">
-                                    <p className="text-sm text-muted-foreground">Quiz respondido: <span className="font-mono text-primary">{client.quizId}</span></p>
+                                    <p className="text-sm text-muted-foreground">Quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
                                 </CardFooter>
                                 )}
                             </Card>
@@ -460,3 +473,5 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
+
+    
