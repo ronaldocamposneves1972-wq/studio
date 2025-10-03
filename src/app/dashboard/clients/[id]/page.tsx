@@ -91,6 +91,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -143,6 +144,7 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
 
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
+  const { id: clientId } = params;
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -162,9 +164,9 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
 
   const clientRef = useMemoFirebase(() => {
-    if (!firestore || !params.id) return null
-    return doc(firestore, 'clients', params.id)
-  }, [firestore, params.id])
+    if (!firestore || !clientId) return null
+    return doc(firestore, 'clients', clientId)
+  }, [firestore, clientId])
 
   const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
 
@@ -505,5 +507,4 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   )
 }
 
-    
     
