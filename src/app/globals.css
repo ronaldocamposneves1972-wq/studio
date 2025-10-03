@@ -61,3 +61,9 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .bg-sidebar-custom {
+    background-color: #1c1f24;
+  }
+}
