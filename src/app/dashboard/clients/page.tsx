@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -9,9 +10,12 @@ import {
   MoreHorizontal,
   PlusCircle,
   Users,
+  Trash2,
+  Pencil
 } from "lucide-react"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
+import { collection, query, doc } from "firebase/firestore"
+import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -48,6 +52,18 @@ import {
 } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Client, ClientStatus } from "@/lib/types"
+import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -93,6 +109,8 @@ function ClientRowSkeleton() {
 
 export default function ClientsPage() {
   const firestore = useFirestore()
+  const router = useRouter()
+  const { toast } = useToast()
   
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -100,6 +118,16 @@ export default function ClientsPage() {
   }, [firestore])
 
   const { data: clients, isLoading } = useCollection<Client>(clientsQuery)
+
+  const handleDeleteClient = (client: Client) => {
+    if (!firestore) return;
+    const clientRef = doc(firestore, 'clients', client.id);
+    deleteDocumentNonBlocking(clientRef);
+    toast({
+      title: "Cliente excluído!",
+      description: `O cliente "${client.name}" foi removido.`,
+    });
+  }
   
   const filteredClients = (status: ClientStatus | 'all') => {
     if (status === 'all' || !clients) return clients || [];
@@ -128,7 +156,7 @@ export default function ClientsPage() {
     }
     
     return clientList.map(client => (
-      <TableRow key={client.id}>
+      <TableRow key={client.id} onClick={() => router.push(`/dashboard/clients/${client.id}`)} className="cursor-pointer">
         <TableCell className="hidden sm:table-cell">
           <Image
             alt="Avatar do cliente"
@@ -140,9 +168,7 @@ export default function ClientsPage() {
           />
         </TableCell>
         <TableCell className="font-medium">
-          <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">
             {client.name}
-          </Link>
           <div className="text-sm text-muted-foreground md:hidden">{client.email}</div>
         </TableCell>
         <TableCell>
@@ -154,7 +180,7 @@ export default function ClientsPage() {
         <TableCell className="hidden md:table-cell">
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
         </TableCell>
-        <TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -168,9 +194,41 @@ export default function ClientsPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem asChild><Link href={`/dashboard/clients/${client.id}`}>Ver Detalhes</Link></DropdownMenuItem>
-              <DropdownMenuItem>Editar</DropdownMenuItem>
-              <DropdownMenuItem>Excluir</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${client.id}`)}>
+                <Users className="mr-2 h-4 w-4" /> Ver Detalhes
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Pencil className="mr-2 h-4 w-4" /> Editar
+              </DropdownMenuItem>
+               <DropdownMenuSeparator />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteClient(client)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Sim, excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>

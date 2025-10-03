@@ -20,7 +20,9 @@ import {
   Clock,
   Send,
   Activity,
-  Link2
+  Link2,
+  Trash2,
+  Pencil
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -71,10 +73,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { useDoc, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
 import { doc, collection, query, where } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -129,6 +143,7 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const clientRef = useMemoFirebase(() => {
     if (!firestore || !params.id) return null
@@ -157,6 +172,25 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     // The page at /q/[id] will then fetch the quiz with placement 'client_link'.
     const quizLink = `${window.location.origin}/q/${client?.id}`;
     copyToClipboard(quizLink, "Link para envio de documentos copiado!");
+  }
+
+  const handleStatusChange = (newStatus: ClientStatus) => {
+    if (!clientRef) return;
+    updateDocumentNonBlocking(clientRef, { status: newStatus });
+    toast({
+      title: "Status atualizado!",
+      description: `O status do cliente foi alterado para ${newStatus}.`,
+    })
+  }
+  
+  const handleDeleteClient = () => {
+    if (!clientRef) return;
+    deleteDocumentNonBlocking(clientRef);
+    toast({
+      title: "Cliente excluído!",
+      description: "O cliente foi removido com sucesso.",
+    });
+    router.push('/dashboard/clients');
   }
 
 
@@ -191,7 +225,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
             Cliente não encontrado
           </h3>
           <p className="text-sm text-muted-foreground">
-            O cliente que você está procurando não existe ou você não tem permissão para vê-lo.
+            O cliente que você está procurando não existe ou foi excluído.
           </p>
           <Button className="mt-4" asChild>
             <Link href="/dashboard/clients">Voltar para Clientes</Link>
@@ -228,7 +262,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Select defaultValue={client.status}>
+                                <Select onValueChange={handleStatusChange} value={client.status}>
                                     <SelectTrigger className="w-[160px]">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
@@ -240,6 +274,48 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                         <SelectItem value="Reprovado"><Badge variant="destructive" className="mr-2"/>Reprovado</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                 <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="icon" variant="outline">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem>
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      Editar Cliente
+                                    </DropdownMenuItem>
+                                     <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Excluir Cliente
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={handleDeleteClient}
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                          >
+                                            Sim, excluir
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         </div>
                     </CardHeader>
@@ -264,9 +340,9 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                       // This part is complex without fetching the quiz definition itself
                                       const questionLabel = key.replace('q-', '').replace(/-/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                                       return(
-                                        <div className="grid gap-1" key={key}>
-                                          <p className="font-medium">{questionLabel}</p>
-                                          <p className="text-muted-foreground">{value || "Não informado"}</p>
+                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={key}>
+                                          <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
+                                          <p className="text-foreground">{value || "Não informado"}</p>
                                         </div>
                                       )
                                      })
