@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import Image from "next/image"
@@ -25,6 +24,7 @@ import {
   Pencil,
   Info
 } from "lucide-react"
+import { useState, useEffect } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -147,6 +147,20 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   const { toast } = useToast();
   const router = useRouter();
 
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (cooldown > 0) {
+      timer = setInterval(() => {
+        setCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+
   const clientRef = useMemoFirebase(() => {
     if (!firestore || !params.id) return null
     return doc(firestore, 'clients', params.id)
@@ -170,10 +184,10 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   };
 
   const handleGenerateDocLink = () => {
-    // This generates a link to the standalone quiz page, passing the client's ID.
-    // The page at /q/[id] will then fetch the quiz with placement 'client_link'.
     const quizLink = `${window.location.origin}/q/${client?.id}`;
-    copyToClipboard(quizLink, "Link para envio de documentos copiado!");
+    setGeneratedLink(quizLink);
+    setCooldown(600); // 10 minutes in seconds
+    toast({ title: 'Link Gerado!', description: 'O link para envio de documentos foi criado e está visível abaixo.' });
   }
 
   const handleStatusChange = (newStatus: ClientStatus) => {
@@ -410,22 +424,39 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                               <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-60">
-                              {!profileComplete && (
-                                <Alert>
-                                  <Info className="h-4 w-4" />
-                                  <AlertTitle>Dados Incompletos</AlertTitle>
-                                  <AlertDescription>
-                                    É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
-                                  </AlertDescription>
-                                </Alert>
-                              )}
-                              <Upload className="h-12 w-12 text-muted-foreground" />
-                              <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
-                              <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
-                              <Button onClick={handleGenerateDocLink} disabled={!profileComplete}>
-                                <Link2 className="mr-2 h-4 w-4" />
-                                Gerar Link de Documentos
-                              </Button>
+                                {!profileComplete && (
+                                    <Alert>
+                                    <Info className="h-4 w-4" />
+                                    <AlertTitle>Dados Incompletos</AlertTitle>
+                                    <AlertDescription>
+                                        É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
+                                    </AlertDescription>
+                                    </Alert>
+                                )}
+                                {generatedLink ? (
+                                <div className="w-full space-y-4 text-left">
+                                    <p className="text-sm text-muted-foreground">O link abaixo foi gerado para o cliente enviar a documentação. Você pode copiá-lo e enviar via WhatsApp ou E-mail.</p>
+                                    <div className="flex items-center space-x-2">
+                                        <Input value={generatedLink} readOnly />
+                                        <Button onClick={() => copyToClipboard(generatedLink, "Link copiado para a área de transferência!")}><Copy className="h-4 w-4" /></Button>
+                                    </div>
+                                    {cooldown > 0 && (
+                                        <p className="text-xs text-muted-foreground text-center">
+                                            Você poderá gerar um novo link em {Math.floor(cooldown / 60)}:{(cooldown % 60).toString().padStart(2, '0')}
+                                        </p>
+                                    )}
+                                </div>
+                                ) : (
+                                    <>
+                                        <Upload className="h-12 w-12 text-muted-foreground" />
+                                        <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
+                                        <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
+                                    </>
+                                )}
+                                <Button onClick={handleGenerateDocLink} disabled={!profileComplete || cooldown > 0}>
+                                    <Link2 className="mr-2 h-4 w-4" />
+                                    {generatedLink ? 'Gerar Novo Link' : 'Gerar Link de Documentos'}
+                                </Button>
                             </CardContent>
                              <CardFooter className="border-t px-6 py-4 flex justify-end">
                                 <Button disabled> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
@@ -474,4 +505,5 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   )
 }
 
+    
     
