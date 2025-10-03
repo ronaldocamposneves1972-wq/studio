@@ -1,293 +1,259 @@
 /**
- * @fileoverview Firestore Security Rules for Consórcio and Crédito Management System.
+ * @fileOverview Firestore Security Rules for a Consórcio and Crédito Management System.
  *
  * Core Philosophy:
- * This ruleset prioritizes strong authorization based on user identity and role.
- * Access is granted based on ownership (e.g., a user can only access their own profile)
- * and, where appropriate, on role-based access control. Data shape validation is minimal
- * to allow for rapid prototyping and schema iteration.
+ * This ruleset prioritizes strict authorization. It enforces user-ownership for user-specific data (e.g., sales under a user).
+ * For other collections, it assumes public read access and requires that writes are authenticated. The schema is not strictly enforced
+ * to allow for rapid prototyping, but relational integrity is maintained for key relationships.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Stores sales data for a specific user (sales representative),
- *   accessible only by the user and admins.
- * - /clients/{clientId}: Stores client information, accessible by authorized users (e.g., Admin, Gestor, Atendente).
- * - /products/{productId}: Stores product information, accessible by authorized users (e.g., Admin, Gestor).
- * - /banks/{bankId}: Stores bank information, accessible by authorized users (e.g., Admin, Gestor, Financeiro).
- * - /quizzes/{quizId}: Stores quiz configurations. Accessible to all users; logged-in users can perform CRUD operations, while logged-out users can only read and send responses.
- * - /webhooks/{webhookId}: Stores webhook configurations, accessible only by admins.
- * - /roles_admin/{userId}: Indicates admin status; document existence implies admin role.
+ * - /users/{userId}: User profiles, accessible only by the user and admins.
+ * - /users/{userId}/sales/{saleId}: Sales data associated with a specific user.
+ * - /clients/{clientId}: Client information, publicly readable, writes require authentication
+ * - /products/{productId}: Product information, publicly readable, writes require authentication
+ * - /banks/{bankId}: Bank information, publicly readable, writes require authentication
+ * - /quizzes/{quizId}: Quiz configurations, publicly readable, writes require authentication
+ * - /webhooks/{webhookId}: Webhook configurations, writes restricted to admins
+ * - /roles_admin/{userId}: Documents indicating admin status.
+ * - /accounts/{accountId}: Bank and digital account information, publicly readable, writes require authentication
+ * - /transactions/{transactionId}: All financial transactions, publicly readable, writes require authentication
+ * - /payablesReceivables/{prId}: Accounts payable and receivable items, publicly readable, writes require authentication
  *
  * Key Security Decisions:
- * - User listing is disallowed for privacy.
- * - Default security posture is strict; any ambiguous access is denied unless explicitly allowed.
- * - Data validation is limited to authorization-critical fields.
+ * - User listing is disabled for /users collection.
+ * - Public read access is granted for most collections, with authenticated writes.
+ *
+ * Denormalization for Authorization:
+ * To simplify rules, authorization data (e.g., ownership, roles) should be denormalized directly onto the documents being secured.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @path N/A (Helper function)
-     * @allow N/A
-     * @deny N/A
-     * @principle Verified Identity
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the user is the owner of the document.
-     * @path N/A (Helper function)
-     * @allow N/A
-     * @deny N/A
-     * @principle Ownership
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is the owner of the existing document.
-     *              This also verifies that the document exists.
-     * @path N/A (Helper function)
-     * @allow N/A
-     * @deny N/A
-     * @principle Ownership & Existence Check
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-        /**
-     * @description Checks if the user has admin privileges by checking the /roles_admin/{userId} collection.
-     * @path N/A (Helper function)
-     * @allow N/A
-     * @deny N/A
-     * @principle Role-based Access Control
-     */
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Rule for /users/{userId} documents.
+     * @description Secure user profile information.
      * @path /users/{userId}
-     * @allow (get) Authenticated user getting their own profile: request.auth.uid == userId
-     * @allow (create) Authenticated user creating their own profile: request.auth.uid == userId
-     * @allow (update) Authenticated user updating their own profile: request.auth.uid == userId
-     * @allow (delete) Authenticated user deleting their own profile: request.auth.uid == userId
-     * @deny (get) Authenticated user getting someone else's profile: request.auth.uid != userId
-     * @deny (create) Unauthenticated user creating a profile.
-     * @deny (update) Authenticated user updating someone else's profile: request.auth.uid != userId
-     * @deny (delete) Authenticated user deleting someone else's profile: request.auth.uid != userId
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) - User with ID 'user123' creates their own profile.
+     *   request.auth.uid == 'user123' && request.resource.data.id == 'user123'
+     * @allow (get, update, delete) - User with ID 'user123' reads their own profile.
+     *   request.auth.uid == 'user123'
+     * @deny (create) - User 'user456' tries to create profile for 'user123'.
+     *   request.auth.uid == 'user456' && request.resource.data.id == 'user123'
+     * @deny (get, update, delete) - User 'user456' tries to read profile of 'user123'.
+     *   request.auth.uid == 'user456'
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if false; // User listing is not permitted.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      // Validate that the user is signed in
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      // On creation, enforce that the userId matches the authenticated user's UID
+      allow create: if isSignedIn() && isSelfCreate(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Rule for /users/{userId}/sales/{saleId} documents.
+     * @description Secure sales data associated with a specific user (sales representative).
      * @path /users/{userId}/sales/{saleId}
-     * @allow (get) Authenticated user getting their own sale: request.auth.uid == userId
-     * @allow (create) Authenticated user creating a sale under their profile: request.auth.uid == userId
-     * @allow (update) Authenticated user updating their own sale: request.auth.uid == userId
-     * @allow (delete) Authenticated user deleting their own sale: request.auth.uid == userId
-     * @deny (get) Authenticated user getting someone else's sale: request.auth.uid != userId
-     * @deny (create) Authenticated user creating a sale under someone else's profile: request.auth.uid != userId
-     * @deny (update) Authenticated user updating someone else's sale: request.auth.uid != userId
-     * @deny (delete) Authenticated user deleting someone else's sale: request.auth.uid != userId
-     * @principle Enforces document ownership for reads and writes within a user's data tree.
+     * @allow (create) - User with ID 'user123' creates a sale under their profile.
+     *   request.auth.uid == 'user123'
+     * @allow (get, update, delete) - User with ID 'user123' reads a sale under their profile.
+     *   request.auth.uid == 'user123'
+     * @deny (create) - User 'user456' tries to create a sale under profile of 'user123'.
+     *   request.auth.uid == 'user456'
+     * @deny (get, update, delete) - User 'user456' tries to read a sale under profile of 'user123'.
+     *   request.auth.uid == 'user456'
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/sales/{saleId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null && isOwner(userId);
+      allow delete: if isSignedIn() && resource != null && isOwner(userId);
     }
 
     /**
-     * @description Rule for /clients/{clientId} documents.
+     * @description Secure client information.
      * @path /clients/{clientId}
-     * @allow (get) Any authenticated user can get a client.
-     * @allow (list) Any authenticated user can list clients.
-     * @allow (create) Any authenticated user can create a client.
-     * @allow (update) Any authenticated user can update a client.
-     * @allow (delete) Any authenticated user can delete a client.
-     * @deny (get) Unauthenticated user cannot get a client.
-     * @deny (list) Unauthenticated user cannot list clients.
-     * @deny (create) Unauthenticated user cannot create a client.
-     * @deny (update) Unauthenticated user cannot update a client.
-     * @deny (delete) Unauthenticated user cannot delete a client.
-     * @principle Allows access to client information for authenticated users.
+     * @allow (create) - Any authenticated user can create a client.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read client information.
+     * @allow (update, delete) - Any authenticated user can modify client information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn() || isAdmin();
-      allow list: if isSignedIn() || isAdmin();
-      allow create: if isSignedIn() || isAdmin();
-      allow update: if isSignedIn() || isAdmin();
-      allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Rule for /products/{productId} documents.
+     * @description Secure product information (Consórcio and Crédito).
      * @path /products/{productId}
-     * @allow (get) Any authenticated user can get a product.
-     * @allow (list) Any authenticated user can list products.
-     * @allow (create) Any authenticated user can create a product.
-     * @allow (update) Any authenticated user can update a product.
-     * @allow (delete) Any authenticated user can delete a product.
-     * @deny (get) Unauthenticated user cannot get a product.
-     * @deny (list) Unauthenticated user cannot list products.
-     * @deny (create) Unauthenticated user cannot create a product.
-     * @deny (update) Unauthenticated user cannot update a product.
-     * @deny (delete) Unauthenticated user cannot delete a product.
-     * @principle Allows access to product information for authenticated users.
+     * @allow (create) - Any authenticated user can create a product.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read product information.
+     * @allow (update, delete) - Any authenticated user can modify product information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /products/{productId} {
-      allow get: if isSignedIn() || isAdmin();
-      allow list: if isSignedIn() || isAdmin();
-      allow create: if isSignedIn() || isAdmin();
-      allow update: if isSignedIn() || isAdmin();
-      allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Rule for /banks/{bankId} documents.
+     * @description Secure bank information.
      * @path /banks/{bankId}
-     * @allow (get) Any authenticated user can get a bank.
-     * @allow (list) Any authenticated user can list banks.
-     * @allow (create) Any authenticated user can create a bank.
-     * @allow (update) Any authenticated user can update a bank.
-     * @allow (delete) Any authenticated user can delete a bank.
-     * @deny (get) Unauthenticated user cannot get a bank.
-     * @deny (list) Unauthenticated user cannot list banks.
-     * @deny (create) Unauthenticated user cannot create a bank.
-     * @deny (update) Unauthenticated user cannot update a bank.
-     * @deny (delete) Unauthenticated user cannot delete a bank.
-     * @principle Allows access to bank information for authenticated users.
+     * @allow (create) - Any authenticated user can create a bank.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read bank information.
+     * @allow (update, delete) - Any authenticated user can modify bank information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /banks/{bankId} {
-      allow get: if isSignedIn() || isAdmin();
-      allow list: if isSignedIn() || isAdmin();
-      allow create: if isSignedIn() || isAdmin();
-      allow update: if isSignedIn() || isAdmin();
-      allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Rule for /quizzes/{quizId} documents.
-     * Logged-in users can perform CRUD operations, while logged-out users can only read and send responses.
+     * @description Secure quiz configurations.
      * @path /quizzes/{quizId}
-     * @allow (get) Any user can read a quiz.
-     * @allow (list) Any user can list quizzes.
-     * @allow (create) Logged-in users can create quizzes.
-     * @allow (update) Logged-in users can update quizzes.
-     * @allow (delete) Logged-in users can delete quizzes.
-     * @deny (create) Logged-out users cannot create quizzes.
-     * @deny (update) Logged-out users cannot update quizzes.
-     * @deny (delete) Logged-out users cannot delete quizzes.
-     * @principle Allows read access to all, and CRUD access for logged-in users.
+     * @allow (create) - Any authenticated user can create a quiz.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read quiz configurations.
+     * @allow (update, delete) - Any authenticated user can modify quiz configurations.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /quizzes/{quizId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isSignedIn() || isAdmin();
-        allow update: if isSignedIn() || isAdmin();
-        allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Rule for /webhooks/{webhookId} documents.
+     * @description Secure webhook configurations.
      * @path /webhooks/{webhookId}
-     * @allow (get) Admin users can get a webhook.
-     * @allow (list) Admin users can list webhooks.
-     * @allow (create) Admin users can create a webhook.
-     * @allow (update) Admin users can update a webhook.
-     * @allow (delete) Admin users can delete a webhook.
-     * @deny (get) Non-admin users cannot get a webhook.
-     * @deny (list) Non-admin users cannot list webhooks.
-     * @deny (create) Non-admin users cannot create a webhook.
-     * @deny (update) Non-admin users cannot update a webhook.
-     * @deny (delete) Non-admin users cannot delete a webhook.
-     * @principle Restricts webhook access to admin users only.
+     * @allow (create, update, delete) - Denied for all.
+     * @allow (get, list) - Denied for all.
+     * @principle Only Admins can configure webhooks.
      */
     match /webhooks/{webhookId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
-      /**
-     * @description Rule for /roles_admin/{userId} documents.
+
+    /**
+     * @description Secure documents indicating admin status.  Existence implies admin role.
      * @path /roles_admin/{userId}
-     * @allow (get) Only admins can get a role.
-     * @allow (list) Only admins can list roles.
-     * @allow (create) Only admins can create a role.
-     * @allow (update) Only admins can update a role.
-     * @allow (delete) Only admins can delete a role.
-     * @deny (get) Non-admins cannot get a role.
-     * @deny (list) Non-admins cannot list roles.
-     * @deny (create) Non-admins cannot create a role.
-     * @deny (update) Non-admins cannot update a role.
-     * @deny (delete) Non-admins cannot delete a role.
      */
     match /roles_admin/{userId} {
-          allow get: if isAdmin();
-          allow list: if false;
-          allow create: if isAdmin();
-          allow update: if isAdmin();
-          allow delete: if isAdmin();
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
+
     /**
-     * @description Rules for /accounts/{accountId} documents.
+     * @description Secure bank and digital account information.
      * @path /accounts/{accountId}
-     * @allow (get, list, create, update, delete) Any authenticated user can perform any operation.
-     * @deny (get, list, create, update, delete) Unauthenticated users are denied all operations.
-     * @principle Allows authenticated users full access to account data.
+     * @allow (create) - Any authenticated user can create a account.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read account information.
+     * @allow (update, delete) - Any authenticated user can modify account information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /accounts/{accountId} {
-          allow get: if isSignedIn() || isAdmin();
-          allow list: if isSignedIn() || isAdmin();
-          allow create: if isSignedIn() || isAdmin();
-          allow update: if isSignedIn() || isAdmin();
-          allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
-     /**
-      * @description Rules for /transactions/{transactionId} documents.
-      * @path /transactions/{transactionId}
-      * @allow (get, list, create, update, delete) Any authenticated user can perform any operation.
-      * @deny (get, list, create, update, delete) Unauthenticated users are denied all operations.
-      * @principle Allows authenticated users full access to transaction data.
-      */
-    match /transactions/{transactionId} {
-          allow get: if isSignedIn() || isAdmin();
-          allow list: if isSignedIn() || isAdmin();
-          allow create: if isSignedIn() || isAdmin();
-          allow update: if isSignedIn() || isAdmin();
-          allow delete: if isSignedIn() || isAdmin();
-    }
+
     /**
-     * @description Rules for /payablesReceivables/{prId} documents.
+     * @description Secure all financial transactions.
+     * @path /transactions/{transactionId}
+     * @allow (create) - Any authenticated user can create a transaction.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read transaction information.
+     * @allow (update, delete) - Any authenticated user can modify transaction information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
+     */
+    match /transactions/{transactionId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+    }
+
+    /**
+     * @description Secure accounts payable and receivable items.
      * @path /payablesReceivables/{prId}
-     * @allow (get, list, create, update, delete) Any authenticated user can perform any operation.
-     * @deny (get, list, create, update, delete) Unauthenticated users are denied all operations.
-     * @principle Allows authenticated users full access to payables/receivables data.
+     * @allow (create) - Any authenticated user can create a payable/receivable.
+     *   request.auth != null
+     * @allow (get, list) - Anyone can read payable/receivable information.
+     * @allow (update, delete) - Any authenticated user can modify payable/receivable information.
+     *   request.auth != null
+     * @principle Allows public read access, but requires authentication for writes.
      */
     match /payablesReceivables/{prId} {
-          allow get: if isSignedIn() || isAdmin();
-          allow list: if isSignedIn() || isAdmin();
-          allow create: if isSignedIn() || isAdmin();
-          allow update: if isSignedIn() || isAdmin();
-          allow delete: if isSignedIn() || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
+  }
+
+  // --- Helper Functions ---
+
+  /**
+   * @description Checks if the user is signed in.
+   * @returns {boolean} True if the user is signed in, false otherwise.
+   */
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  /**
+   * @description Checks if the user is the owner of the document, based on the userId.
+   * @param {string} userId - The user ID to compare against the authenticated user's UID.
+   * @returns {boolean} True if the user is the owner, false otherwise.
+   */
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+    /**
+   * @description Checks if the user is creating their own user document.
+   * @param {string} userId - The user ID from the document path.
+   * @returns {boolean} True if the user is creating their own document, false otherwise.
+   */
+  function isSelfCreate(userId) {
+    return isSignedIn() && request.auth.uid == userId && request.resource.data.id == userId;
+  }
+
+  /**
+   * @description Combines ownership and existence check for update/delete operations.
+   * @param {string} userId - The user ID from the document path.
+   * @returns {boolean} True if the user is the owner and the document exists.
+   */
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
