@@ -19,6 +19,8 @@ export type Client = {
   income: number;
   salesRep: User;
   timeline: TimelineEvent[];
+  quizId?: string; // Optional: ID of the quiz the client took
+  answers?: Record<string, any>; // Optional: Client's answers to the quiz
 };
 
 export type TimelineEvent = {
@@ -62,4 +64,17 @@ export type Bank = {
   commissionRate: number;
   approvedVolume: number;
   sentVolume: number;
+};
+
+export type QuizQuestion = {
+    id: string;
+    text: string;
+    type: 'text' | 'number' | 'email' | 'tel' | 'radio' | 'checkbox' | 'file';
+    options?: string[];
+};
+
+export type Quiz = {
+    id: string;
+    name: string;
+    questions: QuizQuestion[];
 };

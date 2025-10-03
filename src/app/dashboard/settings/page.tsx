@@ -1,3 +1,5 @@
+'use client'
+
 import Link from "next/link"
 import {
   CircleUser,
@@ -18,17 +20,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { useCollection } from "@/firebase"
+import { useFirestore } from "@/firebase"
+import { collection, query } from "firebase/firestore"
 
 export default function SettingsPage() {
+  const firestore = useFirestore()
+  const quizzesQuery = query(collection(firestore, 'quizzes'))
+  const { data: quizzes, isLoading } = useCollection(quizzesQuery)
+
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-2">
       <h1 className="text-3xl font-semibold">Configurações</h1>
@@ -54,7 +61,6 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* User list would go here */}
                <p className="text-sm text-muted-foreground">Funcionalidade de gerenciamento de usuários em desenvolvimento.</p>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
@@ -71,23 +77,32 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Quiz de Qualificação Padrão</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <p>1. Qual seu objetivo com o crédito?</p>
-                  <p>2. Possui restrição no nome?</p>
-                  <p>3. Valor de entrada disponível.</p>
-                  <p>4. Upload de Documentos (RG/CNH, Comp. Renda)</p>
-                </CardContent>
-                <CardFooter>
-                  <Button variant="secondary">Editar</Button>
-                </CardFooter>
-              </Card>
+              {isLoading && <p>Carregando quizzes...</p>}
+              {quizzes?.map((quiz) => (
+                <Card key={quiz.id}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{quiz.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>{quiz.questions?.length || 0} perguntas</p>
+                  </CardContent>
+                  <CardFooter>
+                    <Button variant="secondary" asChild>
+                      <Link href={`/dashboard/settings/quizzes/${quiz.id}`}>Editar</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+               {!isLoading && quizzes?.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <p>Nenhum quiz encontrado.</p>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button>Criar Novo Quiz</Button>
+               <Button asChild>
+                <Link href="/dashboard/settings/quizzes/new">Criar Novo Quiz</Link>
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
