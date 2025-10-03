@@ -1,209 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, query, limit, where } from 'firebase/firestore';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
-import { ArrowRight, CheckCircle, Handshake, Landmark, Phone, User, Mail, ChevronRight, ChevronLeft } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { Quiz } from '@/lib/types';
-
-
-function QuizForm({ quiz, onComplete }: { quiz: Quiz, onComplete: (answers: any) => void }) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<any>({});
-  const totalSteps = quiz.questions.length;
-
-  const handleNext = () => {
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete(answers);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleAnswerChange = (questionId: string, value: string) => {
-    setAnswers({ ...answers, [questionId]: value });
-  };
-  
-  const currentQuestion = quiz.questions[currentStep];
-
-  // This check prevents rendering if questions are not yet available.
-  if (!currentQuestion) {
-    return <p>Carregando pergunta...</p>;
-  }
-
-  return (
-    <div className="space-y-4">
-      <Progress value={((currentStep + 1) / totalSteps) * 100} className="w-full" />
-       <div className="space-y-2 text-left">
-          <h3 className="text-2xl font-bold">{quiz.name}</h3>
-          <p className="text-muted-foreground">Passo {currentStep + 1} de {totalSteps}</p>
-        </div>
-
-      <div className="space-y-4 py-4 min-h-[150px]">
-        <Label htmlFor={currentQuestion.id} className="text-lg">{currentQuestion.text}</Label>
-        {currentQuestion.type === 'text' && (
-          <Input
-            id={currentQuestion.id}
-            type="text"
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-            placeholder="Sua resposta"
-          />
-        )}
-        {currentQuestion.type === 'number' && (
-           <Input
-            id={currentQuestion.id}
-            type="number"
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-            placeholder="Digite um número"
-          />
-        )}
-        {currentQuestion.type === 'email' && (
-           <Input
-            id={currentQuestion.id}
-            type="email"
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-            placeholder="seu@email.com"
-          />
-        )}
-         {currentQuestion.type === 'tel' && (
-           <Input
-            id={currentQuestion.id}
-            type="tel"
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-            placeholder="(99) 99999-9999"
-          />
-        )}
-         {currentQuestion.type === 'radio' && currentQuestion.options && (
-          <RadioGroup 
-            onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-            value={answers[currentQuestion.id] || ''}
-            className="space-y-2"
-          >
-            {currentQuestion.options.map((option, index) => (
-               <div key={index} className="flex items-center space-x-2">
-                 <RadioGroupItem value={option} id={`${currentQuestion.id}-${index}`} />
-                 <Label htmlFor={`${currentQuestion.id}-${index}`}>{option}</Label>
-              </div>
-            ))}
-          </RadioGroup>
-        )}
-      </div>
-
-      <div className="flex justify-between items-center pt-4">
-        {currentStep > 0 ? (
-          <Button variant="outline" onClick={handleBack}>
-             <ChevronLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-        ) : <div></div>}
-        <Button onClick={handleNext}>
-          {currentStep === totalSteps - 1 ? 'Finalizar' : 'Continuar'}
-           <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
+import { ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function LandingPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const { toast } = useToast();
   const router = useRouter();
-  const firestore = useFirestore();
-
-  const landingPageQuizQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'quizzes'), where('placement', '==', 'landing_page'), limit(1));
-  }, [firestore]);
-
-  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(landingPageQuizQuery);
-  const quiz = quizzes?.[0];
-
-
-  const handleSubmit = async (answers: any) => {
-    setIsLoading(true);
-
-    const newClient = {
-      name: answers['q-name'] || 'Novo Cliente',
-      email: answers['q-email'] || '',
-      phone: answers['q-phone'] || '',
-      cpf: answers['q-cpf'] || '',
-      birthDate: answers['q-birthdate'] || '',
-      motherName: answers['q-mother'] || '',
-      cep: answers['q-cep'] || '',
-      address: answers['q-address'] || '',
-      complement: answers['q-complement'] || '',
-      status: 'Novo',
-      quizId: quiz?.id,
-      answers,
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-        if (!firestore) throw new Error("Firestore not available");
-        const clientsCollection = collection(firestore, 'clients');
-        await addDocumentNonBlocking(clientsCollection, newClient);
-        
-        toast({
-            title: 'Cadastro recebido!',
-            description: 'Obrigado por se cadastrar. Em breve nossa equipe entrará em contato.',
-        });
-        setIsSubmitted(true);
-    } catch(error) {
-         toast({
-            variant: 'destructive',
-            title: 'Ops! Algo deu errado.',
-            description: 'Não foi possível enviar seu cadastro. Tente novamente.',
-        });
-    }
-
-
-    setIsLoading(false);
-  };
-  
-  const renderQuizContent = () => {
-    if (isLoadingQuiz) {
-      return <p>Carregando formulário...</p>;
-    }
-
-    if (isSubmitted) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
-            <h3 className="text-2xl font-bold">Obrigado!</h3>
-            <p className="text-muted-foreground">Seu cadastro foi enviado com sucesso. Nossa equipe entrará em contato em breve.</p>
-            <Button onClick={() => setIsSubmitted(false)}>Voltar ao Início</Button>
-        </div>
-      );
-    }
-    
-    // Ensure quiz and quiz.questions are valid before rendering the form
-    if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <QuizForm quiz={quiz} onComplete={handleSubmit} />;
-    }
-
-    return <p>Nenhum formulário de cadastro disponível no momento.</p>;
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -229,9 +33,17 @@ export default function LandingPage() {
                     Realize seus sonhos com a ConsorciaTech. Oferecemos as melhores condições para você comprar seu imóvel, carro ou investir no seu futuro.
                   </p>
                 </div>
+                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Button asChild size="lg">
+                    <Link href="/cadastro">
+                      Iniciar Simulação Agora
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="mx-auto w-full max-w-lg space-y-4 rounded-lg bg-background p-6 shadow-lg text-center">
-                {renderQuizContent()}
+              <div className="mx-auto w-full max-w-lg flex items-center justify-center">
+                 <img src="https://picsum.photos/seed/hero-image/600/600" alt="Hero" data-ai-hint="happy couple" className="rounded-xl object-cover shadow-2xl aspect-square" />
               </div>
             </div>
           </div>
@@ -288,9 +100,11 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="mx-auto w-full max-w-sm">
-                <Button type="submit" size="lg" onClick={() => document.querySelector('form')?.scrollIntoView({ behavior: 'smooth' })}>
+                <Button asChild type="submit" size="lg">
+                  <Link href="/cadastro">
                     Quero uma simulação
                     <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
             </div>
           </div>
