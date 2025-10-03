@@ -31,24 +31,38 @@ export default function CadastroPage() {
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
     
-    const newClient = {
-      name: answers['q-name'] || null,
-      email: answers['q-email'] || null,
-      phone: answers['q-phone'] || null,
-      cpf: answers['q-cpf'] || null,
-      birthDate: answers['q-birthdate'] || null,
-      motherName: answers['q-mothername'] || null,
-      cep: answers['q-cep'] || null,
-      address: `${answers['q-address'] || ''}, ${answers['q-number'] || ''}`.trim() === ',' ? null : `${answers['q-address'] || ''}, ${answers['q-number'] || ''}`,
-      complement: answers['q-complement'] || null,
-      neighborhood: answers['q-neighborhood'] || null,
-      city: answers['q-city'] || null,
-      state: answers['q-state'] || null,
+    const newClient: Record<string, any> = {
       status: 'Novo',
       quizId: quiz?.id || null,
-      answers: answers, // Re-add the answers object
+      answers: answers,
       createdAt: new Date().toISOString(),
     };
+
+    const fieldMapping: Record<string, string> = {
+        'q-name': 'name',
+        'q-email': 'email',
+        'q-phone': 'phone',
+        'q-cpf': 'cpf',
+        'q-birthdate': 'birthDate',
+        'q-mothername': 'motherName',
+        'q-cep': 'cep',
+        'q-complement': 'complement',
+        'q-neighborhood': 'neighborhood',
+        'q-city': 'city',
+        'q-state': 'state',
+    };
+
+    for (const key in fieldMapping) {
+        if (answers[key]) {
+            newClient[fieldMapping[key]] = answers[key];
+        }
+    }
+
+    const addressParts = [answers['q-address'], answers['q-number']].filter(Boolean);
+    if (addressParts.length > 0) {
+      newClient.address = addressParts.join(', ');
+    }
+
 
     try {
         if (!firestore) throw new Error("Firestore not available");
