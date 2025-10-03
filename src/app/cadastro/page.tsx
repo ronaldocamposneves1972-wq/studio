@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import { collection, query, limit, where } from 'firebase/firestore';
@@ -130,17 +130,8 @@ function QuizForm({ quiz, onComplete }: { quiz: Quiz, onComplete: (answers: any)
 export default function CadastroPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
   const firestore = useFirestore();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitialLoading(false);
-    }, 10000); // 10 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
 
   const landingPageQuizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -192,7 +183,7 @@ export default function CadastroPage() {
   };
   
   const renderContent = () => {
-    if (initialLoading || isLoadingQuiz || isSubmitting) {
+    if (isLoadingQuiz || isSubmitting) {
        return (
           <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />

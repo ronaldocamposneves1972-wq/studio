@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase, useCollection } from '@/firebase';
+import { useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, limit, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,20 +127,10 @@ function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, client
 export default function StandaloneQuizPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
-  const router = useRouter();
   const params = useParams();
   const firestore = useFirestore();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitialLoading(false);
-    }, 10000); // 10 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
 
   // Query for the quiz intended for client links
   const quizQuery = useMemoFirebase(() => {
@@ -197,7 +187,7 @@ export default function StandaloneQuizPage() {
   };
   
   const renderContent = () => {
-    if (initialLoading || isLoadingQuiz || isSubmitting) {
+    if (isLoadingQuiz || isSubmitting) {
       return (
           <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />
