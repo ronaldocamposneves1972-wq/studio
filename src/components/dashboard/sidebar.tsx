@@ -44,55 +44,55 @@ const navItems = [
         label: 'Cadastro',
         icon: FilePlus,
         children: [
-            { href: '/dashboard/proposals/new', label: 'Nova Proposta' },
-            { href: '/dashboard/restrictions', label: 'Restrição' },
+            { href: '/dashboard/proposals/new', label: 'Nova Proposta', icon: FilePlus },
+            { href: '/dashboard/restrictions', label: 'Restrição', icon: FileX },
         ],
     },
     {
         label: 'Consulta',
         icon: BookUser,
         children: [
-            { href: '/dashboard/analytics/production', label: 'Analítico de Produção' },
-            { href: '/dashboard/contracts/by-client', label: 'Contratos por Cliente' },
-            { href: '/dashboard/promoter/debt', label: 'Dívida do Promotor' },
-            { href: '/dashboard/promoter/statement', label: 'Extrato Pgto Promotor' },
-            { href: '/dashboard/debts-discounts', label: 'Dívidas e Descontos' },
-            { href: '/dashboard/differences-returns', label: 'Diferenças e Devoluções' },
-            { href: '/dashboard/deferred-commission', label: 'Pgto Comissão Diferido' },
+            { href: '/dashboard/analytics/production', label: 'Analítico de Produção', icon: LineChart },
+            { href: '/dashboard/contracts/by-client', label: 'Contratos por Cliente', icon: Users },
+            { href: '/dashboard/promoter/debt', label: 'Dívida do Promotor', icon: DollarSign },
+            { href: '/dashboard/promoter/statement', label: 'Extrato Pgto Promotor', icon: FileText },
+            { href: '/dashboard/debts-discounts', label: 'Dívidas e Descontos', icon: DollarSign },
+            { href: '/dashboard/differences-returns', label: 'Diferenças e Devoluções', icon: DollarSign },
+            { href: '/dashboard/deferred-commission', label: 'Pgto Comissão Diferido', icon: DollarSign },
             { 
                 label: 'Comissão',
-                href: '/dashboard/commission',
+                icon: DollarSign,
                 children: [
-                    { href: '/dashboard/commission/current-table', label: 'Tabela Atual' },
-                    { href: '/dashboard/commission/best-commission', label: 'Melhor Comissão' },
+                    { href: '/dashboard/commission/current-table', label: 'Tabela Atual', icon: Scale },
+                    { href: '/dashboard/commission/best-commission', label: 'Melhor Comissão', icon: DollarSign },
                 ]
             },
-            { href: '/dashboard/pending-payments', label: 'Pendentes de Pagamento' },
-            { href: '/dashboard/opportunity-panel', label: 'Painel de oportunidade' },
+            { href: '/dashboard/pending-payments', label: 'Pendentes de Pagamento', icon: FileText },
+            { href: '/dashboard/opportunity-panel', label: 'Painel de oportunidade', icon: Package },
         ],
     },
     {
         label: 'Acompanhamento',
         icon: LineChart,
         children: [
-            { href: '/dashboard/proposals', label: 'Propostas' },
+            { href: '/dashboard/proposals', label: 'Propostas', icon: FileText },
         ],
     },
     {
         label: 'Formalização',
         icon: ClipboardCheck,
         children: [
-            { href: '/dashboard/formalization/protocol', label: 'Protocolo' },
-            { href: '/dashboard/formalization/pending-contracts', label: 'Contratos Pendentes' },
+            { href: '/dashboard/formalization/protocol', label: 'Protocolo', icon: ClipboardList },
+            { href: '/dashboard/formalization/pending-contracts', label: 'Contratos Pendentes', icon: FileText },
         ],
     },
     {
         label: 'Utilitários',
         icon: Briefcase,
         children: [
-            { href: '/dashboard/utils/internal-mail', label: 'Correio Interno' },
-            { href: '/dashboard/utils/docs-download', label: 'Download de Documentos' },
-            { href: '/dashboard/utils/bank-login-requests', label: 'Solicitações de Login de Banco' },
+            { href: '/dashboard/utils/internal-mail', label: 'Correio Interno', icon: Mail },
+            { href: '/dashboard/utils/docs-download', label: 'Download de Documentos', icon: Download },
+            { href: '/dashboard/utils/bank-login-requests', label: 'Solicitações de Login de Banco', icon: Landmark },
         ],
     },
     { href: '/dashboard/charts', icon: GanttChart, label: 'Gráficos' },
@@ -102,14 +102,15 @@ const navItems = [
 const NavLink = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
     const pathname = usePathname();
     const isActive = item.href && (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)));
+    const ItemIcon = item.icon;
 
     const linkContent = (
          <div className={cn(
             "flex h-9 w-full items-center justify-start gap-2 rounded-md px-3 text-sm font-medium transition-colors",
-            isActive ? "text-foreground bg-accent/50" : "text-foreground/70 hover:text-foreground",
+            isActive ? "text-foreground bg-accent/50" : "text-foreground hover:bg-accent/50",
             isCollapsed && "h-9 w-9 justify-center p-0"
         )}>
-            <item.icon className="h-5 w-5" />
+            {ItemIcon && <ItemIcon className="h-5 w-5" />}
             <span className={cn("truncate", isCollapsed && "sr-only")}>{item.label}</span>
         </div>
     );
@@ -135,6 +136,7 @@ const NavLink = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
 const CollapsibleNavLink = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
     const pathname = usePathname();
     const isParentActive = item.children?.some((child: any) => child.href && pathname.startsWith(child.href));
+    const ItemIcon = item.icon;
 
     return (
         <Collapsible defaultOpen={isParentActive}>
@@ -143,11 +145,11 @@ const CollapsibleNavLink = ({ item, isCollapsed }: { item: any, isCollapsed: boo
                     <TooltipTrigger asChild>
                         <CollapsibleTrigger asChild>
                              <div className={cn(
-                                "flex h-9 w-full items-center justify-start gap-2 rounded-md px-3 text-sm font-medium transition-colors cursor-pointer",
-                                isParentActive ? "text-foreground" : "text-foreground/70 hover:text-foreground",
+                                "flex h-9 w-full items-center justify-start gap-2 rounded-md px-3 text-sm font-medium transition-colors cursor-pointer group",
+                                isParentActive ? "text-foreground" : "text-foreground hover:bg-accent/50",
                                 isCollapsed && "h-9 w-9 justify-center p-0"
                             )}>
-                                <item.icon className="h-5 w-5" />
+                                {ItemIcon && <ItemIcon className="h-5 w-5" />}
                                 <span className={cn("flex-1 truncate text-left", isCollapsed && "sr-only")}>{item.label}</span>
                                 {!isCollapsed && <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-90" />}
                             </div>
@@ -164,7 +166,9 @@ const CollapsibleNavLink = ({ item, isCollapsed }: { item: any, isCollapsed: boo
             {!isCollapsed && (
                  <CollapsibleContent className="space-y-1 py-1 pl-7">
                     {item.children?.map((child: any) => (
-                         <CollapsibleNavLink key={child.label} item={child} isCollapsed={isCollapsed} />
+                        child.children ?
+                        <CollapsibleNavLink key={child.label} item={child} isCollapsed={isCollapsed} /> :
+                        <NavLink key={child.label} item={child} isCollapsed={isCollapsed} />
                     ))}
                 </CollapsibleContent>
             )}
@@ -199,7 +203,7 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
                 <TooltipTrigger asChild>
                     <Link href="/dashboard/settings" className={cn(
                         "flex h-9 w-full items-center justify-start gap-2 rounded-md px-3 text-sm font-medium transition-colors",
-                        pathname.startsWith('/dashboard/settings') ? "text-foreground bg-accent/50" : "text-foreground/70 hover:text-foreground",
+                        pathname.startsWith('/dashboard/settings') ? "text-foreground bg-accent/50" : "text-foreground hover:bg-accent/50",
                         isCollapsed && "h-9 w-9 justify-center p-0"
                     )}>
                         <Settings className="h-5 w-5" />
