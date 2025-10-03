@@ -1,22 +1,19 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, query, limit, where } from 'firebase/firestore';
+import { useState, useCallback } from 'react';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { addDoc, collection, query, limit, where } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
-import { CheckCircle, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { CheckCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import type { Quiz } from '@/lib/types';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { validateCPF, maskCPF, maskPhone, maskDate, maskCEP } from '@/lib/utils';
@@ -24,22 +21,32 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 
 // --- Zod Schema for Validation ---
 const formSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo."),
-  cpf: z.string().min(14, "CPF é obrigatório.").refine(validateCPF, "CPF inválido."),
-  birthDate: z.string().min(10, "Data de nascimento é obrigatória."),
-  phone: z.string().min(14, "Telefone é obrigatório."),
-  email: z.string().email("E-mail inválido."),
-  motherName: z.string().min(1, "Nome da mãe é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo."),
-  cep: z.string().min(9, "CEP é obrigatório."),
-  address: z.string().min(1, "Endereço é obrigatório."),
-  complement: z.string().optional(),
-  neighborhood: z.string().min(1, "Bairro é obrigatório."),
-  city: z.string().min(1, "Cidade é obrigatória."),
-  state: z.string().min(1, "Estado é obrigatório."),
-  number: z.string().min(1, "Número é obrigatório."),
+  'q-name': z.string().min(1, "Nome é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo."),
+  'q-cpf': z.string().min(14, "CPF é obrigatório.").refine(validateCPF, "CPF inválido."),
+  'q-birthdate': z.string().min(10, "Data de nascimento é obrigatória."),
+  'q-phone': z.string().min(14, "Telefone é obrigatório."),
+  'q-email': z.string().email("E-mail inválido."),
+  'q-mothername': z.string().min(1, "Nome da mãe é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo da mãe."),
+  'q-cep': z.string().min(9, "CEP é obrigatório."),
+  'q-address': z.string().min(1, "Endereço é obrigatório."),
+  'q-complement': z.string().optional(),
+  'q-neighborhood': z.string().min(1, "Bairro é obrigatório."),
+  'q-city': z.string().min(1, "Cidade é obrigatória."),
+  'q-state': z.string().min(1, "Estado é obrigatório."),
+  'q-number': z.string().min(1, "Número é obrigatório."),
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+const getMaskFunction = (questionId: string) => {
+    switch (questionId) {
+        case 'q-cpf': return maskCPF;
+        case 'q-phone': return maskPhone;
+        case 'q-birthdate': return maskDate;
+        case 'q-cep': return maskCEP;
+        default: return (value: string) => value;
+    }
+}
 
 
 export default function CadastroPage() {
@@ -59,19 +66,19 @@ export default function CadastroPage() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      cpf: '',
-      birthDate: '',
-      phone: '',
-      email: '',
-      motherName: '',
-      cep: '',
-      address: '',
-      complement: '',
-      neighborhood: '',
-      city: '',
-      state: '',
-      number: '',
+      'q-name': '',
+      'q-cpf': '',
+      'q-birthdate': '',
+      'q-phone': '',
+      'q-email': '',
+      'q-mothername': '',
+      'q-cep': '',
+      'q-address': '',
+      'q-complement': '',
+      'q-neighborhood': '',
+      'q-city': '',
+      'q-state': '',
+      'q-number': '',
     },
   });
 
@@ -87,10 +94,10 @@ export default function CadastroPage() {
         toast({ variant: 'destructive', title: 'CEP não encontrado.' });
         return;
       }
-      form.setValue('address', data.logradouro);
-      form.setValue('neighborhood', data.bairro);
-      form.setValue('city', data.localidade);
-      form.setValue('state', data.uf);
+      form.setValue('q-address', data.logradouro);
+      form.setValue('q-neighborhood', data.bairro);
+      form.setValue('q-city', data.localidade);
+      form.setValue('q-state', data.uf);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar CEP.' });
     }
@@ -99,30 +106,31 @@ export default function CadastroPage() {
 
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true);
-
+    
+    // Convert answers to a Client-like structure
     const newClient = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      cpf: data.cpf,
-      birthDate: data.birthDate,
-      motherName: data.motherName,
-      cep: data.cep,
-      address: `${data.address}, ${data.number}`,
-      complement: data.complement,
-      neighborhood: data.neighborhood,
-      city: data.city,
-      state: data.state,
+      name: data['q-name'],
+      email: data['q-email'],
+      phone: data['q-phone'],
+      cpf: data['q-cpf'],
+      birthDate: data['q-birthdate'],
+      motherName: data['q-mothername'],
+      cep: data['q-cep'],
+      address: `${data['q-address']}, ${data['q-number']}`,
+      complement: data['q-complement'],
+      neighborhood: data['q-neighborhood'],
+      city: data['q-city'],
+      state: data['q-state'],
       status: 'Novo',
       quizId: quiz?.id,
-      answers: data, // Save all form data as answers
+      answers: data, // Save all raw form data
       createdAt: new Date().toISOString(),
     };
 
     try {
         if (!firestore) throw new Error("Firestore not available");
         const clientsCollection = collection(firestore, 'clients');
-        await addDocumentNonBlocking(clientsCollection, newClient);
+        await addDoc(clientsCollection, newClient);
         
         toast({
             title: 'Cadastro recebido!',
@@ -135,9 +143,10 @@ export default function CadastroPage() {
             title: 'Ops! Algo deu errado.',
             description: 'Não foi possível enviar seu cadastro. Tente novamente.',
         });
+        console.error(error);
+    } finally {
+        setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   };
   
   const renderContent = () => {
@@ -170,117 +179,179 @@ export default function CadastroPage() {
     }
     
     if (quiz) {
+      const personalDataQuestions = quiz.questions.filter(q => !['q-cep', 'q-address', 'q-neighborhood', 'q-city', 'q-state', 'q-number', 'q-complement'].includes(q.id));
+      const addressQuestions = quiz.questions.filter(q => ['q-cep', 'q-address', 'q-neighborhood', 'q-city', 'q-state', 'q-number', 'q-complement'].includes(q.id));
+      
+      const getFieldProps = (qId: string) => {
+        const isReadOnly = ['q-address', 'q-neighborhood', 'q-city', 'q-state'].includes(qId);
+        let onBlur, onChange;
+
+        if (qId === 'q-cep') {
+            onBlur = () => handleCEPBlur(form.getValues('q-cep'));
+        }
+        
+        const mask = getMaskFunction(qId);
+        onChange = (e: React.ChangeEvent<HTMLInputElement>) => form.setValue(qId as keyof FormData, mask(e.target.value));
+
+        return { isReadOnly, onBlur, onChange };
+      };
+
       return (
          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                 <div className="space-y-2 text-left">
                   <h3 className="text-2xl font-bold">{quiz.name}</h3>
                   <p className="text-muted-foreground">Preencha seus dados para iniciar a simulação.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Nome Completo*</FormLabel>
-                          <FormControl><Input placeholder="Seu nome completo" {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                  <FormField control={form.control} name="cpf" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>CPF*</FormLabel>
-                          <FormControl><Input placeholder="000.000.000-00" {...field} onChange={e => field.onChange(maskCPF(e.target.value))} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="birthDate" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Data de Nascimento*</FormLabel>
-                          <FormControl><Input placeholder="DD/MM/AAAA" {...field} onChange={e => field.onChange(maskDate(e.target.value))} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="phone" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Telefone Celular*</FormLabel>
-                          <FormControl><Input placeholder="(99) 99999-9999" {...field} onChange={e => field.onChange(maskPhone(e.target.value))} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="email" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Email*</FormLabel>
-                          <FormControl><Input placeholder="seu@email.com" type="email" {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="motherName" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Nome da Mãe*</FormLabel>
-                          <FormControl><Input placeholder="Nome completo da sua mãe" {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
+                <div>
+                    <h4 className="text-lg font-semibold mb-4">Dados Pessoais</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {personalDataQuestions.map(question => {
+                        const { onChange } = getFieldProps(question.id);
+                        return (
+                        <FormField
+                            key={question.id}
+                            control={form.control}
+                            name={question.id as keyof FormData}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{question.text}</FormLabel>
+                                    <FormControl>
+                                        <Input 
+                                            {...field}
+                                            onChange={(e) => {
+                                                onChange(e); // Apply mask
+                                                field.onChange(e); // Notify react-hook-form
+                                            }}
+                                            placeholder={question.text.replace('*','')} 
+                                            type={question.type}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        )
+                    })}
+                    </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-6">
-                    <FormField control={form.control} name="cep" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>CEP*</FormLabel>
-                          <FormControl><Input placeholder="00000-000" {...field} onChange={e => field.onChange(maskCEP(e.target.value))} onBlur={() => handleCEPBlur(field.value)} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="state" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Estado</FormLabel>
-                          <FormControl><Input readOnly {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="city" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Cidade</FormLabel>
-                          <FormControl><Input readOnly {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="address" render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                          <FormLabel>Endereço</FormLabel>
-                          <FormControl><Input readOnly {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="neighborhood" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Bairro</FormLabel>
-                          <FormControl><Input readOnly {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="number" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Número*</FormLabel>
-                          <FormControl><Input placeholder="Ex: 123" {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                  <FormField control={form.control} name="complement" render={({ field }) => (
-                      <FormItem className="md:col-span-2">
-                          <FormLabel>Complemento</FormLabel>
-                          <FormControl><Input placeholder="Apto, Bloco, etc." {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
+                <div>
+                    <h4 className="text-lg font-semibold mb-4 border-t pt-6">Endereço</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {quiz.questions.find(q => q.id === 'q-cep') && (
+                            <FormField
+                                control={form.control}
+                                name="q-cep"
+                                render={({ field }) => {
+                                    const { onBlur, onChange } = getFieldProps('q-cep');
+                                    return (
+                                        <FormItem className="md:col-span-1">
+                                            <FormLabel>CEP*</FormLabel>
+                                            <FormControl>
+                                                <Input 
+                                                    {...field}
+                                                    onChange={(e) => {
+                                                        onChange(e);
+                                                        field.onChange(e);
+                                                    }}
+                                                    onBlur={onBlur}
+                                                    placeholder="00000-000"
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
+                            />
+                        )}
+                        {quiz.questions.find(q => q.id === 'q-state') && (
+                             <FormField
+                                control={form.control}
+                                name="q-state"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-1">
+                                        <FormLabel>Estado</FormLabel>
+                                        <FormControl><Input readOnly {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+                         {quiz.questions.find(q => q.id === 'q-city') && (
+                             <FormField
+                                control={form.control}
+                                name="q-city"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Cidade</FormLabel>
+                                        <FormControl><Input readOnly {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+                         {quiz.questions.find(q => q.id === 'q-address') && (
+                            <FormField
+                                control={form.control}
+                                name="q-address"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Endereço</FormLabel>
+                                        <FormControl><Input readOnly {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                         )}
+                         {quiz.questions.find(q => q.id === 'q-neighborhood') && (
+                            <FormField
+                                control={form.control}
+                                name="q-neighborhood"
+                                render={({ field }) => (
+                                    <FormItem className="md:col-span-2">
+                                        <FormLabel>Bairro</FormLabel>
+                                        <FormControl><Input readOnly {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+                         {quiz.questions.find(q => q.id === 'q-number') && (
+                           <FormField
+                                control={form.control}
+                                name="q-number"
+                                render={({ field }) => (
+                                <FormItem className="md:col-span-1">
+                                    <FormLabel>Número*</FormLabel>
+                                    <FormControl><Input placeholder="Ex: 123" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                        )}
+                        {quiz.questions.find(q => q.id === 'q-complement') && (
+                          <FormField
+                                control={form.control}
+                                name="q-complement"
+                                render={({ field }) => (
+                                <FormItem className="md:col-span-3">
+                                    <FormLabel>Complemento</FormLabel>
+                                    <FormControl><Input placeholder="Apto, Bloco, etc." {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                        )}
+                    </div>
                 </div>
 
 
                 <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     {isSubmitting ? 'Enviando...' : 'Finalizar Cadastro'}
-                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
             </form>
@@ -318,3 +389,4 @@ export default function CadastroPage() {
     </div>
   );
 }
+

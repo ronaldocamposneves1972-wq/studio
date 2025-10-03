@@ -36,8 +36,6 @@ export type Client = {
   neighborhood?: string;
   city?: string;
   state?: string;
-  firstName?: string; // Kept for backward compatibility if needed
-  lastName?: string; // Kept for backward compatibility if needed
 };
 
 export type TimelineEvent = {

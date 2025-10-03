@@ -7,7 +7,7 @@ import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
-import { collection } from "firebase/firestore"
+import { collection, addDoc } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useFirestore, useUser, addDocumentNonBlocking } from "@/firebase"
+import { useFirestore, useUser } from "@/firebase"
 import { QuizPlacement } from "@/lib/types"
 
 const questionSchema = z.object({
@@ -51,13 +51,17 @@ const initialDataCadastro = {
   questions: [
     { id: "q-name", text: "Nome Completo*", type: "text" as const, options: "" },
     { id: "q-cpf", text: "CPF*", type: "text" as const, options: "" },
-    { id: "q-birthdate", text: "Data de Nascimento", type: "text" as const, options: "" },
+    { id: "q-birthdate", text: "Data de Nascimento*", type: "text" as const, options: "" },
     { id: "q-phone", text: "Telefone Celular*", type: "tel" as const, options: "" },
     { id: "q-email", text: "Email*", type: "email" as const, options: "" },
-    { id: "q-mothername", text: "Nome da Mãe", type: "text" as const, options: "" },
-    { id: "q-cep", text: "CEP", type: "text" as const, options: "" },
-    { id: "q-address", text: "Endereço", type: "text" as const, options: "" },
+    { id: "q-mothername", text: "Nome da Mãe*", type: "text" as const, options: "" },
+    { id: "q-cep", text: "CEP*", type: "text" as const, options: "" },
+    { id: "q-address", text: "Endereço*", type: "text" as const, options: "" },
+    { id: "q-number", text: "Número*", type: "text" as const, options: "" },
     { id: "q-complement", text: "Complemento", type: "text" as const, options: "" },
+    { id: "q-neighborhood", text: "Bairro*", type: "text" as const, options: "" },
+    { id: "q-city", text: "Cidade*", type: "text" as const, options: "" },
+    { id: "q-state", text: "Estado*", type: "text" as const, options: "" },
   ],
 }
 
@@ -135,7 +139,7 @@ export default function NewQuizPage() {
       if (!firestore) throw new Error("Firestore not available");
       const quizzesCollection = collection(firestore, 'quizzes');
       
-      addDocumentNonBlocking(quizzesCollection, quizData);
+      await addDoc(quizzesCollection, quizData);
       
       toast({
         title: "Quiz criado com sucesso!",
@@ -308,5 +312,3 @@ export default function NewQuizPage() {
     </div>
   )
 }
-
-    
