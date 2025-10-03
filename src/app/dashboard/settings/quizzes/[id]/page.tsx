@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { useFieldArray, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -48,9 +48,10 @@ const quizSchema = z.object({
 
 type QuizFormData = z.infer<typeof quizSchema>
 
-export default function EditQuizPage({ params }: { params: { id: string } }) {
+export default function EditQuizPage() {
   const router = useRouter()
-  const quizId = params.id
+  const params = useParams();
+  const quizId = params.id as string;
   const { toast } = useToast()
   const firestore = useFirestore()
   const { user, isUserLoading } = useUser()
@@ -113,7 +114,6 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
 
     setIsSubmitting(true)
 
-    // Security rules should check if the user is the owner
     const quizData = {
       ...data,
       questions: data.questions.map(q => ({
@@ -122,7 +122,6 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
       })),
     }
 
-    // This is non-blocking and handles its own errors
     updateDocumentNonBlocking(quizDocRef, quizData);
     
     toast({
@@ -187,7 +186,7 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
     )
   }
   
-    // Security check on client-side as a safeguard
+  // Security check on client-side as a safeguard
   if (quiz.ownerId !== user.uid) {
      return (
       <div className="text-center py-10">

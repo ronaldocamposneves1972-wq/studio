@@ -27,6 +27,8 @@ import {
   FileText
 } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useParams } from 'next/navigation'
+
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -145,8 +147,9 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
 };
 
 
-export default function ClientDetailPage({ params }: { params: { id: string } }) {
-  const { id: clientId } = params;
+export default function ClientDetailPage() {
+  const params = useParams();
+  const clientId = params.id as string;
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
