@@ -20,10 +20,10 @@ export type Client = {
   phone: string;
   status: ClientStatus;
   createdAt: string;
-  avatarUrl: string;
-  income: number;
-  salesRep: User;
-  timeline: TimelineEvent[];
+  avatarUrl?: string;
+  income?: number;
+  salesRep?: User;
+  timeline?: TimelineEvent[];
   quizId?: string; // Optional: ID of the quiz the client took
   answers?: Record<string, any>; // Optional: Client's answers to the quiz
   documents?: ClientDocument[];
@@ -33,6 +33,9 @@ export type Client = {
   cep?: string;
   address?: string;
   complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
   firstName?: string; // Kept for backward compatibility if needed
   lastName?: string; // Kept for backward compatibility if needed
 };
@@ -92,7 +95,7 @@ export type QuizPlacement = 'landing_page' | 'client_link';
 export type Quiz = {
     id: string;
     name: string;
-    ownerId: string;
+    ownerId?: string;
     questions: QuizQuestion[];
     placement: QuizPlacement;
     createdAt?: string;

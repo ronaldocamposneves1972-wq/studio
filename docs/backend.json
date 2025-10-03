@@ -95,6 +95,18 @@
         "complement": {
           "type": "string",
           "description": "The client's address complement."
+        },
+        "neighborhood": {
+          "type": "string",
+          "description": "The client's neighborhood."
+        },
+        "city": {
+          "type": "string",
+          "description": "The client's city."
+        },
+        "state": {
+          "type": "string",
+          "description": "The client's state."
         }
       },
       "required": [
