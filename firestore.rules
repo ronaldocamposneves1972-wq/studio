@@ -1,187 +1,289 @@
 /**
- * @fileOverview Firestore Security Rules for a Consórcio and Crédito Management System.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user-specific data (e.g., sales),
- * role-based access for shared data (e.g., clients, products, banks), and admin-only access for
- * sensitive configurations (e.g., webhooks). Authorization Independence is maintained via path-based
- * ownership and denormalization (copying authorization data onto secured documents).
- * Structural Segregation ensures collections contain documents with similar security needs.
- *
- * Data Structure:
- * - /users/{userId}: User profile information. Only accessible by the user themselves.
- * - /users/{userId}/sales/{saleId}: Sales data owned by a specific user.
- * - /clients/{clientId}: Client information. Accessible based on user role (Admin, Gestor, Atendente).
- * - /products/{productId}: Product information. Accessible based on user role (Admin, Gestor).
- * - /banks/{bankId}: Bank information. Accessible based on user role (Admin, Gestor, Financeiro).
- * - /quizzes/{quizId}: Quiz configurations. Accessible based on user role (Admin, Gestor).
- * - /webhooks/{webhookId}: Webhook configurations. Accessible only by Admins.
- * - /roles_admin/{userId}: Documents indicating admin status. Presence grants admin role.
- *
- * Key Security Decisions:
- * - User listing is disallowed.
- * - `get` operations do not check for document existence.
- * - Timestamp fields are not validated for prototyping flexibility.
- * - Authorization relies on `request.auth` and avoids complex queries.
- *
- * Denormalization for Authorization:
- * - No explicit denormalization is performed in this prototype, but the rules are designed to
- *   accommodate denormalized role data in the future (e.g., a `managers` map on `Sale` documents
- *   to allow 'Gestor' roles access).
- *
- * Structural Segregation:
- * - User-specific data (sales) is stored under the /users/{userId} path, while shared data
- *   (clients, products, banks) resides in top-level collections. Webhooks are in a separate
- *   collection accessible only by admins.
- */
-rules_version = '2';
-service cloud.firestore {
+  * @file Overview
+  * This ruleset enforces a hybrid security model. It provides public access for creating new clients while enforcing strict ownership and role-based access for all other data.
+  *
+  * @dataStructure
+  * - /users/{userId}: Stores user profiles, accessible only by the user themselves.
+  * - /users/{userId}/sales/{saleId}: Stores sales data, accessible only by the owning user.
+  * - /clients/{clientId}: Stores client data, publicly creatable, but otherwise inaccessible without authorization.
+  * - /products/{productId}: Stores product information.
+  * - /banks/{bankId}: Stores bank information.
+  * - /quizzes/{quizId}: Stores quiz information.
+  * - /webhooks/{webhookId}: Stores webhook configurations, accessible only by admins.
+  * - /roles_admin/{userId}: Indicates admin status. Existence implies admin role.
+  *
+  * @keySecurityDecisions
+  * - Client creation is publicly allowed to facilitate lead generation. Other operations are denied.
+  * - Listing clients is disallowed to prevent unauthorized data access.
+  * - Other collections enforce strict owner-only or role-based access.
+  */
+ 
+
+ rules_version = '2';
+ service cloud.firestore {
   match /databases/{database}/documents {
+ 
 
-    /**
-     * @description Secure root access
-     * @path /
-     * @allow (get, list) if false;
-     * @deny (create, update, delete) if true;
-     * @principle Restrict root access
-     */
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    /**
-     * @description Grants access to user profile information.
-     * @path /users/{userId}
-     * @allow (get, list) User can read their own profile.
-     * @allow (create) User can create their own profile with matching id.
-     * @allow (update,delete) User can update their own profile if it exists.
-     * @deny (create) if request.auth.uid != request.resource.data.id; // Mismatched user ID on create.
-     * @deny (update) User tries to change the id after creation.
-     * @deny (delete) User tries to delete the document that does not exists
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && (request.resource.data.id == userId);
-      allow update: if isSignedIn() && isExistingOwner(userId) && (request.resource.data.id == resource.data.id);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
-
-    /**
-     * @description Grants access to sales data associated with a specific user.
-     * @path /users/{userId}/sales/{saleId}
-     * @allow (get, list) User can read their own sales data.
-     * @allow (create, update,delete) User can create/update/delete their own sales data if it exists.
-     * @deny (create) User attempts to create sales data for another user.
-     * @deny (update) User attempts to modify sales data that does not exist.
-     * @deny (delete) User attempts to delete sales data that does not exist.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId}/sales/{saleId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && (request.resource.data.salesRepId == userId);
-      allow update: if isSignedIn() && isExistingOwner(userId) && (resource.data.salesRepId == userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
-
-    /**
-     * @description Grants access to client information.
-     * @path /clients/{clientId}
-     * @allow (get, list) All users can read client information
-     * @allow (create, update, delete) All users can create/update/delete client information.
-     * @principle Open access for prototyping.
-     */
-    match /clients/{clientId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource != null);
-      allow delete: if isSignedIn() && (resource != null);
-    }
-
-    /**
-     * @description Grants access to product information.
-     * @path /products/{productId}
-     * @allow (get, list) All users can read product information
-     * @allow (create, update, delete) All users can create/update/delete product information.
-     * @principle Open access for prototyping.
-     */
-    match /products/{productId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource != null);
-      allow delete: if isSignedIn() && (resource != null);
-    }
-
-    /**
-     * @description Grants access to bank information.
-     * @path /banks/{bankId}
-     * @allow (get, list) All users can read bank information
-     * @allow (create, update, delete) All users can create/update/delete bank information.
-     * @principle Open access for prototyping.
-     */
-    match /banks/{bankId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource != null);
-      allow delete: if isSignedIn() && (resource != null);
-    }
-
-    /**
-     * @description Grants access to quiz configurations.
-     * @path /quizzes/{quizId}
-     * @allow (get, list) All users can read quiz configurations
-     * @allow (create, update, delete) All users can create/update/delete quiz configurations.
-     * @principle Open access for prototyping.
-     */
-    match /quizzes/{quizId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource != null);
-      allow delete: if isSignedIn() && (resource != null);
-    }
-
-    /**
-     * @description Grants access to webhook configurations.
-     * @path /webhooks/{webhookId}
-     * @allow (get, list) All users can read webhook configurations
-     * @allow (create, update, delete) All users can create/update/delete webhook configurations.
-     * @principle Open access for prototyping.
-     */
-    match /webhooks/{webhookId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (resource != null);
-      allow delete: if isSignedIn() && (resource != null);
-    }
-
-      /**
-       * @description Grants access to roles_admin information.
-       * @path /roles_admin/{userId}
-       * @allow (get, list) All users can read roles_admin information
-       * @allow (create, update, delete) All users can create/update/delete roles_admin information.
-       * @principle Open access for prototyping.
-       */
-    match /roles_admin/{userId} {
-       allow get, list: if true;
-       allow create: if isSignedIn();
-       allow update: if isSignedIn() && (resource != null);
-       allow delete: if isSignedIn() && (resource != null);
-    }
-
-  }
-
-  // Helper functions
-  function isSignedIn() {
+   /**
+    * @description Checks if the current user is signed in.
+    * @example isSignedIn() returns true if request.auth != null.
+    * @principle Verified Identity
+    */
+   function isSignedIn() {
     return request.auth != null;
-  }
+   }
+ 
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
+   /**
+    * @description Checks if the requesting user is the owner of the resource.
+    * @param {string} userId - The user ID to compare against the request's authentication UID.
+    * @example isOwner("someUserId") returns true if request.auth.uid == "someUserId".
+    * @principle Ownership
+    */
+   function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+   }
+ 
 
-  function isExistingOwner(userId) {
-      return isSignedIn() && isOwner(userId) && resource != null;
+   /**
+    * @description Checks if the requesting user is the owner of the resource and that the resource exists.
+    * @param {string} userId - The user ID to compare against the request's authentication UID.
+    * @example isExistingOwner("someUserId") returns true if request.auth.uid == "someUserId" and the resource exists.
+    * @principle Ownership and Existence
+    */
+   function isExistingOwner(userId) {
+    return isOwner(userId) && exists(resource.path);
+   }
+ 
+
+   /**
+    * @description Determines if the user has admin privileges.
+    * @return {bool} True if the user has admin privileges, false otherwise.
+    * @principle Roles
+    */
+   function isAdmin() {
+    return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing user profile information.
+    *
+    * @path /users/{userId}
+    * @allow (get) User with ID 'user123' can read their own profile.
+    *   - request.auth.uid: 'user123'
+    * @allow (create) User with ID 'user123' can create their own profile.
+    *   - request.auth.uid: 'user123'
+    * @allow (update) User with ID 'user123' can update their own profile.
+    *   - request.auth.uid: 'user123'
+    * @allow (delete) User with ID 'user123' can delete their own profile.
+    *   - request.auth.uid: 'user123'
+    * @deny (get) User with ID 'user456' cannot read the profile of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (create) User with ID 'user456' cannot create a profile for user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (update) User with ID 'user456' cannot update the profile of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (delete) User with ID 'user456' cannot delete the profile of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @principle Enforces document ownership for reads and writes
+    */
+   match /users/{userId} {
+    allow get: if isOwner(userId);
+    allow list: if false;
+    allow create: if isOwner(userId);
+    allow update: if isOwner(userId);
+    allow delete: if isOwner(userId);
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing sales data associated with a specific user (sales representative).
+    *
+    * @path /users/{userId}/sales/{saleId}
+    * @allow (get) User with ID 'user123' can read their own sales data.
+    *   - request.auth.uid: 'user123'
+    * @allow (create) User with ID 'user123' can create sales data under their user ID.
+    *   - request.auth.uid: 'user123'
+    * @allow (update) User with ID 'user123' can update their own sales data.
+    *   - request.auth.uid: 'user123'
+    * @allow (delete) User with ID 'user123' can delete their own sales data.
+    *   - request.auth.uid: 'user123'
+    * @deny (get) User with ID 'user456' cannot read the sales data of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (create) User with ID 'user456' cannot create sales data for user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (update) User with ID 'user456' cannot update the sales data of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @deny (delete) User with ID 'user456' cannot delete the sales data of user 'user123'.
+    *   - request.auth.uid: 'user456'
+    * @principle Restricts access to a user's own data tree
+    */
+   match /users/{userId}/sales/{saleId} {
+    allow get: if isOwner(userId);
+    allow list: if false;
+    allow create: if isOwner(userId);
+    allow update: if isOwner(userId);
+    allow delete: if isOwner(userId);
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing client information.
+    * Allows public creation but restricts other operations.
+    *
+    * @path /clients/{clientId}
+    * @allow (create) Any user (authenticated or not) can create a client document.
+    *   - request.auth: null
+    * @deny (get) Any user cannot read client data.
+    *   - request.auth: null
+    * @deny (list) Any user cannot list client data.
+    *   - request.auth: null
+    * @deny (update) Any user cannot update client data.
+    *   - request.auth: null
+    * @deny (delete) Any user cannot delete client data.
+    *   - request.auth: null
+    * @principle Allows public creation of clients while restricting other access.
+    */
+   match /clients/{clientId} {
+    allow get: if false;
+    allow list: if false;
+    allow create: if true;
+    allow update: if false;
+    allow delete: if false;
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing product information.
+    *
+    * @path /products/{productId}
+    * @allow (get) Only admins can read product information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (list) Only admins can list product information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (create) Only admins can create product information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (update) Only admins can update product information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (delete) Only admins can delete product information.
+    *   - request.auth.uid exists in /roles_admin
+    * @principle Requires admin role for all access.
+    */
+   match /products/{productId} {
+    allow get: if isAdmin();
+    allow list: if isAdmin();
+    allow create: if isAdmin();
+    allow update: if isAdmin();
+    allow delete: if isAdmin();
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing bank information.
+    *
+    * @path /banks/{bankId}
+    * @allow (get) Only admins can read bank information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (list) Only admins can list bank information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (create) Only admins can create bank information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (update) Only admins can update bank information.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (delete) Only admins can delete bank information.
+    *   - request.auth.uid exists in /roles_admin
+    * @principle Requires admin role for all access.
+    */
+   match /banks/{bankId} {
+    allow get: if isAdmin();
+    allow list: if isAdmin();
+    allow create: if isAdmin();
+    allow update: if isAdmin();
+    allow delete: if isAdmin();
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing quiz configurations.
+    *
+    * @path /quizzes/{quizId}
+    * @allow (get) Only admins can read quiz configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (list) Only admins can list quiz configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (create) Only admins can create quiz configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (update) Only admins can update quiz configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (delete) Only admins can delete quiz configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @principle Requires admin role for all access.
+    */
+   match /quizzes/{quizId} {
+    allow get: if isAdmin();
+    allow list: if isAdmin();
+    allow create: if isAdmin();
+    allow update: if isAdmin();
+    allow delete: if isAdmin();
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents containing webhook configurations.
+    *
+    * @path /webhooks/{webhookId}
+    * @allow (get) Only admins can read webhook configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (list) Only admins can list webhook configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (create) Only admins can create webhook configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (update) Only admins can update webhook configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (delete) Only admins can delete webhook configurations.
+    *   - request.auth.uid exists in /roles_admin
+    * @principle Requires admin role for all access.
+    */
+   match /webhooks/{webhookId} {
+    allow get: if isAdmin();
+    allow list: if isAdmin();
+    allow create: if isAdmin();
+    allow update: if isAdmin();
+    allow delete: if isAdmin();
+   }
+ 
+
+   /**
+    * @description
+    * Applies to documents that determine administrative roles.
+    *
+    * @path /roles_admin/{userId}
+    * @allow (get) Only admins can verify other admins.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (list) No listing allowed.
+    *   - None
+    * @allow (create) Only admins can assign other admins.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (update) Only admins can modify other admins.
+    *   - request.auth.uid exists in /roles_admin
+    * @allow (delete) Only admins can remove other admins.
+    *   - request.auth.uid exists in /roles_admin
+    * @principle Restricts admin role management to existing admins.
+    */
+   match /roles_admin/{userId} {
+    allow get: if isAdmin();
+    allow list: if false;
+    allow create: if isAdmin();
+    allow update: if isAdmin();
+    allow delete: if isAdmin();
+   }
   }
-}
+ }
