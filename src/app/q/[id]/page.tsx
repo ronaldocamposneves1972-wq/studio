@@ -125,13 +125,22 @@ function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, client
 
 
 export default function StandaloneQuizPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
   const firestore = useFirestore();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 10000); // 10 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Query for the quiz intended for client links
   const quizQuery = useMemoFirebase(() => {
@@ -143,7 +152,7 @@ export default function StandaloneQuizPage() {
   const quiz = quizzes?.[0];
 
   const handleSubmit = async (answers: any) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     // TODO: Handle file uploads to Firebase Storage
     const serializableAnswers = { ...answers };
@@ -184,11 +193,11 @@ export default function StandaloneQuizPage() {
         });
     }
 
-    setIsLoading(false);
+    setIsSubmitting(false);
   };
   
   const renderContent = () => {
-    if (isLoadingQuiz || isLoading) {
+    if (initialLoading || isLoadingQuiz || isSubmitting) {
       return (
           <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />
