@@ -4,126 +4,16 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, collection, query, where, limit, getDoc, arrayUnion } from 'firebase/firestore';
+import { doc, collection, query, where, limit, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
-import { CheckCircle, ChevronRight, ChevronLeft, Upload, Loader2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Quiz, Client } from '@/lib/types';
-
-
-function StandaloneQuizForm({ quiz, clientId, onComplete, isSubmitting }: { quiz: Quiz, clientId: string, onComplete: (answers: any) => void, isSubmitting: boolean }) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<any>({});
-  const totalSteps = quiz.questions.length;
-
-  const handleNext = () => {
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onComplete(answers);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleAnswerChange = (questionId: string, value: string | File) => {
-    setAnswers({ ...answers, [questionId]: value });
-  };
-  
-  const currentQuestion = quiz.questions[currentStep];
-
-  if (!currentQuestion) {
-    return <Skeleton className="w-full h-64" />;
-  }
-
-  const renderInput = () => {
-    switch(currentQuestion.type) {
-        case 'file':
-            return (
-                <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center">
-                    <Upload className="w-12 h-12 text-muted-foreground" />
-                    <Label htmlFor={currentQuestion.id} className="mt-4 text-lg cursor-pointer text-primary hover:underline">
-                        Clique para enviar o arquivo
-                    </Label>
-                    <Input
-                        id={currentQuestion.id}
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.files ? e.target.files[0] : '')}
-                    />
-                    {answers[currentQuestion.id] && <p className="mt-2 text-sm text-muted-foreground">Arquivo selecionado: {(answers[currentQuestion.id] as File).name}</p>}
-                </div>
-            );
-        case 'radio':
-            return (
-                <RadioGroup 
-                    onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                    value={answers[currentQuestion.id] || ''}
-                    className="space-y-2"
-                >
-                    {currentQuestion.options?.map((option, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={`${currentQuestion.id}-${index}`} />
-                        <Label htmlFor={`${currentQuestion.id}-${index}`}>{option}</Label>
-                    </div>
-                    ))}
-                </RadioGroup>
-            );
-        default:
-            return (
-                <Input
-                    id={currentQuestion.id}
-                    type={currentQuestion.type}
-                    value={typeof answers[currentQuestion.id] === 'string' ? answers[currentQuestion.id] : ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    placeholder="Sua resposta"
-                />
-            );
-    }
-  }
-
-
-  return (
-    <div className="space-y-4">
-      <Progress value={((currentStep + 1) / totalSteps) * 100} className="w-full" />
-       <div className="space-y-2 text-left">
-          <h3 className="text-2xl font-bold">{quiz.name}</h3>
-          <p className="text-muted-foreground">Passo {currentStep + 1} de {totalSteps}</p>
-        </div>
-
-      <div className="space-y-4 py-4 min-h-[200px]">
-        <Label htmlFor={currentQuestion.id} className="text-lg">{currentQuestion.text}</Label>
-        {renderInput()}
-      </div>
-
-      <div className="flex justify-between items-center pt-4">
-        {currentStep > 0 ? (
-          <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
-             <ChevronLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-        ) : <div></div>}
-        <Button onClick={handleNext} disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {isSubmitting ? 'Enviando...' : (currentStep === totalSteps - 1 ? 'Finalizar' : 'Continuar')}
-          {!isSubmitting && currentStep < totalSteps - 1 && <ChevronRight className="ml-2 h-4 w-4" />}
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
 
 export default function StandaloneQuizPage() {
@@ -234,7 +124,7 @@ export default function StandaloneQuizPage() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <StandaloneQuizForm quiz={quiz} clientId={clientId} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
+      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
     }
 
     return (

@@ -5,49 +5,14 @@ import { useState, useCallback } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, query, limit, where } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import type { Quiz } from '@/lib/types';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { validateCPF, maskCPF, maskPhone, maskDate, maskCEP } from '@/lib/utils';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-
-// --- Zod Schema for Validation ---
-const formSchema = z.object({
-  'q-name': z.string().min(1, "Nome é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo."),
-  'q-cpf': z.string().min(14, "CPF é obrigatório.").refine(validateCPF, "CPF inválido."),
-  'q-birthdate': z.string().min(10, "Data de nascimento é obrigatória."),
-  'q-phone': z.string().min(14, "Telefone é obrigatório."),
-  'q-email': z.string().email("E-mail inválido."),
-  'q-mothername': z.string().min(1, "Nome da mãe é obrigatório.").refine(value => value.trim().split(' ').length >= 2, "Por favor, insira o nome completo da mãe."),
-  'q-cep': z.string().min(9, "CEP é obrigatório."),
-  'q-address': z.string().min(1, "Endereço é obrigatório."),
-  'q-complement': z.string().optional(),
-  'q-neighborhood': z.string().min(1, "Bairro é obrigatório."),
-  'q-city': z.string().min(1, "Cidade é obrigatória."),
-  'q-state': z.string().min(1, "Estado é obrigatório."),
-  'q-number': z.string().min(1, "Número é obrigatório."),
-});
-
-type FormData = z.infer<typeof formSchema>;
-
-const getMaskFunction = (questionId: string) => {
-    switch (questionId) {
-        case 'q-cpf': return maskCPF;
-        case 'q-phone': return maskPhone;
-        case 'q-birthdate': return maskDate;
-        case 'q-cep': return maskCEP;
-        default: return (value: string) => value;
-    }
-}
-
+import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
 export default function CadastroPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,67 +28,25 @@ export default function CadastroPage() {
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(landingPageQuizQuery);
   const quiz = quizzes?.[0];
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      'q-name': '',
-      'q-cpf': '',
-      'q-birthdate': '',
-      'q-phone': '',
-      'q-email': '',
-      'q-mothername': '',
-      'q-cep': '',
-      'q-address': '',
-      'q-complement': '',
-      'q-neighborhood': '',
-      'q-city': '',
-      'q-state': '',
-      'q-number': '',
-    },
-  });
-
-  const handleCEPBlur = useCallback(async (cep: string) => {
-    const cleanCEP = cep.replace(/\D/g, '');
-    if (cleanCEP.length !== 8) {
-      return;
-    }
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
-      const data = await response.json();
-      if (data.erro) {
-        toast({ variant: 'destructive', title: 'CEP não encontrado.' });
-        return;
-      }
-      form.setValue('q-address', data.logradouro);
-      form.setValue('q-neighborhood', data.bairro);
-      form.setValue('q-city', data.localidade);
-      form.setValue('q-state', data.uf);
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar CEP.' });
-    }
-  }, [form, toast]);
-
-
-  const handleSubmit = async (data: FormData) => {
+  const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
     
-    // Convert answers to a Client-like structure
     const newClient = {
-      name: data['q-name'],
-      email: data['q-email'],
-      phone: data['q-phone'],
-      cpf: data['q-cpf'],
-      birthDate: data['q-birthdate'],
-      motherName: data['q-mothername'],
-      cep: data['q-cep'],
-      address: `${data['q-address']}, ${data['q-number']}`,
-      complement: data['q-complement'],
-      neighborhood: data['q-neighborhood'],
-      city: data['q-city'],
-      state: data['q-state'],
+      name: answers['q-name'],
+      email: answers['q-email'],
+      phone: answers['q-phone'],
+      cpf: answers['q-cpf'],
+      birthDate: answers['q-birthdate'],
+      motherName: answers['q-mothername'],
+      cep: answers['q-cep'],
+      address: `${answers['q-address']}, ${answers['q-number']}`,
+      complement: answers['q-complement'],
+      neighborhood: answers['q-neighborhood'],
+      city: answers['q-city'],
+      state: answers['q-state'],
       status: 'Novo',
       quizId: quiz?.id,
-      answers: data, // Save all raw form data
+      answers: answers,
       createdAt: new Date().toISOString(),
     };
 
@@ -153,14 +76,15 @@ export default function CadastroPage() {
     if (isLoadingQuiz) {
        return (
           <div className="space-y-4 animate-pulse">
+            <Skeleton className="h-4 w-full" />
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-1/2" />
-            <div className="space-y-4 py-4 min-h-[300px]">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+             <div className="space-y-4 py-4 min-h-[200px]">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-24 w-full" />
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-between">
+                <Skeleton className="h-10 w-24" />
                 <Skeleton className="h-10 w-32" />
             </div>
         </div>
@@ -178,109 +102,8 @@ export default function CadastroPage() {
       );
     }
     
-    if (quiz) {
-      const personalDataQuestions = quiz.questions.filter(q => !['q-cep', 'q-address', 'q-neighborhood', 'q-city', 'q-state', 'q-number', 'q-complement'].includes(q.id));
-      const addressQuestionIds = ['q-cep', 'q-state', 'q-city', 'q-address', 'q-neighborhood', 'q-number', 'q-complement'];
-      const addressQuestions = addressQuestionIds.map(id => quiz.questions.find(q => q.id === id)).filter(Boolean);
-
-      return (
-         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                <div className="space-y-2 text-left">
-                  <h3 className="text-2xl font-bold">{quiz.name}</h3>
-                  <p className="text-muted-foreground">Preencha seus dados para iniciar a simulação.</p>
-                </div>
-
-                <div>
-                    <h4 className="text-lg font-semibold mb-4">Dados Pessoais</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {personalDataQuestions.map(question => {
-                         const mask = getMaskFunction(question.id);
-                        return (
-                        <FormField
-                            key={question.id}
-                            control={form.control}
-                            name={question.id as keyof FormData}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>{question.text}</FormLabel>
-                                    <FormControl>
-                                        <Input 
-                                            {...field}
-                                            onChange={(e) => {
-                                                const maskedValue = mask(e.target.value);
-                                                e.target.value = maskedValue; // Update input value for user
-                                                field.onChange(e); // Notify react-hook-form
-                                            }}
-                                            placeholder={question.text.replace('*','')} 
-                                            type={question.type}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        )
-                    })}
-                    </div>
-                </div>
-                
-                <div>
-                    <h4 className="text-lg font-semibold mb-4 border-t pt-6">Endereço</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {addressQuestions.map(question => {
-                            if (!question) return null;
-                            const questionId = question.id as keyof FormData;
-                            const isReadOnly = ['q-address', 'q-neighborhood', 'q-city', 'q-state'].includes(questionId);
-                            let colSpan = "md:col-span-4";
-                            if (questionId === 'q-cep' || questionId === 'q-state' || questionId === 'q-number') colSpan = 'md:col-span-1';
-                            if (questionId === 'q-city' || questionId === 'q-neighborhood' || questionId === 'q-address') colSpan = 'md:col-span-2';
-                             if (questionId === 'q-complement') colSpan = 'md:col-span-3';
-
-                            return (
-                                <FormField
-                                    key={questionId}
-                                    control={form.control}
-                                    name={questionId}
-                                    render={({ field }) => {
-                                        const mask = getMaskFunction(questionId);
-                                        const handleBlur = questionId === 'q-cep' ? () => handleCEPBlur(form.getValues('q-cep')) : undefined;
-                                        return (
-                                            <FormItem className={colSpan}>
-                                                <FormLabel>{question.text}</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        {...field}
-                                                        readOnly={isReadOnly}
-                                                        onBlur={handleBlur}
-                                                        onChange={(e) => {
-                                                             const maskedValue = mask(e.target.value);
-                                                             e.target.value = maskedValue;
-                                                             field.onChange(e);
-                                                        }}
-                                                        placeholder={question.text.replace('*','')}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )
-                                    }}
-                                />
-                            )
-                        })}
-                    </div>
-                </div>
-
-
-                <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {isSubmitting ? 'Enviando...' : 'Finalizar Cadastro'}
-                  </Button>
-                </div>
-            </form>
-         </Form>
-      );
+    if (quiz && quiz.questions && quiz.questions.length > 0) {
+       return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
     }
 
     return (
@@ -304,7 +127,7 @@ export default function CadastroPage() {
         </Button>
       </header>
       <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-4xl">
+        <Card className="w-full max-w-2xl">
             <CardContent className="p-6 md:p-8">
                 {renderContent()}
             </CardContent>
@@ -313,6 +136,3 @@ export default function CadastroPage() {
     </div>
   );
 }
-
-
-    
