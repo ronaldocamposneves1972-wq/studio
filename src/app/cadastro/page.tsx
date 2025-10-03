@@ -180,21 +180,8 @@ export default function CadastroPage() {
     
     if (quiz) {
       const personalDataQuestions = quiz.questions.filter(q => !['q-cep', 'q-address', 'q-neighborhood', 'q-city', 'q-state', 'q-number', 'q-complement'].includes(q.id));
-      const addressQuestions = quiz.questions.filter(q => ['q-cep', 'q-address', 'q-neighborhood', 'q-city', 'q-state', 'q-number', 'q-complement'].includes(q.id));
-      
-      const getFieldProps = (qId: string) => {
-        const isReadOnly = ['q-address', 'q-neighborhood', 'q-city', 'q-state'].includes(qId);
-        let onBlur, onChange;
-
-        if (qId === 'q-cep') {
-            onBlur = () => handleCEPBlur(form.getValues('q-cep'));
-        }
-        
-        const mask = getMaskFunction(qId);
-        onChange = (e: React.ChangeEvent<HTMLInputElement>) => form.setValue(qId as keyof FormData, mask(e.target.value));
-
-        return { isReadOnly, onBlur, onChange };
-      };
+      const addressQuestionIds = ['q-cep', 'q-state', 'q-city', 'q-address', 'q-neighborhood', 'q-number', 'q-complement'];
+      const addressQuestions = addressQuestionIds.map(id => quiz.questions.find(q => q.id === id)).filter(Boolean);
 
       return (
          <Form {...form}>
@@ -208,7 +195,7 @@ export default function CadastroPage() {
                     <h4 className="text-lg font-semibold mb-4">Dados Pessoais</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {personalDataQuestions.map(question => {
-                        const { onChange } = getFieldProps(question.id);
+                         const mask = getMaskFunction(question.id);
                         return (
                         <FormField
                             key={question.id}
@@ -221,7 +208,8 @@ export default function CadastroPage() {
                                         <Input 
                                             {...field}
                                             onChange={(e) => {
-                                                onChange(e); // Apply mask
+                                                const maskedValue = mask(e.target.value);
+                                                e.target.value = maskedValue; // Update input value for user
                                                 field.onChange(e); // Notify react-hook-form
                                             }}
                                             placeholder={question.text.replace('*','')} 
@@ -240,110 +228,46 @@ export default function CadastroPage() {
                 <div>
                     <h4 className="text-lg font-semibold mb-4 border-t pt-6">Endereço</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {quiz.questions.find(q => q.id === 'q-cep') && (
-                            <FormField
-                                control={form.control}
-                                name="q-cep"
-                                render={({ field }) => {
-                                    const { onBlur, onChange } = getFieldProps('q-cep');
-                                    return (
-                                        <FormItem className="md:col-span-1">
-                                            <FormLabel>CEP*</FormLabel>
-                                            <FormControl>
-                                                <Input 
-                                                    {...field}
-                                                    onChange={(e) => {
-                                                        onChange(e);
-                                                        field.onChange(e);
-                                                    }}
-                                                    onBlur={onBlur}
-                                                    placeholder="00000-000"
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )
-                                }}
-                            />
-                        )}
-                        {quiz.questions.find(q => q.id === 'q-state') && (
-                             <FormField
-                                control={form.control}
-                                name="q-state"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-1">
-                                        <FormLabel>Estado</FormLabel>
-                                        <FormControl><Input readOnly {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                         {quiz.questions.find(q => q.id === 'q-city') && (
-                             <FormField
-                                control={form.control}
-                                name="q-city"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel>Cidade</FormLabel>
-                                        <FormControl><Input readOnly {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                         {quiz.questions.find(q => q.id === 'q-address') && (
-                            <FormField
-                                control={form.control}
-                                name="q-address"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel>Endereço</FormLabel>
-                                        <FormControl><Input readOnly {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                         )}
-                         {quiz.questions.find(q => q.id === 'q-neighborhood') && (
-                            <FormField
-                                control={form.control}
-                                name="q-neighborhood"
-                                render={({ field }) => (
-                                    <FormItem className="md:col-span-2">
-                                        <FormLabel>Bairro</FormLabel>
-                                        <FormControl><Input readOnly {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                         {quiz.questions.find(q => q.id === 'q-number') && (
-                           <FormField
-                                control={form.control}
-                                name="q-number"
-                                render={({ field }) => (
-                                <FormItem className="md:col-span-1">
-                                    <FormLabel>Número*</FormLabel>
-                                    <FormControl><Input placeholder="Ex: 123" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        )}
-                        {quiz.questions.find(q => q.id === 'q-complement') && (
-                          <FormField
-                                control={form.control}
-                                name="q-complement"
-                                render={({ field }) => (
-                                <FormItem className="md:col-span-3">
-                                    <FormLabel>Complemento</FormLabel>
-                                    <FormControl><Input placeholder="Apto, Bloco, etc." {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        )}
+                        {addressQuestions.map(question => {
+                            if (!question) return null;
+                            const questionId = question.id as keyof FormData;
+                            const isReadOnly = ['q-address', 'q-neighborhood', 'q-city', 'q-state'].includes(questionId);
+                            let colSpan = "md:col-span-4";
+                            if (questionId === 'q-cep' || questionId === 'q-state' || questionId === 'q-number') colSpan = 'md:col-span-1';
+                            if (questionId === 'q-city' || questionId === 'q-neighborhood' || questionId === 'q-address') colSpan = 'md:col-span-2';
+                             if (questionId === 'q-complement') colSpan = 'md:col-span-3';
+
+                            return (
+                                <FormField
+                                    key={questionId}
+                                    control={form.control}
+                                    name={questionId}
+                                    render={({ field }) => {
+                                        const mask = getMaskFunction(questionId);
+                                        const handleBlur = questionId === 'q-cep' ? () => handleCEPBlur(form.getValues('q-cep')) : undefined;
+                                        return (
+                                            <FormItem className={colSpan}>
+                                                <FormLabel>{question.text}</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        readOnly={isReadOnly}
+                                                        onBlur={handleBlur}
+                                                        onChange={(e) => {
+                                                             const maskedValue = mask(e.target.value);
+                                                             e.target.value = maskedValue;
+                                                             field.onChange(e);
+                                                        }}
+                                                        placeholder={question.text.replace('*','')}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )
+                                    }}
+                                />
+                            )
+                        })}
                     </div>
                 </div>
 
@@ -390,3 +314,5 @@ export default function CadastroPage() {
   );
 }
 
+
+    
