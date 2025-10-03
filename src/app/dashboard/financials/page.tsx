@@ -98,7 +98,7 @@ export default function FinancialsPage() {
                     <TableHead>Venda (ID)</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead className="hidden md:table-cell">Atendente</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Status Pagamento</TableHead>
                     <TableHead className="text-right">Comissão</TableHead>
                   </TableRow>
                 </TableHeader>

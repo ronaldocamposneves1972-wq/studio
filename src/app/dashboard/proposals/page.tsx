@@ -81,7 +81,7 @@ export default function ProposalsPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Filtrar por Status</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem checked>Abertta</DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked>Aberta</DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem>Em negociação</DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem>Finalizada</DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem>Cancelada</DropdownMenuCheckboxItem>
@@ -138,7 +138,7 @@ export default function ProposalsPage() {
                       <DropdownMenuTrigger asChild>
                         <Button aria-haspopup="true" size="icon" variant="ghost">
                           <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Toggle menu</span>
+                          <span className="sr-only">Alternar menu</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">

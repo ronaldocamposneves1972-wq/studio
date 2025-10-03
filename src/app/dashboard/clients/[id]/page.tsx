@@ -364,7 +364,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                 </CardContent>
                                 {client.quizId && (
                                 <CardFooter className="border-t px-6 py-4">
-                                    <p className="text-sm text-muted-foreground">Respondido a partir do quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
+                                    <p className="text-sm text-muted-foreground">Quiz respondido: <span className="font-mono text-primary">{client.quizId}</span></p>
                                 </CardFooter>
                                 )}
                             </Card>
