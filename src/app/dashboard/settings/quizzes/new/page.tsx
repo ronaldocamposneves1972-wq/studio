@@ -45,6 +45,38 @@ const quizSchema = z.object({
 
 type QuizFormData = z.infer<typeof quizSchema>
 
+const initialDataCadastro = {
+  name: "Cadastro Inicial de Cliente",
+  placement: "landing_page" as QuizPlacement,
+  questions: [
+    { id: "q-cpf", text: "CPF*", type: "text" as const, options: "" },
+    { id: "q-name", text: "Nome Completo*", type: "text" as const, options: "" },
+    { id: "q-birthdate", text: "Data de Nascimento", type: "text" as const, options: "" },
+    { id: "q-phone", text: "Telefone Celular*", type: "tel" as const, options: "" },
+    { id: "q-email", text: "Email*", type: "email" as const, options: "" },
+    { id: "q-mother", text: "Nome da Mãe", type: "text" as const, options: "" },
+    { id: "q-cep", text: "CEP", type: "text" as const, options: "" },
+    { id: "q-address", text: "Endereço", type: "text" as const, options: "" },
+    { id: "q-complement", text: "Complemento", type: "text" as const, options: "" },
+  ],
+}
+
+const initialDataDocs = {
+  name: "Envio de Documentos",
+  placement: "client_link" as QuizPlacement,
+  questions: [
+    { id: "q-income", text: "Renda Mensal Comprovada", type: "number" as const, options: "" },
+    { id: "q-bank-name", text: "Banco", type: "text" as const, options: "" },
+    { id: "q-bank-agency", text: "Agência", type: "text" as const, options: "" },
+    { id: "q-bank-account", text: "Número da Conta", type: "text" as const, options: "" },
+    { id: "q-bank-digit", text: "Dígito da Conta", type: "text" as const, options: "" },
+    { id: "q-account-type", text: "Tipo de Conta", type: "radio" as const, options: "Conta Corrente, Conta Poupança" },
+    { id: "q-doc-id", text: "RG ou CNH (Frente e Verso)", type: "file" as const, options: "" },
+    { id: "q-doc-address", text: "Comprovante de Endereço", type: "file" as const, options: "" },
+    { id: "q-doc-payslip", text: "Último Holerite/Comprovante de Renda", type: "file" as const, options: "" },
+  ],
+}
+
 export default function NewQuizPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -57,30 +89,25 @@ export default function NewQuizPage() {
     control,
     handleSubmit,
     formState: { errors },
-    setValue
+    setValue,
+    reset,
   } = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
-    defaultValues: {
-      name: "Cadastro Inicial de Cliente",
-      placement: "landing_page",
-      questions: [
-        { id: "q-cpf", text: "CPF*", type: "text", options: "" },
-        { id: "q-name", text: "Nome Completo*", type: "text", options: "" },
-        { id: "q-birthdate", text: "Data de Nascimento", type: "text", options: "" },
-        { id: "q-phone", text: "Telefone Celular*", type: "tel", options: "" },
-        { id: "q-email", text: "Email*", type: "email", options: "" },
-        { id: "q-mother", text: "Nome da Mãe", type: "text", options: "" },
-        { id: "q-cep", text: "CEP", type: "text", options: "" },
-        { id: "q-address", text: "Endereço", type: "text", options: "" },
-        { id: "q-complement", text: "Complemento", type: "text", options: "" },
-      ],
-    },
+    defaultValues: initialDataCadastro,
   })
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: "questions",
   })
+
+  const handleTemplateChange = (template: 'cadastro' | 'docs') => {
+    if (template === 'cadastro') {
+      reset(initialDataCadastro);
+    } else {
+      reset(initialDataDocs);
+    }
+  }
 
   const onSubmit = async (data: QuizFormData) => {
     if (!user) {
@@ -108,7 +135,6 @@ export default function NewQuizPage() {
       if (!firestore) throw new Error("Firestore not available");
       const quizzesCollection = collection(firestore, 'quizzes');
       
-      // This function is non-blocking and handles its own errors
       addDocumentNonBlocking(quizzesCollection, quizData);
       
       toast({
@@ -154,13 +180,17 @@ export default function NewQuizPage() {
         <h1 className="flex-1 shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight sm:grow-0">
           Novo Quiz
         </h1>
+        <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleTemplateChange('cadastro')}>Usar Modelo de Cadastro</Button>
+            <Button variant="outline" size="sm" onClick={() => handleTemplateChange('docs')}>Usar Modelo de Documentos</Button>
+        </div>
       </div>
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card>
           <CardHeader>
             <CardTitle>Detalhes do Quiz</CardTitle>
             <CardDescription>
-              Dê um nome ao seu quiz e adicione as perguntas.
+              Dê um nome ao seu quiz, escolha um modelo ou crie suas próprias perguntas.
             </CardDescription>
           </CardHeader>
           <CardContent>

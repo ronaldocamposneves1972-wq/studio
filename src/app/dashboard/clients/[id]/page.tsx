@@ -19,7 +19,8 @@ import {
   XCircle,
   Clock,
   Send,
-  Activity
+  Activity,
+  Link2
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -274,25 +275,19 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                           <Card>
                             <CardHeader>
                               <CardTitle>Documentos</CardTitle>
-                              <CardDescription>Documentos enviados pelo cliente para análise.</CardDescription>
+                              <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
-                            <CardContent className="grid gap-6 md:grid-cols-3">
-                              {[docCnh, docRg, docProof].map((doc, index) => (
-                                doc && (
-                                <Card key={index}>
-                                  <CardContent className="p-2">
-                                    <Image src={doc.imageUrl} alt={doc.description} width={600} height={400} className="rounded-md object-cover aspect-video" data-ai-hint={doc.imageHint} />
-                                  </CardContent>
-                                  <CardFooter className="flex justify-between p-2 pt-0">
-                                    <p className="text-sm font-medium">{doc.description.split("a ")[1]}</p>
-                                    <Badge variant="default"><CheckCircle2 className="h-3 w-3 mr-1" /> Validado</Badge>
-                                  </CardFooter>
-                                </Card>
-                                )
-                              ))}
+                            <CardContent className="flex flex-col items-center justify-center text-center gap-4 min-h-60">
+                              <Upload className="h-12 w-12 text-muted-foreground" />
+                              <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
+                              <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
+                              <Button>
+                                <Link2 className="mr-2 h-4 w-4" />
+                                Gerar Link de Documentos
+                              </Button>
                             </CardContent>
-                             <CardFooter className="border-t px-6 py-4">
-                                <Button> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                             <CardFooter className="border-t px-6 py-4 flex justify-end">
+                                <Button disabled> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
                              </CardFooter>
                           </Card>
                         </TabsContent>
@@ -337,7 +332,3 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
-
-    
-
-    
