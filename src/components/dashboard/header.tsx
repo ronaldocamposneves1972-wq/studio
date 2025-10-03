@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Sheet,
   SheetContent,
@@ -33,13 +33,12 @@ import {
   FileText,
   DollarSign,
   Settings,
-  CircleUser,
-  Building,
 } from 'lucide-react';
 import Image from 'next/image';
-import { users } from '@/lib/placeholder-data';
 import { AppLogo } from '../logo';
 import React from 'react';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -64,7 +63,14 @@ const BreadcrumbMap: { [key: string]: string } = {
 
 export default function DashboardHeader() {
   const pathname = usePathname();
-  const currentUser = users[0]; // Assuming the first user is the logged-in user
+  const { user } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
 
   const pathSegments = pathname.split('/').filter(Boolean);
 
@@ -133,23 +139,29 @@ export default function DashboardHeader() {
             size="icon"
             className="overflow-hidden rounded-full"
           >
-            <Image
-              src={currentUser.avatarUrl}
-              width={36}
-              height={36}
-              alt="Avatar"
-              className="overflow-hidden rounded-full"
-              data-ai-hint="person portrait"
-            />
+            {user?.photoURL ? (
+                <Image
+                    src={user.photoURL}
+                    width={36}
+                    height={36}
+                    alt="Avatar"
+                    className="overflow-hidden rounded-full"
+                    data-ai-hint="person portrait"
+                />
+            ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    {user?.email?.charAt(0).toUpperCase()}
+                </div>
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+          <DropdownMenuLabel>{user?.displayName || user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>Configurações</DropdownMenuItem>
           <DropdownMenuItem>Suporte</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Sair</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Sair</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
