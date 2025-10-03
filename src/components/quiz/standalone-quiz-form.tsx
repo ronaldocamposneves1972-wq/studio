@@ -161,6 +161,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
 
                 <form onSubmit={(e) => e.preventDefault()} className="space-y-4 py-4 min-h-[200px]">
                     <FormField
+                        key={currentQuestion.id}
                         control={form.control}
                         name={currentQuestion.id as any}
                         render={({ field }) => (
@@ -190,4 +191,3 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         </Form>
     );
 }
-
