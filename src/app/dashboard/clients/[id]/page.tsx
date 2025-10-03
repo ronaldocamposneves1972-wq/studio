@@ -248,7 +248,6 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     )
   }
 
-  const initialQuizLink = client.quizId ? `${window.location.origin}/q/${client.quizId}` : "N/A"
 
   return (
     <div className="grid flex-1 items-start gap-4 md:gap-8">
@@ -355,7 +354,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                       return(
                                         <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={key}>
                                           <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
-                                          <p className="text-foreground">{value || "Não informado"}</p>
+                                          <p className="text-foreground">{String(value) || "Não informado"}</p>
                                         </div>
                                       )
                                      })
@@ -363,10 +362,11 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                                     <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
                                   )}
                                 </CardContent>
-                                <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
-                                    <p className="text-sm text-muted-foreground">Link do Quiz: <span className="font-mono text-primary">{initialQuizLink}</span></p>
-                                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(initialQuizLink, "Link do quiz inicial copiado!")}><Copy className="h-3 w-3 mr-2" /> Copiar Link</Button>
+                                {client.quizId && (
+                                <CardFooter className="border-t px-6 py-4">
+                                    <p className="text-sm text-muted-foreground">Respondido a partir do quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
                                 </CardFooter>
+                                )}
                             </Card>
                         </TabsContent>
                         <TabsContent value="history">
@@ -449,5 +449,3 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     </div>
   )
 }
-
-    

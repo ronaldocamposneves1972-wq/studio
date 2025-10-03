@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where, limit } from 'firebase/firestore';
+import { doc, collection, query, where, limit, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Quiz } from '@/lib/types';
+import type { Quiz, Client } from '@/lib/types';
 
 
 function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, clientId: string, onComplete: (answers: any) => void }) {
@@ -84,7 +85,7 @@ function StandaloneQuizForm({ quiz, clientId, onComplete }: { quiz: Quiz, client
                 <Input
                     id={currentQuestion.id}
                     type={currentQuestion.type}
-                    value={answers[currentQuestion.id] || ''}
+                    value={typeof answers[currentQuestion.id] === 'string' ? answers[currentQuestion.id] : ''}
                     onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                     placeholder="Sua resposta"
                 />
@@ -159,8 +160,9 @@ export default function StandaloneQuizPage() {
         
         const clientRef = doc(firestore, 'clients', clientId);
         // We merge the new answers with existing ones from the initial quiz
-        const clientDoc = (await (await fetch(clientRef.path)).json()); // This is a mock, ideally you would fetch doc before updating
-        const existingAnswers = clientDoc?.answers || {};
+        const clientSnap = await getDoc(clientRef);
+        const clientData = clientSnap.data() as Client | undefined;
+        const existingAnswers = clientData?.answers || {};
 
         updateDocumentNonBlocking(clientRef, { 
             answers: { ...existingAnswers, ...serializableAnswers },
@@ -174,6 +176,7 @@ export default function StandaloneQuizPage() {
         setIsSubmitted(true);
 
     } catch(error) {
+        console.error(error);
          toast({
             variant: 'destructive',
             title: 'Ops! Algo deu errado.',
