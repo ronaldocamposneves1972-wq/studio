@@ -1,193 +1,194 @@
 /**
- * @file Firebase Security Rules for Consórcio and Crédito Management System
+ * @fileoverview Firestore Security Rules for Consórcio and Crédito Management System.
  *
- * @core_philosophy This ruleset enforces a strict user-ownership model for personal data,
- * role-based access for shared resources, and structural segregation for security.
- * All write operations are protected by authorization checks, with validation limited to
- * fields critical for authorization and relational integrity. Flexible data shapes are
- * permitted to allow for rapid iteration during prototyping.
+ * Core Philosophy:
+ * This ruleset enforces a multi-layered security model:
+ * 1. User-owned data: Each user has full control over their own data (e.g., sales).
+ * 2. Role-based access: Certain operations and data are restricted to users with specific roles (e.g., Admin, Gestor).  The roles_admin collection is used to grant administrative privileges.
+ * 3. Resource-based access: In some cases, access depends on data within the resource (e.g., a quiz can be created by any signed-in user).
  *
- * @data_structure
- * - /users/{userId}: Stores user profile information, accessible only by the user and admins.
- * - /users/{userId}/sales/{saleId}: Stores sales data for a specific user (sales representative),
- *   accessible only by the user and admins.
- * - /clients/{clientId}: Stores client information, accessible by users with appropriate roles.
- * - /products/{productId}: Stores product information, accessible by users with appropriate roles.
- * - /banks/{bankId}: Stores bank information, accessible by users with appropriate roles.
- * - /quizzes/{quizId}: Stores quiz configurations, accessible by users with appropriate roles.
- * - /webhooks/{webhookId}: Stores webhook configurations, accessible only by admins.
+ * Data Structure:
+ * - /users/{userId}: User profile information. Accessible only by the user and admins.
+ * - /users/{userId}/sales/{saleId}: Sales data associated with a specific user.
+ * - /clients/{clientId}: Client information.
+ * - /products/{productId}: Product information (Consórcio and Crédito).
+ * - /banks/{bankId}: Bank information.
+ * - /quizzes/{quizId}: Quiz configurations.
+ * - /webhooks/{webhookId}: Webhook configurations.
  *
- * @key_security_decisions
- * - User listing is not allowed to protect privacy.
- * - Data validation is minimized in favor of rapid prototyping but critical authorization
- *   and relational integrity checks are enforced.
- * - Role-based access is used to control access to shared resources.
- * - Ownership is enforced through path-based rules and data consistency checks.
- * - Admin status is managed via documents in the `/roles_admin/{userId}` collection.
+ * Key Security Decisions:
+ * - Users can only manage their own sales data.
+ * - Role-based access control is enforced for sensitive operations.
+ * - Listing of user documents is allowed only for the owner.
  *
- * @denormalization_for_authorization No denormalization required as the structure supports
- * path-based ownership for user-specific data and membership maps for collaborative entities.
- *
- * @structural_segregation Clear separation of user data, client data, and sales data under
- * individual users.
+ * Denormalization for Authorization:
+ * - The `roles_admin/{userId}` collection is used to denote admin privileges.  The existence of a document for a user indicates admin status.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profile information.
+     * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+        /**
+     * @description Checks if the authenticated user is an admin.
+     * @return {boolean} True if the user is an admin, false otherwise.
+     */
+    function isAdmin() {
+        return exists(/databases/(default)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Checks if the authenticated user is the existing owner of a document.
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Defines the logic for granting read or write access to a resource based on whether the user is an admin
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is an admin or the owner, false otherwise.
+     */
+    function isAdminOrOwner(userId) {
+      return isAdmin() || isOwner(userId);
+    }
+
+    /**
+     * @description Rules for user profile documents.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own user document if the userId matches their auth.uid.
-     * @allow (get) - Authenticated user can get their own user document.
-     * @allow (update) - Authenticated user can update their own user document.
-     * @allow (delete) - Authenticated user can delete their own user document.
-     * @deny (create) - Non-authenticated user cannot create any user document.
-     * @deny (update) - Authenticated user cannot update another user's document.
-     * @deny (delete) - Authenticated user cannot delete another user's document.
-     * @principle Enforces document ownership for writes and restricts access to a user's own data.
+     * @allow (get, update, delete) if the user is the owner or an admin.
+     * @deny (create) if the user is not the owner.
+     * @allow (create) if the user's ID matches the requested document ID.
+     * @deny (list) always, user listing is disallowed.
+     * @principle Enforces user-ownership and admin access for user profiles.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      allow get: if isOwner(userId);
+      // Only the user or an admin can read their own profile.
+      allow get: if isAdminOrOwner(userId);
+      // Only the user themselves can create their profile.
+      allow create: if isOwner(userId);
+      // Only the user or an admin can update their own profile.
+      allow update: if isExistingOwner(userId) || isAdmin();
+      // Only the user or an admin can delete their own profile.
+      allow delete: if isExistingOwner(userId) || isAdmin();
+      // No one can list all users.
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Manages sales data associated with a specific user (sales representative).
+     * @description Rules for sales documents nested under a user.
      * @path /users/{userId}/sales/{saleId}
-     * @allow (create) - Authenticated user (sales representative) can create a sale document under their user ID.
-     * @allow (get) - Authenticated user (sales representative) can get their own sale document.
-     * @allow (update) - Authenticated user (sales representative) can update their own sale document.
-     * @allow (delete) - Authenticated user (sales representative) can delete their own sale document.
-     * @deny (create) - Non-authenticated user cannot create any sale document.
-     * @deny (update) - Authenticated user cannot update another user's sale document.
-     * @deny (delete) - Authenticated user cannot delete another user's sale document.
-     * @principle Enforces document ownership for writes and restricts access to a user's own sales data.
+     * @allow (get, list, create, update, delete) if the user is the owner (sales rep) or an admin.
+     * @deny if the user is not the owner or an admin.
+     * @principle Enforces user-ownership for sales data.
      */
     match /users/{userId}/sales/{saleId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+      // Only the user or an admin can read/write their own sales data.
+      allow get: if isAdminOrOwner(userId);
+      allow list: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isExistingOwner(userId) || isAdmin();
+      allow delete: if isExistingOwner(userId) || isAdmin();
     }
 
     /**
-     * @description Manages client information.
+     * @description Rules for client documents.
      * @path /clients/{clientId}
-     * @allow (get) - Public read access to client information.
-     * @allow (list) - Public read access to client list.
-     * @allow (create) - Only authenticated users can create client documents.
-     * @allow (update) - Only the user who created the client can update it.  Requires `ownerId` on the document.
-     * @allow (delete) - Only the user who created the client can delete it.  Requires `ownerId` on the document.
-     * @deny (create) - Non-authenticated users cannot create client documents.
-     * @principle Public read access with owner-only writes.
+     * @allow (get, list) to anyone.
+     * @allow (create, update, delete) only to admins.
+     * @principle Restricts client management to admins.
      */
     match /clients/{clientId} {
-        allow get, list: if true;
-        // CRITICAL: Cannot implement owner-only writes. The 'Client' entity is missing an 'ownerId' or 'authorId' field.
-        allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Everyone can read client information.
+      allow get, list: if true;
+      // Only admins can create, update, or delete clients.
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Manages product information.
+     * @description Rules for product documents.
      * @path /products/{productId}
-     * @allow (get) - Public read access to product information.
-     * @allow (list) - Public read access to product list.
-     * @allow (create) - Only authenticated users can create product documents.
-     * @allow (update) - Only the user who created the product can update it. Requires `ownerId` on the document.
-     * @allow (delete) - Only the user who created the product can delete it. Requires `ownerId` on the document.
-     * @deny (create) - Non-authenticated users cannot create product documents.
-     * @principle Public read access with owner-only writes.
+     * @allow (get, list) to anyone.
+     * @allow (create, update, delete) only to admins.
+     * @principle Restricts product management to admins.
      */
     match /products/{productId} {
-        allow get, list: if true;
-        // CRITICAL: Cannot implement owner-only writes. The 'Product' entity is missing an 'ownerId' or 'authorId' field.
-        allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Everyone can read product information.
+      allow get, list: if true;
+      // Only admins can create, update, or delete products.
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Manages bank information.
+     * @description Rules for bank documents.
      * @path /banks/{bankId}
-     * @allow (get) - Public read access to bank information.
-     * @allow (list) - Public read access to bank list.
-     * @allow (create) - Only authenticated users can create bank documents.
-     * @allow (update) - Only the user who created the bank can update it. Requires `ownerId` on the document.
-     * @allow (delete) - Only the user who created the bank can delete it. Requires `ownerId` on the document.
-     * @deny (create) - Non-authenticated users cannot create bank documents.
-     * @principle Public read access with owner-only writes.
+     * @allow (get, list) to anyone.
+     * @allow (create, update, delete) only to admins.
+     * @principle Restricts bank management to admins.
      */
     match /banks/{bankId} {
-        allow get, list: if true;
-        // CRITICAL: Cannot implement owner-only writes. The 'Bank' entity is missing an 'ownerId' or 'authorId' field.
-        allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Everyone can read bank information.
+      allow get, list: if true;
+      // Only admins can create, update, or delete banks.
+      allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description Manages quiz configurations.
+     /**
+     * @description Rules for quiz documents.
      * @path /quizzes/{quizId}
-     * @allow (get) - Public read access to quiz configurations.
-     * @allow (list) - Public read access to quiz list.
-     * @allow (create) - Only authenticated users can create quiz documents.
-     * @allow (update) - Only the user who created the quiz can update it. Requires `ownerId` on the document.
-     * @allow (delete) - Only the user who created the quiz can delete it. Requires `ownerId` on the document.
-     * @deny (create) - Non-authenticated users cannot create quiz documents.
-     * @principle Public read access with owner-only writes.
+     * @allow get, list: if true;
+     * @allow create: if isSignedIn();
+     * @allow update, delete: if isAdmin();
+     * @principle Allows anyone to read quizzes, any signed-in user to create, and only admins to modify/delete.
      */
     match /quizzes/{quizId} {
-        allow get, list: if true;
-        // CRITICAL: Cannot implement owner-only writes. The 'Quiz' entity is missing an 'ownerId' or 'authorId' field.
-        allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Everyone can read quiz information.
+      allow get, list: if true;
+      // Only signed-in users can create quizzes.
+      allow create: if isSignedIn();
+      // Only admins can update or delete quizzes.
+      allow update, delete: if isAdmin();
     }
 
     /**
-     * @description Manages webhook configurations.
+     * @description Rules for webhook documents.
      * @path /webhooks/{webhookId}
-     * @allow (get) - Public read access to webhook configurations.
-     * @allow (list) - Public read access to webhook list.
-     * @allow (create) - Only authenticated users can create webhook documents.
-     * @allow (update) - Only the user who created the webhook can update it. Requires `ownerId` on the document.
-     * @allow (delete) - Only the user who created the webhook can delete it. Requires `ownerId` on the document.
-     * @deny (create) - Non-authenticated users cannot create webhook documents.
-     * @principle Public read access with owner-only writes.
+     * @allow (get, list, create, update, delete) only to admins.
+     * @principle Restricts webhook management to admins.
      */
     match /webhooks/{webhookId} {
-        allow get, list: if true;
-        // CRITICAL: Cannot implement owner-only writes. The 'Webhook' entity is missing an 'ownerId' or 'authorId' field.
-        allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      // Only admins can manage webhooks.
+      allow get, list, create, update, delete: if isAdmin();
     }
-        /**
-     * @description Allows admins to bypass all rules.
+
+    /**
+     * @description Rules for roles_admin documents.  The existence of a document here confers admin rights.
      * @path /roles_admin/{userId}
      */
     match /roles_admin/{userId} {
-          function isAdmin(userId) {
-            return request.auth != null && request.auth.uid == userId;
-          }
-
-          function isExistingAdmin(userId) {
-            return isAdmin(userId) && resource != null;
-          }
-          allow get: if isAdmin(userId);
-          allow list: if false;
-          allow create: if isAdmin(userId) && request.resource.data.id == userId;
-          allow update: if isExistingAdmin(userId) && request.resource.data.id == resource.data.id;
-          allow delete: if isExistingAdmin(userId);
+        allow get: if isAdmin();
+        allow create: if isAdmin();
+        allow update: if false;
+        allow delete: if isAdmin();
+        allow list: if false;
     }
   }
 }
