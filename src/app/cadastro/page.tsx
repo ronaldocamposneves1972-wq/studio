@@ -46,7 +46,6 @@ export default function CadastroPage() {
       state: answers['q-state'] || null,
       status: 'Novo',
       quizId: quiz?.id || null,
-      answers: answers,
       createdAt: new Date().toISOString(),
     };
 
