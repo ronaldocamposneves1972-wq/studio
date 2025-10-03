@@ -53,7 +53,7 @@ export default function DashboardSidebar() {
                   href={item.href}
                   className={cn(
                     'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:text-foreground md:h-8 md:w-8',
-                    pathname.startsWith(item.href) ? 'text-foreground' : 'text-foreground/70'
+                    (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))) ? 'text-foreground' : 'text-foreground/70'
                   )}
                 >
                   <item.icon className="h-5 w-5" />
