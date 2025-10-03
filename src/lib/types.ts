@@ -78,6 +78,7 @@ export type QuizPlacement = 'landing_page' | 'client_link';
 export type Quiz = {
     id: string;
     name: string;
+    ownerId?: string;
     questions: QuizQuestion[];
     placement?: QuizPlacement;
 };

@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useFirestore, addDocumentNonBlocking } from "@/firebase"
+import { useFirestore, addDocumentNonBlocking, useUser } from "@/firebase"
 import { collection } from "firebase/firestore"
 import { QuizPlacement } from "@/lib/types"
 
@@ -49,6 +49,7 @@ export default function NewQuizPage() {
   const router = useRouter()
   const { toast } = useToast()
   const firestore = useFirestore()
+  const { user, isUserLoading } = useUser()
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -72,10 +73,20 @@ export default function NewQuizPage() {
   })
 
   const onSubmit = async (data: QuizFormData) => {
+    if (!user) {
+       toast({
+        variant: "destructive",
+        title: "Erro de autenticação",
+        description: "Você precisa estar logado para criar um quiz.",
+      })
+      return;
+    }
+
     setIsLoading(true)
 
     const quizData = {
       ...data,
+      ownerId: user.uid, // Add ownerId
       questions: data.questions.map(q => ({
         ...q,
         options: q.options ? q.options.split(',').map(opt => opt.trim()) : [],
@@ -84,6 +95,7 @@ export default function NewQuizPage() {
     }
 
     try {
+      if (!firestore) throw new Error("Firestore not available");
       const quizzesCollection = collection(firestore, 'quizzes');
       await addDocumentNonBlocking(quizzesCollection, quizData);
       
@@ -97,10 +109,25 @@ export default function NewQuizPage() {
       toast({
         variant: "destructive",
         title: "Erro ao criar quiz",
-        description: "Não foi possível salvar o quiz. Tente novamente.",
+        description: "Não foi possível salvar o quiz. Verifique as permissões do Firestore.",
       })
       setIsLoading(false)
     }
+  }
+
+  if (isUserLoading) {
+    return <p>Carregando...</p>
+  }
+  
+  if (!user) {
+     return (
+      <div className="text-center py-10">
+        <p>Você precisa estar logado para acessar esta página.</p>
+         <Button asChild className="mt-4">
+          <Link href="/dashboard">Ir para o Login</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
