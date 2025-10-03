@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { useFieldArray, useForm, useWatch } from "react-hook-form"
+import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useFirestore, useUser, useDoc, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
 import type { Quiz, QuizPlacement } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
@@ -64,14 +65,7 @@ export default function EditQuizPage() {
 
   const { data: quiz, isLoading: isLoadingQuiz } = useDoc<Quiz>(quizDocRef)
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    reset,
-  } = useForm<QuizFormData>({
+  const form = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
     defaultValues: {
       name: "",
@@ -80,12 +74,9 @@ export default function EditQuizPage() {
     }
   })
 
-  const watchedPlacement = useWatch({ control, name: "placement" });
-
-
   useEffect(() => {
     if (quiz) {
-      reset({
+      form.reset({
         name: quiz.name,
         placement: quiz.placement,
         questions: quiz.questions.map(q => ({
@@ -94,10 +85,10 @@ export default function EditQuizPage() {
         })),
       })
     }
-  }, [quiz, reset])
+  }, [quiz, form])
 
   const { fields, append, remove } = useFieldArray({
-    control,
+    control: form.control,
     name: "questions",
   })
 
@@ -212,126 +203,163 @@ export default function EditQuizPage() {
           Editar Quiz
         </h1>
       </div>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalhes do Quiz</CardTitle>
-            <CardDescription>
-              Modifique o nome, localização e as perguntas do seu quiz.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Nome do Quiz</Label>
-                  <Input
-                    id="name"
-                    {...register("name")}
-                    className={errors.name ? "border-destructive" : ""}
-                    disabled={isSubmitting}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Detalhes do Quiz</CardTitle>
+              <CardDescription>
+                Modifique o nome, localização e as perguntas do seu quiz.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome do Quiz</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome do seu quiz" {...field} disabled={isSubmitting}/>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                </div>
-                 <div>
-                    <Label>Localização</Label>
-                     <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} value={watchedPlacement} disabled={isSubmitting}>
-                        <SelectTrigger className={errors.placement ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Selecione onde o quiz será usado" />
-                        </SelectTrigger>
-                        <SelectContent>
+                  <FormField
+                    control={form.control}
+                    name="placement"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Localização</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isSubmitting}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione onde o quiz será usado" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
                             <SelectItem value="landing_page">Página Inicial</SelectItem>
                             <SelectItem value="client_link">Link para Cliente</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     {errors.placement && <p className="text-sm text-destructive mt-1">{errors.placement.message}</p>}
-                </div>
-              </div>
-
-
-              <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
-              {fields.map((field, index) => (
-                <div key={field.id} className="grid gap-4 border p-4 rounded-lg relative">
-                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7"
-                    onClick={() => remove(index)}
-                    disabled={isSubmitting}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                        <Label>ID da Pergunta</Label>
-                        <Input
-                        {...register(`questions.${index}.id`)}
-                        placeholder="ex: q-email"
-                        disabled={isSubmitting}
-                        />
-                        {errors.questions?.[index]?.id && <p className="text-sm text-destructive mt-1">{errors.questions?.[index]?.id?.message}</p>}
-                    </div>
-                     <div>
-                        <Label>Texto da Pergunta</Label>
-                        <Input
-                        {...register(`questions.${index}.text`)}
-                        placeholder="Ex: Qual o seu e-mail?"
-                        disabled={isSubmitting}
-                        />
-                         {errors.questions?.[index]?.text && <p className="text-sm text-destructive mt-1">{errors.questions?.[index]?.text?.message}</p>}
-                    </div>
-                     <div>
-                        <Label>Tipo da Pergunta</Label>
-                        <Select onValueChange={(value) => setValue(`questions.${index}.type`, value as any)} value={field.type} disabled={isSubmitting}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione o tipo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="text">Texto</SelectItem>
-                                <SelectItem value="number">Número</SelectItem>
-                                <SelectItem value="email">Email</SelectItem>
-                                <SelectItem value="tel">Telefone</SelectItem>
-                                <SelectItem value="radio">Múltipla Escolha (Radio)</SelectItem>
-                                <SelectItem value="checkbox">Seleção (Checkbox)</SelectItem>
-                                <SelectItem value="file">Arquivo</SelectItem>
-                            </SelectContent>
+                          </SelectContent>
                         </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Opções (separadas por vírgula)</Label>
-                    <Input
-                      {...register(`questions.${index}.options`)}
-                      placeholder="Opção 1, Opção 2, Opção 3"
-                      disabled={isSubmitting}
-                    />
-                  </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              ))}
-              {errors.questions && typeof errors.questions.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.questions.message}</p>}
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => append({ id: "", text: "", type: "text", options: "" })}
-                disabled={isSubmitting}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Adicionar Pergunta
-              </Button>
-            </div>
-          </CardContent>
-           <CardFooter className="border-t px-6 py-4 flex justify-end gap-2">
-                 <Button variant="outline" type="button" onClick={() => router.push('/dashboard/settings/quizzes')} disabled={isSubmitting}>Cancelar</Button>
-                <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Salvando..." : "Salvar Alterações"}
+
+                <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid gap-4 border p-4 rounded-lg relative">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7"
+                      onClick={() => remove(index)}
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                    <div className="grid md:grid-cols-3 gap-4">
+                       <FormField
+                          control={form.control}
+                          name={`questions.${index}.id`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ID da Pergunta</FormLabel>
+                              <FormControl>
+                                <Input placeholder="ex: q-email" {...field} disabled={isSubmitting}/>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                         <FormField
+                          control={form.control}
+                          name={`questions.${index}.text`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Texto da Pergunta</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ex: Qual o seu e-mail?" {...field} disabled={isSubmitting}/>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`questions.${index}.type`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tipo da Pergunta</FormLabel>
+                               <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isSubmitting}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o tipo" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="text">Texto</SelectItem>
+                                    <SelectItem value="number">Número</SelectItem>
+                                    <SelectItem value="email">Email</SelectItem>
+                                    <SelectItem value="tel">Telefone</SelectItem>
+                                    <SelectItem value="radio">Múltipla Escolha (Radio)</SelectItem>
+                                    <SelectItem value="checkbox">Seleção (Checkbox)</SelectItem>
+                                    <SelectItem value="file">Arquivo</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                    </div>
+                     <FormField
+                        control={form.control}
+                        name={`questions.${index}.options`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Opções (separadas por vírgula)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Opção 1, Opção 2, Opção 3" {...field} disabled={isSubmitting}/>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
+                ))}
+                {form.formState.errors.questions && typeof form.formState.errors.questions.message === 'string' && <p className="text-sm text-destructive mt-1">{form.formState.errors.questions.message}</p>}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => append({ id: "", text: "", type: "text", options: "" })}
+                  disabled={isSubmitting}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Adicionar Pergunta
                 </Button>
-            </CardFooter>
-        </Card>
-      </form>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t px-6 py-4 flex justify-end gap-2">
+                  <Button variant="outline" type="button" onClick={() => router.push('/dashboard/settings/quizzes')} disabled={isSubmitting}>Cancelar</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+              </CardFooter>
+          </Card>
+        </form>
+      </Form>
     </div>
   )
 }
+
+    
