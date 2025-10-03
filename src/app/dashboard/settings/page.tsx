@@ -27,13 +27,16 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { useCollection } from "@/firebase"
+import { useCollection, useMemoFirebase } from "@/firebase"
 import { useFirestore } from "@/firebase"
 import { collection, query } from "firebase/firestore"
 
 export default function SettingsPage() {
   const firestore = useFirestore()
-  const quizzesQuery = query(collection(firestore, 'quizzes'))
+  const quizzesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'quizzes'));
+  }, [firestore]);
   const { data: quizzes, isLoading } = useCollection(quizzesQuery)
 
   return (
@@ -113,7 +116,7 @@ export default function SettingsPage() {
               <CardDescription>
                 Conecte a ConsorciaTech com suas ferramentas favoritas.
               </CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">API Key do WhatsApp</label>
@@ -136,7 +139,7 @@ export default function SettingsPage() {
               <CardDescription>
                 Configure URLs para receber eventos da plataforma em tempo real.
               </CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">URL para Validação de Documentos</label>
