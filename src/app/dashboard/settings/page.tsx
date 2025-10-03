@@ -78,7 +78,7 @@ export default function SettingsPage() {
         Gerencie as configurações da sua conta e da plataforma.
       </p>
 
-      <Tabs defaultValue="users" className="mt-4">
+      <Tabs defaultValue="quizzes" className="mt-4">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Usuários</TabsTrigger>
           <TabsTrigger value="quizzes"><FileQuestion className="w-4 h-4 mr-2" />Quizzes</TabsTrigger>
@@ -124,8 +124,7 @@ export default function SettingsPage() {
                   </CardContent>
                   <CardFooter className="flex justify-between">
                     <Button variant="secondary" asChild>
-                      {/* TODO: Create edit page */}
-                      <Link href={`/dashboard/settings/quizzes/new`}>Editar</Link>
+                      <Link href={`/dashboard/settings/quizzes/${quiz.id}`}>Editar</Link>
                     </Button>
                     {/* Only show delete button if the logged-in user is the owner */}
                     {user && quiz.ownerId === user.uid && (
