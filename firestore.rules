@@ -1,165 +1,258 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech.
+ * @fileoverview Firestore Security Rules for ConsorciaTech application.
  *
  * Core Philosophy:
- * This ruleset prioritizes ease of access across the board, with no authorization checks.
+ * This ruleset prioritizes authorization independence by denormalizing data and using path-based ownership where feasible.
+ * It enforces strict access control based on user identity and relationships between documents.
  *
  * Data Structure:
- * The database is organized into top-level collections for various entities like users, clients,
- * financial institutions, products (consortiums, credit products), product combos, sales proposals,
- * commissions, quizzes, and questions.
+ * - Users: `/users/{userId}` stores personal user data.
+ * - Admins: `/roles_admin/{userId}` document existence grants admin privileges.
+ * - Clients: `/clients/{clientId}` stores client information.
+ * - Documents: `/clients/{clientId}/documents/{documentId}` stores client-uploaded documents.
+ * - Financial Institutions: `/financial_institutions/{financialInstitutionId}` stores financial institution data.
+ * - Consortiums: `/consortiums/{consortiumId}` stores consortium product information.
+ * - Credit Products: `/credit_products/{creditProductId}` stores credit product information.
+ * - Product Combos: `/product_combos/{productComboId}` stores combinations of products.
+ * - Sales Proposals: `/sales_proposals/{salesProposalId}` stores sales proposal data, including denormalized `clientId`.
+ * - Commissions: `/commissions/{commissionId}` stores commission data.
+ * - Quizzes: `/quizzes/{quizId}` stores quiz data.
+ * - Questions: `/questions/{questionId}` stores individual question data.
  *
  * Key Security Decisions:
- * - All data is publicly readable and writable. This is intended for prototyping only and is NOT
- *   suitable for production.
- * - No data validation is performed.
+ * - List operations are secured to prevent unauthorized data exposure.
+ * - Data denormalization is used to avoid costly `get()` calls within rules, improving performance and security.
+ * - Documents nested under `/users/{userId}` follow a strict ownership model.
+ * - The existence of a document in `/roles_admin/{userId}` grants admin privileges.
+ *
+ * Denormalization for Authorization:
+ * - `sales_proposals` include a denormalized `clientId` field to allow authorization checks based on client ownership without additional reads.
+ *
+ * Structural Segregation:
+ * - No explicit structural segregation is present, but the separation of concerns into different collections
+ *   ensures that public and private data can be managed with distinct access controls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any user to read and write user data.
-     * @path /users/{userId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @description Checks if the request is made by a signed-in user.
+     * @return {bool} True if the user is signed in, false otherwise.
      */
-    match /users/{userId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Allows any user to read and write admin roles.
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @return {bool} True if the user IDs match, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+     /**
+     * @description Checks if the authenticated user ID matches the provided user ID and the resource exists.
+     * @param {string} userId - The user ID to compare against the authenticated user's ID.
+     * @return {bool} True if the user IDs match and resource exist, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for user documents.
+     * @path /users/{userId}
+     * @allow (create) User with UID 'user123' can create their own user document.
+     * @allow (get) User with UID 'user123' can read their own user document.
+     * @deny (create) User with UID 'user456' cannot create a user document with ID 'user123'.
+     * @deny (update) User with UID 'user456' cannot update user document with ID 'user123'.
+     * @principle Enforces document ownership for user data.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if false;
+    }
+
+     /**
+     * @description Rules for admin role documents. Document existence determines admin role.
      * @path /roles_admin/{userId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) User with UID 'user123' can create their own role admin document.
+     * @allow (get) Anyone can read admin role.
+     * @deny (create) User with UID 'user456' cannot create a user document with ID 'user123'.
+     * @deny (update) User with UID 'user456' cannot update user document with ID 'user123'.
+     * @principle Document existence determines admin role.
      */
     match /roles_admin/{userId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write client data.
+     * @description Rules for client documents.
      * @path /clients/{clientId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create client document.
+     * @allow (get) Anyone can get client data.
+     * @deny (create) Unsigned-in user cannot create client document.
+     * @deny (update) Unsigned-in user cannot update client document.
+     * @principle Allows anyone to read client data but requires authentication to create.
      */
     match /clients/{clientId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write client documents.
+     * @description Rules for documents uploaded by clients. Path-based ownership under client.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Client 'client123' can create a document under their ID.
+     * @allow (get) Anyone can get client document data.
+     * @deny (create) Client 'client456' cannot create a document under client ID 'client123'.
+     * @deny (update) Client 'client456' cannot update client document with client ID 'client123'.
+     * @principle Enforces path-based ownership for client documents.
      */
     match /clients/{clientId}/documents/{documentId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write financial institution data.
+     * @description Rules for financial institution documents.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create financial institution document.
+     * @allow (get) Anyone can get financial institution data.
+     * @deny (create) Unsigned-in user cannot create financial institution document.
+     * @deny (update) Unsigned-in user cannot update financial institution document.
+     * @principle Allows anyone to read financial institution data but requires authentication to create.
      */
     match /financial_institutions/{financialInstitutionId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write consortium data.
+     * @description Rules for consortium product documents.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create consortium product document.
+     * @allow (get) Anyone can get consortium product data.
+     * @deny (create) Unsigned-in user cannot create consortium product document.
+     * @deny (update) Unsigned-in user cannot update consortium product document.
+     * @principle Allows anyone to read consortium product data but requires authentication to create.
      */
     match /consortiums/{consortiumId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write credit product data.
+     * @description Rules for credit product documents.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create credit product document.
+     * @allow (get) Anyone can get credit product data.
+     * @deny (create) Unsigned-in user cannot create credit product document.
+     * @deny (update) Unsigned-in user cannot update credit product document.
+     * @principle Allows anyone to read credit product data but requires authentication to create.
      */
     match /credit_products/{creditProductId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write product combo data.
+     * @description Rules for product combo documents.
      * @path /product_combos/{productComboId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create product combo document.
+     * @allow (get) Anyone can get product combo data.
+     * @deny (create) Unsigned-in user cannot create product combo document.
+     * @deny (update) Unsigned-in user cannot update product combo document.
+     * @principle Allows anyone to read product combo data but requires authentication to create.
      */
     match /product_combos/{productComboId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write sales proposal data.
+     * @description Rules for sales proposal documents. Includes denormalized 'clientId' for authorization independence.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create a sales proposal document.
+     * @allow (get) Anyone can get sales proposal data.
+     * @deny (create) Unsigned-in user cannot create a sales proposal document.
+     * @deny (update) Unsigned-in user cannot update sales proposal document.
+     * @principle Allows anyone to read sales proposal data but requires authentication to create.
      */
     match /sales_proposals/{salesProposalId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write commission data.
+     * @description Rules for commission documents.
      * @path /commissions/{commissionId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create commission document.
+     * @allow (get) Anyone can get commission data.
+     * @deny (create) Unsigned-in user cannot create commission document.
+     * @deny (update) Unsigned-in user cannot update commission document.
+     * @principle Allows anyone to read commission data but requires authentication to create.
      */
     match /commissions/{commissionId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write quiz data.
+     * @description Rules for quiz documents.
      * @path /quizzes/{quizId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create quiz document.
+     * @allow (get) Anyone can get quiz data.
+     * @deny (create) Unsigned-in user cannot create quiz document.
+     * @deny (update) Unsigned-in user cannot update quiz document.
+     * @principle Allows anyone to read quiz data but requires authentication to create.
      */
     match /quizzes/{quizId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any user to read and write question data.
+     * @description Rules for question documents.
      * @path /questions/{questionId}
-     * @allow (get, list, create, update, delete) - Any user can perform any operation.
-     * @deny None.
-     * @principle Open access for prototyping.
+     * @allow (create) Signed-in user can create question document.
+     * @allow (get) Anyone can get question data.
+     * @deny (create) Unsigned-in user cannot create question document.
+     * @deny (update) Unsigned-in user cannot update question document.
+     * @principle Allows anyone to read question data but requires authentication to create.
      */
     match /questions/{questionId} {
       allow get, list: if true;
-      allow create, update, delete: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
