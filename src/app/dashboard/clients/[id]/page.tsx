@@ -216,46 +216,49 @@ export default function ClientDetailPage() {
  const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
 
-    // Helper to check if a value is filled
     const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
 
-    // 1. Create a unified profile object, merging root fields and quiz answers.
-    const unifiedProfile: Record<string, any> = {};
+    // 1. Create a unified profile object.
+    const unifiedProfile: Record<string, any> = { ...client };
 
-    // Copy all root properties from client
-    Object.assign(unifiedProfile, client);
-
-    // Override with quiz answers, normalizing keys (q-name -> name)
+    // 2. Merge answers from the quiz, normalizing keys.
     if (client.answers) {
         for (const [key, value] of Object.entries(client.answers)) {
-            const normalizedKey = key.startsWith('q-') ? key.substring(2) : key;
-            // Handle variations like mothername vs motherName
-            const finalKey = normalizedKey.toLowerCase() === 'mothername' ? 'motherName' : normalizedKey;
-            unifiedProfile[finalKey] = value;
+            let normalizedKey = key.startsWith('q-') ? key.substring(2) : key;
+            if (normalizedKey === 'mothername') normalizedKey = 'motherName';
+            if (normalizedKey === 'birthdate') normalizedKey = 'birthDate';
+            unifiedProfile[normalizedKey] = value;
         }
     }
     
-    // If quiz provided address and number, combine them.
-    if(isFilled(unifiedProfile.address) && isFilled(unifiedProfile.number)) {
-        unifiedProfile.address = `${unifiedProfile.address}, ${unifiedProfile.number}`;
+    // 3. Combine address parts if they exist in the quiz answers
+    const quizAddress = unifiedProfile.address; // From `q-address`
+    const quizNumber = unifiedProfile.number;   // From `q-number`
+
+    if (isFilled(quizAddress)) {
+         // Create the full address from parts, only if `address` is from the quiz
+         // This check prevents overwriting an already complete address from the root client object
+         if(client.answers && client.answers['q-address']){
+            unifiedProfile.address = [quizAddress, quizNumber].filter(isFilled).join(', ');
+         }
     }
 
 
-    // 2. Define the list of absolutely required fields. 'complement' is optional.
+    // 4. Define required fields (complement is optional).
     const requiredFields = [
         'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName',
-        'cep', 'address'
+        'cep', 'address', 'neighborhood', 'city', 'state'
     ];
 
-    // 3. Check if every required field in the unified profile is filled.
-    return requiredFields.every(field => {
-        const value = unifiedProfile[field];
-        const isOk = isFilled(value);
-        if (!isOk) {
-            console.log(`Validation failed for field: ${field}`);
+    // 5. Check if all required fields are filled in the unified profile.
+    for (const field of requiredFields) {
+        if (!isFilled(unifiedProfile[field])) {
+            console.log(`Validation failed for required field: ${field}`);
+            return false;
         }
-        return isOk;
-    });
+    }
+
+    return true;
 }
 
   const profileComplete = isProfileComplete(client);
