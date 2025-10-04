@@ -34,6 +34,7 @@ import type { Client } from '@/lib/types';
 import { navItems as allNavItems } from './sidebar'; 
 import { cn } from '@/lib/utils';
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
