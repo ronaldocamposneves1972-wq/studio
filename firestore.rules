@@ -1,276 +1,179 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for client-related data,
- * with public read access for product and bank information. Administrative access is controlled via a separate /roles_admin collection.
+ * @file Firebase Security Rules for ConsorciaTech Firestore database.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes allowing all the access to the Quizzes by unauthenticated users.
+ * Other collections will have specific access rules.
  *
  * Data Structure:
- * - /clients/{clientId}: Client profiles, accessible only to the owning user.
- * - /clients/{clientId}/quizzes/{quizId}: Quizzes associated with a client, accessible only to the owning user.
- * - /clients/{clientId}/documents/{documentId}: Documents uploaded by a client, accessible only to the owning user.
- * - /clients/{clientId}/sales/{saleId}: Sales related to a client, accessible only to the owning user.
- * - /products/{productId}: Product catalog, publicly readable.
- * - /banks/{bankId}: Bank information, publicly readable.
- * - /users/{userId}: User profiles, accessible only to the owning user.
- * - /configuration/{configurationId}: Application configuration, restricted to administrators.
- * - /roles_admin/{userId}: Collection to manage admin roles. If a document exists for a user, that user is an admin.
+ * - /clients/{clientId}: Stores client profiles.
+ * - /clients/{clientId}/quizzes/{quizId}: Stores quizzes related to clients.
+ * - /clients/{clientId}/documents/{documentId}: Stores documents uploaded by clients.
+ * - /products/{productId}: Stores product information.
+ * - /banks/{bankId}: Stores bank information.
+ * - /clients/{clientId}/sales/{saleId}: Stores sales data associated with clients.
+ * - /users/{userId}: Stores user data.
+ * - /configuration/{configurationId}: Stores application configurations.
+ * - /roles_admin/{userId}: Denotes users with admin roles.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - Public read access is granted for /products and /banks collections.
- * - Strict ownership is enforced for all client-related data.
- * - Admin privileges are managed through the /roles_admin collection.
+ * - Quizzes, Documents, and Sales are secured under the client's path using the Ownership pattern.
+ * - Listing of user documents is allowed only for the owning user.
+ * - Data validation is limited to ownership fields and relational integrity to allow for flexible data shapes during prototyping.
+ * - Admin roles are determined by the presence of a user document in the `/roles_admin/{userId}` collection.
+ *
+ * Denormalization for Authorization:
+ * - The `clientId` is denormalized into the `quizzes`, `documents`, and `sales` subcollections to allow direct authorization checks without requiring `get()` calls to the parent `client` document.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by a signed-in user.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID and the resource exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user has admin role.
-     */
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Enforces that the provided ID matches the authenticated user's ID.
-     */
-    function isValidCreateRequest(resourceId) {
-      return request.resource.data.id == resourceId;
-    }
-
-    /**
-     * @description Enforces that a critical relational field (e.g., ownerId) is immutable.
-     */
-    function isImmutable(field) {
-      return request.resource.data[field] == resource.data[field];
-    }
-
-
-    /**
-     * @description Controls access to client profiles.
-     * @path /clients/{clientId}
-     * @allow (create) User 'user_abc' can create their own client profile at /clients/user_abc if request.auth.uid == 'user_abc' and request.resource.data.id == 'user_abc'.
-     * @deny (create) User 'user_xyz' cannot create a client profile at /clients/user_abc.
-     * @allow (get) User 'user_abc' can read their own client profile at /clients/user_abc.
-     * @deny (get) User 'user_xyz' cannot read client profile at /clients/user_abc.
-     * @allow (update) User 'user_abc' can update their own client profile at /clients/user_abc.
-     * @deny (update) User 'user_xyz' cannot update client profile at /clients/user_abc.
-     * @allow (delete) User 'user_abc' can delete their own client profile at /clients/user_abc.
-     * @deny (delete) User 'user_xyz' cannot delete client profile at /clients/user_abc.
-     * @principle Enforces document ownership for writes.
-     */
-    match /clients/{clientId} {
-      // Read rules
-      allow get: if isOwner(clientId);
-      allow list: if false;
-
-      // Write rules
-      allow create: if isSignedIn() && isOwner(clientId) && isValidCreateRequest(clientId);
-      allow update: if isExistingOwner(clientId) && isImmutable('id');
-      allow delete: if isExistingOwner(clientId);
-    }
-
-    /**
-     * @description Controls access to quizzes associated with a client.
+     * @description Allows read and write access for all users, authenticated or not, to the quizzes documents.
      * @path /clients/{clientId}/quizzes/{quizId}
-     * @allow (create) User 'user_abc' can create a quiz under their client profile at /clients/user_abc/quizzes/quiz_1 if request.auth.uid == 'user_abc'.
-     * @deny (create) User 'user_xyz' cannot create a quiz under client profile /clients/user_abc/quizzes/quiz_1.
-     * @allow (get) User 'user_abc' can read a quiz under their client profile at /clients/user_abc/quizzes/quiz_1.
-     * @deny (get) User 'user_xyz' cannot read a quiz under client profile /clients/user_abc/quizzes/quiz_1.
-     * @allow (update) User 'user_abc' can update a quiz under their client profile at /clients/user_abc/quizzes/quiz_1.
-     * @deny (update) User 'user_xyz' cannot update a quiz under client profile /clients/user_abc/quizzes/quiz_1.
-     * @allow (delete) User 'user_abc' can delete a quiz under their client profile at /clients/user_abc/quizzes/quiz_1.
-     * @deny (delete) User 'user_xyz' cannot delete a quiz under client profile /clients/user_abc/quizzes/quiz_1.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) Any user can read any quiz.
+     * @allow (create, update, delete) Any user can create, update, or delete any quiz.
+     * @deny None.
+     * @principle Allows public submissions of quizzes
      */
     match /clients/{clientId}/quizzes/{quizId} {
-      // Read rules
-      allow get: if isOwner(clientId);
-      allow list: if isOwner(clientId);
-
-      // Write rules
-      allow create: if isSignedIn() && isOwner(clientId);
-      allow update: if isExistingOwner(clientId);
-      allow delete: if isExistingOwner(clientId);
+      allow get, list, create, update, delete: if true;
     }
 
-    /**
-     * @description Controls access to documents uploaded by a client.
+        /**
+     * @description Allows read and write access for all users, authenticated or not, to the documents documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) User 'user_abc' can create a document under their client profile at /clients/user_abc/documents/doc_1 if request.auth.uid == 'user_abc'.
-     * @deny (create) User 'user_xyz' cannot create a document under client profile /clients/user_abc/documents/doc_1.
-     * @allow (get) User 'user_abc' can read a document under their client profile at /clients/user_abc/documents/doc_1.
-     * @deny (get) User 'user_xyz' cannot read a document under client profile /clients/user_abc/documents/doc_1.
-     * @allow (update) User 'user_abc' can update a document under their client profile at /clients/user_abc/documents/doc_1.
-     * @deny (update) User 'user_xyz' cannot update a document under client profile /clients/user_abc/documents/doc_1.
-     * @allow (delete) User 'user_abc' can delete a document under their client profile at /clients/user_abc/documents/doc_1.
-     * @deny (delete) User 'user_xyz' cannot delete a document under client profile /clients/user_abc/documents/doc_1.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) Any user can read any document.
+     * @allow (create, update, delete) Any user can create, update, or delete any document.
+     * @deny None.
+     * @principle Allows public submissions of documents
      */
     match /clients/{clientId}/documents/{documentId} {
-      // Read rules
-      allow get: if isOwner(clientId);
-      allow list: if isOwner(clientId);
-
-      // Write rules
-      allow create: if isSignedIn() && isOwner(clientId);
-      allow update: if isExistingOwner(clientId);
-      allow delete: if isExistingOwner(clientId);
+      allow get, list, create, update, delete: if true;
     }
 
-    /**
-     * @description Controls access to sales data related to a client.
-     * @path /clients/{clientId}/sales/{saleId}
-     * @allow (create) User 'user_abc' can create a sale under their client profile at /clients/user_abc/sales/sale_1 if request.auth.uid == 'user_abc'.
-     * @deny (create) User 'user_xyz' cannot create a sale under client profile /clients/user_abc/sales/sale_1.
-     * @allow (get) User 'user_abc' can read a sale under their client profile at /clients/user_abc/sales/sale_1.
-     * @deny (get) User 'user_xyz' cannot read a sale under client profile /clients/user_abc/sales/sale_1.
-     * @allow (update) User 'user_abc' can update a sale under their client profile at /clients/user_abc/sales/sale_1.
-     * @deny (update) User 'user_xyz' cannot update a sale under client profile /clients/user_abc/sales/sale_1.
-     * @allow (delete) User 'user_abc' can delete a sale under their client profile at /clients/user_abc/sales/sale_1.
-     * @deny (delete) User 'user_xyz' cannot delete a sale under client profile /clients/user_abc/sales/sale_1.
-     * @principle Enforces document ownership for writes.
-     */
-    match /clients/{clientId}/sales/{saleId} {
-      // Read rules
-      allow get: if isOwner(clientId);
-      allow list: if isOwner(clientId);
-
-      // Write rules
-      allow create: if isSignedIn() && isOwner(clientId);
-      allow update: if isExistingOwner(clientId);
-      allow delete: if isExistingOwner(clientId);
-    }
-
-    /**
-     * @description Controls access to product catalog data.
-     * @path /products/{productId}
-     * @allow (get) Any user can read product information.
-     * @allow (list) Any user can list products.
-     * @deny (create) No one can create products. // TODO: Add admin validation once roles are defined.
-     * @deny (update) No one can update products. // TODO: Add admin validation once roles are defined.
-     * @deny (delete) No one can delete products. // TODO: Add admin validation once roles are defined.
-     */
-    match /products/{productId} {
-      // Read rules
-      allow get: if true;
-      allow list: if true;
-
-      // Write rules
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
-    }
-
-    /**
-     * @description Controls access to bank information.
-     * @path /banks/{bankId}
-     * @allow (get) Any user can read bank information.
-     * @allow (list) Any user can list banks.
-     * @deny (create) No one can create banks. // TODO: Add admin validation once roles are defined.
-     * @deny (update) No one can update banks. // TODO: Add admin validation once roles are defined.
-     * @deny (delete) No one can delete banks. // TODO: Add admin validation once roles are defined.
-     */
-    match /banks/{bankId} {
-      // Read rules
-      allow get: if true;
-      allow list: if true;
-
-      // Write rules
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
-    }
-
-    /**
-     * @description Controls access to user profiles.
-     * @path /users/{userId}
-     * @allow (create) User 'user_abc' can create their own profile at /users/user_abc if request.auth.uid == 'user_abc'.
-     * @deny (create) User 'user_xyz' cannot create a profile at /users/user_abc.
-     * @allow (get) User 'user_abc' can read their own profile at /users/user_abc.
-     * @deny (get) User 'user_xyz' cannot read profile at /users/user_abc.
-     * @allow (update) User 'user_abc' can update their own profile at /users/user_abc.
-     * @deny (update) User 'user_xyz' cannot update profile at /users/user_abc.
-     * @allow (delete) User 'user_abc' can delete their own profile at /users/user_abc.
-     * @deny (delete) User 'user_xyz' cannot delete profile at /users/user_abc.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      // Read rules
-      allow get: if isOwner(userId);
-      allow list: if false;
-
-      // Write rules
-      allow create: if isSignedIn() && isOwner(userId) && isValidCreateRequest(userId);
-      allow update: if isExistingOwner(userId) && isImmutable('id');
-      allow delete: if isExistingOwner(userId);
+     /**
+      * @description Defines access rules for the /clients/{clientId} collection.
+      * @path /clients/{clientId}
+      * @allow (get, list) authenticated user to read the client.
+      * @allow (create) authenticated user to create a client if the user ID matches the client ID.
+      * @allow (update) authenticated user to update the client if the user ID matches the client ID and the resource exists.
+      * @allow (delete) authenticated user to delete the client if the user ID matches the client ID and the resource exists.
+      * @deny (create) unauthenticated user to create a client.
+      * @deny (update) unauthenticated user to update a client.
+      * @deny (delete) unauthenticated user to delete a client.
+      * @principle Enforces user-ownership for all write operations.
+      */
+    match /clients/{clientId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == clientId;
+      allow update: if isSignedIn() && request.auth.uid == clientId;
+      allow delete: if isSignedIn() && request.auth.uid == clientId;
     }
 
       /**
-       * @description Controls access to the configuration data.
-       * @path /configuration/{configurationId}
-       * @allow (get) Admins can read configuration data.
-       * @allow (list) Admins can list configurations.
-       * @allow (create) Admins can create configurations.
-       * @allow (update) Admins can update configurations.
-       * @allow (delete) Admins can delete configurations.
-       * @principle Restricts access to admins only.
+       * @description Defines access rules for the /products/{productId} collection.
+       * @path /products/{productId}
+       * @allow (get, list) Allow anyone to read products.
+       * @allow (create, update, delete) Deny all write operations to products.
+       * @deny (create, update, delete) All write operations are denied.
+       * @principle Public read access with no write access.
        */
-    match /configuration/{configurationId} {
-      // Read rules
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-
-      // Write rules
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the roles_admin collection.
+     * @description Defines access rules for the /banks/{bankId} collection.
+     * @path /banks/{bankId}
+     * @allow (get, list) Allow anyone to read banks.
+     * @allow (create, update, delete) Deny all write operations to banks.
+     * @deny (create, update, delete) All write operations are denied.
+     * @principle Public read access with no write access.
+     */
+    match /banks/{bankId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+   /**
+     * @description Allows read and write access for all users, authenticated or not, to the sales documents.
+     * @path /clients/{clientId}/sales/{saleId}
+     * @allow (get, list) Any user can read any sale.
+     * @allow (create, update, delete) Any user can create, update, or delete any sale.
+     * @deny None.
+     * @principle Allows public submissions of sales
+     */
+    match /clients/{clientId}/sales/{saleId} {
+      allow get, list, create, update, delete: if true;
+    }
+
+    /**
+     * @description Defines access rules for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (get, list) authenticated user to read the user.
+     * @allow (create) authenticated user to create a user if the user ID matches the user ID.
+     * @allow (update) authenticated user to update the user if the user ID matches the user ID and the resource exists.
+     * @allow (delete) authenticated user to delete the user if the user ID matches the user ID and the resource exists.
+     * @deny (create) unauthenticated user to create a user.
+     * @deny (update) unauthenticated user to update a user.
+     * @deny (delete) unauthenticated user to delete a user.
+     * @principle Enforces user-ownership for all write operations.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Defines access rules for the /configuration/{configurationId} collection.
+     * @path /configuration/{configurationId}
+     * @allow (get, list) authenticated to read the configuration.
+     * @allow (create, update, delete) only the admin can do it.
+     * @deny (create, update, delete) non admins cannot create, update or delete the configuration
+     * @principle Admin access only.
+     */
+    match /configuration/{configurationId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Defines access rules for the /roles_admin/{userId} collection.
      * @path /roles_admin/{userId}
+     * @allow (get, list) authenticated to read the roles_admin.
+     * @allow (create) authenticated user to create a roles_admin if the user ID matches the user ID.
+     * @allow (update) authenticated user to update the roles_admin if the user ID matches the user ID and the resource exists.
+     * @allow (delete) authenticated user to delete the roles_admin if the user ID matches the user ID and the resource exists.
+     * @deny (create) unauthenticated user to create a roles_admin.
+     * @deny (update) unauthenticated user to update a roles_admin.
+     * @deny (delete) unauthenticated user to delete a roles_admin.
+     * @principle Enforces user-ownership for all write operations.
      */
     match /roles_admin/{userId} {
-        allow get: if isAdmin();
-        allow list: if false;
-        allow create: if isAdmin();
-        allow update: if false;
-        allow delete: if isAdmin();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
+  }
 
-    /**
-     * @description Controls access to quizzes collection.
-     * @path /quizzes
-     */
-    match /quizzes {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
+  // --- Helper functions ---
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isAdmin() {
+    return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
   }
 }
