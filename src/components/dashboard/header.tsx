@@ -18,17 +18,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   PanelLeft,
-  Home,
-  Users,
-  Package,
-  Landmark,
-  FileText,
-  DollarSign,
   Settings,
   PanelLeftClose,
   PanelRightClose,
   Search,
-  Command,
   User,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -36,10 +29,9 @@ import { AppLogo } from '../logo';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth, useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { Input } from '../ui/input';
 import { collection } from 'firebase/firestore';
 import type { Client } from '@/lib/types';
-import { navItems as allNavItems } from './sidebar'; // Assuming navItems are exported from sidebar
+import { navItems as allNavItems } from './sidebar'; 
 import { cn } from '@/lib/utils';
 import {
   CommandDialog,
@@ -161,8 +153,9 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
             )}
             onClick={() => setOpenCommand(true)}
         >
-            <span className="hidden lg:inline-flex">Pesquisar...</span>
-            <span className="inline-flex lg:hidden">Pesquisar...</span>
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <span className="hidden lg:inline-flex pl-6">Pesquisar...</span>
+            <span className="inline-flex lg:hidden pl-6">Pesquisar...</span>
             <kbd className="pointer-events-none absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
                 <span className="text-xs">⌘</span>K
             </kbd>
