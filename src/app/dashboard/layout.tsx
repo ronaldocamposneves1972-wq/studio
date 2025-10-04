@@ -34,9 +34,18 @@ function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    if (!auth) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro',
+            description: 'O serviço de autenticação não está disponível.',
+        });
+        setIsLoading(false);
+        return;
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Let the useEffect in DashboardLayout handle the redirect
+      // The user state change will be detected by DashboardLayout, which will handle the UI update.
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -52,9 +61,18 @@ function LoginPage() {
   
     const handleAnonymousLogin = async () => {
     setIsLoading(true);
+    if (!auth) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro',
+            description: 'O serviço de autenticação não está disponível.',
+        });
+        setIsLoading(false);
+        return;
+    }
     try {
       await signInAnonymously(auth);
-      // Let the useEffect in DashboardLayout handle the redirect
+      // The user state change will be detected by DashboardLayout.
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -134,7 +152,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
       <DashboardSidebar isCollapsed={isSidebarCollapsed} />
-      <div className={cn("flex flex-col", isSidebarCollapsed ? "sm:pl-14" : "sm:pl-52")}>
+      <div className={cn("flex flex-col transition-all duration-300 ease-in-out", isSidebarCollapsed ? "sm:pl-14" : "sm:pl-52")}>
         <DashboardHeader 
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
@@ -157,19 +175,10 @@ export default function DashboardLayout({
 
   if (isUserLoading) {
     return (
-      <div className="flex min-h-screen w-full flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-          <Skeleton className="h-8 w-24" />
-          <div className="relative ml-auto flex-1 md:grow-0"></div>
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </header>
-        <div className="flex flex-1">
-          <aside className="hidden sm:block w-52 bg-muted/40 p-4">
-             <Skeleton className="h-full w-full" />
-          </aside>
-          <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-            <Skeleton className="h-96 w-full" />
-          </main>
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+         <div className="flex flex-col items-center gap-4">
+            <AppLogo className="h-12 w-auto animate-pulse" />
+            <p className="text-muted-foreground">Verificando autenticação...</p>
         </div>
       </div>
     );
