@@ -10,8 +10,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
-const navItems = [
+
+export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   {
     label: 'Cadastro', icon: FilePlus, children: [
@@ -69,58 +75,81 @@ const navItems = [
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
-const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
+const SidebarItem = ({ item, isCollapsed, closeSheet }: { item: any, isCollapsed: boolean, closeSheet?: () => void }) => {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const ItemIcon = item.icon;
 
   const hasChildren = !!item.children;
-  const isActive = item.href ? pathname === item.href : false;
+  const isActive = item.href ? pathname.startsWith(item.href) : false;
 
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      {hasChildren ? (
-        <div
-          className={cn(
-            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm cursor-pointer transition-colors",
-            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "w-12 justify-center p-0",
-            "border-b border-gray-200" // separação entre itens
-          )}
-        >
-          <ItemIcon className="h-5 w-5" />
-          {!isCollapsed && <span className="flex-1">{item.label}</span>}
-          {!isCollapsed && <ChevronRight className="h-4 w-4 ml-auto" />}
-        </div>
-      ) : (
+  const handleLinkClick = () => {
+    if (closeSheet) {
+      closeSheet();
+    }
+  };
+
+  if (isCollapsed) {
+     return (
+      <div
+        className="relative group"
+      >
         <Link
           href={item.href || '#'}
+          onClick={item.href ? handleLinkClick : (e) => e.preventDefault()}
           className={cn(
-            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm transition-colors",
-            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "justify-center p-0",
-            "border-b border-gray-200" // separação entre itens
+            "flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+            isActive && "bg-gray-100 text-gray-700 font-bold",
           )}
         >
           <ItemIcon className="h-5 w-5" />
-          {!isCollapsed && <span>{item.label}</span>}
         </Link>
-      )}
 
-      {hasChildren && isOpen && (
-        <div className="absolute left-full top-0 ml-1 w-48 bg-white shadow-lg z-50 rounded-md border border-gray-200">
-          {item.children.map((child: any, index: number) => (
-            <div key={child.label}>
-              <SidebarItem item={child} isCollapsed={false} />
-            </div>
+        {hasChildren && (
+          <div className="absolute left-full top-0 ml-2 w-56 bg-white shadow-lg z-50 rounded-md border border-gray-200 hidden group-hover:block">
+            <div className="p-2 font-semibold text-sm">{item.label}</div>
+            {item.children.map((child: any) => (
+              <SidebarItem key={child.label} item={child} isCollapsed={false} closeSheet={closeSheet}/>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (hasChildren) {
+    return (
+       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+           <button className={cn(
+              "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+            )}>
+              <ItemIcon className="h-5 w-5" />
+              <span className="flex-1 text-left">{item.label}</span>
+              <ChevronRight className={cn("h-4 w-4 ml-auto transition-transform", isOpen && "rotate-90")} />
+           </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pl-6 mt-1 space-y-1">
+          {item.children.map((child: any) => (
+            <SidebarItem key={child.label} item={child} isCollapsed={false} closeSheet={closeSheet}/>
           ))}
-        </div>
+        </CollapsibleContent>
+      </Collapsible>
+    )
+  }
+
+  return (
+    <Link
+      href={item.href}
+      onClick={handleLinkClick}
+      className={cn(
+        "flex h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors",
+        isActive ? "bg-gray-100 text-gray-700 font-bold" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
       )}
-    </div>
+    >
+      <ItemIcon className="h-5 w-5" />
+      <span>{item.label}</span>
+    </Link>
   );
 };
 
@@ -132,28 +161,26 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
       "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-white transition-all",
       isCollapsed ? "w-14" : "w-52"
     )}>
-      {/* Logo com separação */}
-      <div className={cn("flex h-16 items-center border-b border-gray-200 px-4", isCollapsed ? "justify-center" : "justify-start")}>
+      <div className={cn("flex h-14 items-center border-b px-4", isCollapsed ? "justify-center" : "justify-start")}>
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-700">
           <AppLogo className="h-8 w-8" />
-          {!isCollapsed && <span>Consorcia</span>}
+          {!isCollapsed && <span className="font-bold text-primary">Consorcia</span>}
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2">
+      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
         {navItems.map((item) => (
           <SidebarItem key={item.label} item={item} isCollapsed={isCollapsed} />
         ))}
       </nav>
 
-      {/* Configurações */}
-      <div className="mt-auto p-2 border-t border-gray-200">
+      <div className="mt-auto p-2 border-t">
         <Link
           href="/dashboard/settings"
           className={cn(
-            "flex h-9 w-full items-center justify-center gap-2 px-3 text-sm transition-colors",
-            pathname === '/dashboard/settings' ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "justify-center p-0"
+            "flex h-9 items-center gap-2 rounded-md px-3 text-sm transition-colors",
+            pathname.startsWith('/dashboard/settings') ? "bg-gray-100 font-bold text-gray-700" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+            isCollapsed && "justify-center"
           )}
         >
           <Settings className="h-5 w-5" />
