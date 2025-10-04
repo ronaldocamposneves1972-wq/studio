@@ -41,11 +41,15 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/command"
 
 
 const flattenNavItems = (items: any[]): any[] => {
   let flatList: any[] = [];
+  if (!items) return flatList;
   items.forEach(item => {
     if (item.href) {
       flatList.push(item);
@@ -164,6 +168,10 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
       </div>
 
        <CommandDialog open={openCommand} onOpenChange={setOpenCommand}>
+         <DialogHeader className="sr-only">
+            <DialogTitle>Pesquisa Global</DialogTitle>
+            <DialogDescription>Pesquise clientes por nome/CPF ou navegue para páginas do sistema.</DialogDescription>
+        </DialogHeader>
         <CommandInput placeholder="Digite um comando ou pesquise..." />
         <CommandList>
           <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>

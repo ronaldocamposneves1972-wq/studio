@@ -10,12 +10,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-
 
 export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -51,14 +45,6 @@ export const navItems = [
     ]
   },
   {
-    label: 'Financeiro', icon: DollarSign,
-    children: [
-         { href: '/dashboard/financials', label: 'Visão Geral', icon: LineChart },
-         { href: '/dashboard/financials/transactions', label: 'Transações', icon: FileText },
-         { href: '/dashboard/financials/accounts', label: 'Contas Bancárias', icon: Landmark },
-    ]
-},
-  {
     label: 'Formalização', icon: ClipboardCheck, children: [
       { href: '/dashboard/formalization/protocol', label: 'Protocolo', icon: ClipboardList },
       { href: '/dashboard/formalization/pending-contracts', label: 'Contratos Pendentes', icon: FileText },
@@ -75,81 +61,58 @@ export const navItems = [
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
-const SidebarItem = ({ item, isCollapsed, closeSheet }: { item: any, isCollapsed: boolean, closeSheet?: () => void }) => {
+const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const ItemIcon = item.icon;
 
   const hasChildren = !!item.children;
-  const isActive = item.href ? pathname.startsWith(item.href) : false;
 
-  const handleLinkClick = () => {
-    if (closeSheet) {
-      closeSheet();
-    }
-  };
+  // Ativo apenas se a rota atual for exatamente a do item
+  const isActive = item.href ? pathname === item.href : false;
 
-  if (isCollapsed) {
-     return (
-      <div
-        className="relative group"
-      >
-        <Link
-          href={item.href || '#'}
-          onClick={item.href ? handleLinkClick : (e) => e.preventDefault()}
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      {hasChildren ? (
+        <div
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700",
-            isActive && "bg-gray-100 text-gray-700 font-bold",
+            "flex h-9 w-full items-center gap-2 px-3 text-sm cursor-pointer transition-colors",
+            isActive ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
+            isCollapsed && "w-12 justify-center p-0"
           )}
         >
           <ItemIcon className="h-5 w-5" />
+          {!isCollapsed && <span className="flex-1">{item.label}</span>}
+          {!isCollapsed && <ChevronRight className="h-4 w-4 ml-auto" />}
+        </div>
+      ) : (
+        <Link
+          href={item.href || '#'}
+          className={cn(
+            "flex h-9 w-full items-center gap-2 px-3 text-sm transition-colors",
+            isActive ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
+            isCollapsed && "justify-center p-0"
+          )}
+        >
+          <ItemIcon className="h-5 w-5" />
+          {!isCollapsed && <span>{item.label}</span>}
         </Link>
-
-        {hasChildren && (
-          <div className="absolute left-full top-0 ml-2 w-56 bg-white shadow-lg z-50 rounded-md border border-gray-200 hidden group-hover:block">
-            <div className="p-2 font-semibold text-sm">{item.label}</div>
-            {item.children.map((child: any) => (
-              <SidebarItem key={child.label} item={child} isCollapsed={false} closeSheet={closeSheet}/>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (hasChildren) {
-    return (
-       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
-           <button className={cn(
-              "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-700",
-            )}>
-              <ItemIcon className="h-5 w-5" />
-              <span className="flex-1 text-left">{item.label}</span>
-              <ChevronRight className={cn("h-4 w-4 ml-auto transition-transform", isOpen && "rotate-90")} />
-           </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pl-6 mt-1 space-y-1">
-          {item.children.map((child: any) => (
-            <SidebarItem key={child.label} item={child} isCollapsed={false} closeSheet={closeSheet}/>
-          ))}
-        </CollapsibleContent>
-      </Collapsible>
-    )
-  }
-
-  return (
-    <Link
-      href={item.href}
-      onClick={handleLinkClick}
-      className={cn(
-        "flex h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors",
-        isActive ? "bg-gray-100 text-gray-700 font-bold" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
       )}
-    >
-      <ItemIcon className="h-5 w-5" />
-      <span>{item.label}</span>
-    </Link>
+
+      {hasChildren && isOpen && (
+        <div className="absolute left-full top-0 ml-1 w-48 bg-white shadow-lg z-50 rounded-md">
+          {item.children.map((child: any, index: number) => (
+            <div key={child.label}>
+              <SidebarItem item={child} isCollapsed={false} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -158,29 +121,29 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
 
   return (
     <aside className={cn(
-      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-white transition-all",
+      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 bg-[#ffffff] transition-all",
       isCollapsed ? "w-14" : "w-52"
     )}>
-      <div className={cn("flex h-14 items-center border-b px-4", isCollapsed ? "justify-center" : "justify-start")}>
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-700">
+      <div className={cn("flex h-16 items-center px-4", isCollapsed ? "justify-center" : "justify-start")}>
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-800">
           <AppLogo className="h-8 w-8" />
-          {!isCollapsed && <span className="font-bold text-primary">Consorcia</span>}
+          {!isCollapsed && <span>Consorcia</span>}
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
+      <nav className="flex-1 space-y-1 p-2">
         {navItems.map((item) => (
           <SidebarItem key={item.label} item={item} isCollapsed={isCollapsed} />
         ))}
       </nav>
 
-      <div className="mt-auto p-2 border-t">
+      <div className="mt-auto p-2">
         <Link
           href="/dashboard/settings"
           className={cn(
-            "flex h-9 items-center gap-2 rounded-md px-3 text-sm transition-colors",
-            pathname.startsWith('/dashboard/settings') ? "bg-gray-100 font-bold text-gray-700" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
-            isCollapsed && "justify-center"
+            "flex h-9 w-full items-center justify-center gap-2 px-3 text-sm transition-colors",
+            pathname === '/dashboard/settings' ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
+            isCollapsed && "justify-center p-0"
           )}
         >
           <Settings className="h-5 w-5" />
