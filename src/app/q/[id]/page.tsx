@@ -43,30 +43,50 @@ export default function StandaloneQuizPage() {
 
   const handleSubmit = async (answers: any) => {
     setIsSubmitting(true);
-
     try {
-      if (!firestore || !clientId) throw new Error("Firestore ou ID do cliente não disponível");
+      if (!firestore || !clientId) {
+        throw new Error("Firestore ou ID do cliente não disponível");
+      }
 
       const clientRef = doc(firestore, 'clients', clientId);
       const serializableAnswers: Record<string, any> = {};
       const newDocuments = [];
+      const fileUploadPromises = [];
 
+      // Separate files from other answers and create upload promises
       for (const key in answers) {
         if (answers[key] instanceof File) {
           const file = answers[key] as File;
           toast({ title: `Enviando ${file.name}...`, description: 'Por favor, aguarde.' });
-          const newDoc = await uploadFile(file, clientId);
-          newDocuments.push(newDoc);
-          serializableAnswers[key] = { name: newDoc.name, url: newDoc.url };
+          fileUploadPromises.push(
+            uploadFile(file, clientId).then(newDoc => ({
+              key,
+              newDoc
+            }))
+          );
         } else {
           serializableAnswers[key] = answers[key];
         }
       }
 
+      // Wait for all file uploads to complete
+      const uploadedFiles = await Promise.all(fileUploadPromises);
+
+      // Process uploaded file results
+      uploadedFiles.forEach(({ key, newDoc }) => {
+        newDocuments.push(newDoc);
+        serializableAnswers[key] = { name: newDoc.name, url: newDoc.url };
+      });
+
+
       const clientSnap = await getDoc(clientRef);
-      const clientData = clientSnap.data() as Client | undefined;
-      const existingAnswers = clientData?.answers || {};
-      const existingDocuments = clientData?.documents || [];
+      if (!clientSnap.exists()) {
+        throw new Error("Documento do cliente não encontrado.");
+      }
+      
+      const clientData = clientSnap.data() as Client;
+      const existingAnswers = clientData.answers || {};
+      const existingDocuments = clientData.documents || [];
 
       const updatePayload: any = {
         answers: { ...existingAnswers, ...serializableAnswers },
@@ -84,14 +104,15 @@ export default function StandaloneQuizPage() {
 
     } catch(error) {
       console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'Não foi possível enviar suas respostas. Tente novamente.';
       toast({
         variant: 'destructive',
         title: 'Ops! Algo deu errado.',
-        description: 'Não foi possível enviar suas respostas. Tente novamente.',
+        description: errorMessage,
       });
+    } finally {
+        setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   };
   
   const renderContent = () => {
