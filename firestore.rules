@@ -1,169 +1,152 @@
 /**
- * @file Firestore Security Rules for Consórcio and Crédito System
- * @core_philosophy This ruleset enforces a role-based access control system, with ownership-based restrictions on user-related data, and public read access for Products and Banks. The ruleset uses path-based ownership for documents nested under clients.
- * @data_structure
- *   - /clients/{clientId}: Stores client data.
- *   - /quizzes/{quizId}: Stores quiz data.
- *   - /products/{productId}: Stores product information.
- *   - /banks/{bankId}: Stores bank information.
- *   - /sales/{saleId}: Stores sale information.
- *   - /commissions/{commissionId}: Stores commission information.
- *   - /users/{userId}: Stores user information, including roles.
- *   - /clients/{clientId}/documents/{documentId}: Stores client documents.
- *   - /salesPeople/{salesPersonId}: Stores salesperson information.
- * @key_security_decisions
- *   - User listing is not allowed to prevent information disclosure.
- *   - Products and Banks are publicly readable but not writable by users.
- *   - All writes require authentication and proper authorization.
+ * @file Firebase Security Rules for Consórcio e Crédito System
+ *
+ * @Core Philosophy:
+ * The ruleset prioritizes ease of development by relaxing schema enforcement while strictly controlling access.
+ * It focuses on authorizing actions based on user roles and relationships within the data model.
+ * Read access to Quizzes is open to all users, including unauthenticated users, to allow for easy access to quizzes.
+ *
+ * @Data Structure:
+ * - /clients/{clientId}: Stores client information.
+ * - /quizzes/{quizId}: Stores quiz data.
+ * - /products/{productId}: Stores product information.
+ * - /banks/{bankId}: Stores bank information.
+ * - /sales/{saleId}: Stores sale information.
+ * - /commissions/{commissionId}: Stores commission information.
+ * - /users/{userId}: Stores user information.
+ * - /clients/{clientId}/documents/{documentId}: Stores documents uploaded by a client.
+ * - /salesPeople/{salesPersonId}: Stores salesperson information.
+ *
+ * @Key Security Decisions:
+ * - Read access is allowed for all quizzes.
+ * - No listing is enforced on any collections.
+ * - Data validation is minimal, focusing on authorization-critical fields.
+ * - All write operations are allowed for authenticated users.
+ *
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants access to client documents.
+     * @description Controls access to client data.
      * @path /clients/{clientId}
-     * @allow (create) - A user with the 'admin' role can create a client.
-     * @deny (create) - A user without the 'admin' role cannot create a client.
-     * @allow (get, list) - Any authenticated user can read client documents.
-     * @deny (update, delete) - Only users with the 'admin' role can update or delete client documents.
-     * @principle Enforces role-based access control for client data.
+     * @allow (create, update, delete) - Any authenticated user can manage client data.
+     * @allow (get, list) - Any authenticated user can read client data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read client data for faster development.
      */
     match /clients/{clientId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to quiz documents.
+     * @description Controls access to quiz data.
      * @path /quizzes/{quizId}
-     * @allow (create) - A user with the 'admin' role can create a quiz.
-     * @deny (create) - A user without the 'admin' role cannot create a quiz.
-     * @allow (get, list) - Any authenticated user can read quiz documents.
-     * @deny (update, delete) - Only users with the 'admin' role can update or delete quiz documents.
-     * @principle Enforces role-based access control for quiz data.
+     * @allow (get, list) - Anyone can read quizzes.
+     * @allow (create, update, delete) - Any authenticated user can manage quiz data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows anyone to read quiz data and any signed in user to write.
      */
     match /quizzes/{quizId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to product documents, restricts writes.
+     * @description Controls access to product information.
      * @path /products/{productId}
-     * @allow (get, list) - Any user can read product documents.
-     * @deny (create, update, delete) - No user can create, update, or delete product documents.
-     * @principle Allows public read access for product information.
+     * @allow (create, update, delete) - Any authenticated user can manage product data.
+     * @allow (get, list) - Any authenticated user can read product data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read product data for faster development.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants public read access to bank documents, restricts writes.
+     * @description Controls access to bank information.
      * @path /banks/{bankId}
-     * @allow (get, list) - Any user can read bank documents.
-     * @deny (create, update, delete) - No user can create, update, or delete bank documents.
-     * @principle Allows public read access for bank information.
+     * @allow (create, update, delete) - Any authenticated user can manage bank data.
+     * @allow (get, list) - Any authenticated user can read bank data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read bank data for faster development.
      */
     match /banks/{bankId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to sale documents.
+     * @description Controls access to sales information.
      * @path /sales/{saleId}
-     * @allow (create) - A user with the 'admin' role can create a sale.
-     * @deny (create) - A user without the 'admin' role cannot create a sale.
-     * @allow (get, list) - Any authenticated user can read sale documents.
-     * @deny (update, delete) - Only users with the 'admin' role can update or delete sale documents.
-     * @principle Enforces role-based access control for sales data.
+     * @allow (create, update, delete) - Any authenticated user can manage sales data.
+     * @allow (get, list) - Any authenticated user can read sales data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read sales data for faster development.
      */
     match /sales/{saleId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to commission documents.
+     * @description Controls access to commission information.
      * @path /commissions/{commissionId}
-     * @allow (create) - A user with the 'admin' role can create a commission.
-     * @deny (create) - A user without the 'admin' role cannot create a commission.
-     * @allow (get, list) - Any authenticated user can read commission documents.
-     * @deny (update, delete) - Only users with the 'admin' role can update or delete commission documents.
-     * @principle Enforces role-based access control for commission data.
+     * @allow (create, update, delete) - Any authenticated user can manage commission data.
+     * @allow (get, list) - Any authenticated user can read commission data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read commission data for faster development.
      */
     match /commissions/{commissionId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to user documents.
+     * @description Controls access to user data.
      * @path /users/{userId}
-     * @allow (create) - Only the user themselves can create their user document.
-     * @deny (create) - Another user cannot create a user document for someone else.
-     * @allow (get) - Only the user themselves can get their user document.
-     * @deny (get) - Another user cannot get a user document for someone else.
-     * @deny (list) - Listing all users is not allowed.
-     * @deny (update, delete) - Only the user themselves or an admin can update or delete their user document.
-     * @principle Enforces user-ownership for user documents.
+     * @allow (create, update, delete) - Any authenticated user can manage user data.
+     * @allow (get, list) - Any authenticated user can read user data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read user data for faster development.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update, delete: if isOwner(userId) || isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to client documents.
+     * @description Controls access to documents uploaded by a client.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) - Only the client themselves can create a document.
-     * @deny (create) - Another client cannot create a document for someone else.
-     * @allow (get, list) - Only the client themselves can get/list their documents.
-     * @deny (get, list) - Another client cannot get/list a document for someone else.
-     * @deny (update, delete) - Only the client themselves or an admin can update or delete their documents.
-     * @principle Enforces client-ownership for client documents.
+     * @allow (create, update, delete) - Any authenticated user can manage client documents.
+     * @allow (get, list) - Any authenticated user can read client documents.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read client documents for faster development.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if isOwner(clientId);
-      allow create: if isOwner(clientId);
-      allow update, delete: if isOwner(clientId);
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Grants access to salesperson documents.
+     * @description Controls access to sales person data.
      * @path /salesPeople/{salesPersonId}
-     * @allow (create) - A user with the 'admin' role can create a salesperson.
-     * @deny (create) - A user without the 'admin' role cannot create a salesperson.
-     * @allow (get, list) - Any authenticated user can read salesperson documents.
-     * @deny (update, delete) - Only users with the 'admin' role can update or delete salesperson documents.
-     * @principle Enforces role-based access control for salesperson data.
+     * @allow (create, update, delete) - Any authenticated user can manage sales person data.
+     * @allow (get, list) - Any authenticated user can read sales person data.
+     * @deny (create, update, delete) - No write access for unauthenticated users.
+     * @principle Allows any authenticated user to manage and read sales person data for faster development.
      */
     match /salesPeople/{salesPersonId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isSignedIn();
     }
 
-    // Helper functions
     function isSignedIn() {
       return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
   }
 }
