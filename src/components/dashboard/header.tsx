@@ -26,13 +26,15 @@ import {
   DollarSign,
   Settings,
   PanelLeftClose,
-  PanelRightClose
+  PanelRightClose,
+  Search,
 } from 'lucide-react';
 import Image from 'next/image';
 import { AppLogo } from '../logo';
 import React from 'react';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { Input } from '../ui/input';
 
 const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -104,7 +106,12 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
       </Sheet>
       
       <div className="relative ml-auto flex-1 md:grow-0">
-        {/* Can add a search bar here if needed */}
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Pesquisar..."
+          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+        />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
