@@ -128,6 +128,25 @@ function LoginPage() {
   )
 }
 
+function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  return (
+    <div className="flex min-h-screen w-full flex-col bg-muted/40">
+      <DashboardSidebar isCollapsed={isSidebarCollapsed} />
+      <div className={cn("flex flex-col", isSidebarCollapsed ? "sm:pl-14" : "sm:pl-52")}>
+        <DashboardHeader 
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+        />
+        <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
 
 export default function DashboardLayout({
   children,
@@ -135,7 +154,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   if (isUserLoading) {
     return (
@@ -161,18 +179,5 @@ export default function DashboardLayout({
     return <LoginPage />;
   }
 
-  return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <DashboardSidebar isCollapsed={isSidebarCollapsed} />
-       <div className={cn("flex flex-col", isSidebarCollapsed ? "sm:pl-14" : "sm:pl-52")}>
-        <DashboardHeader 
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
-        />
-        <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
-            {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
 }
