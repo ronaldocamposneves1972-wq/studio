@@ -1,165 +1,126 @@
-/**
- * @file Firebase Security Rules for ConsorciaTech Firestore database.
- *
- * Core Philosophy:
- * This ruleset prioritizes authorization independence and supports secure "list" operations
- * without relying on data filtering. It enforces strict ownership for user profiles
- * and allows open access to quiz data based on client context, following the business requirements.
- *
- * Data Structure:
- * - /users/{userId}: Stores user profiles with path-based ownership.
- * - /clients/{clientId}: Stores client profiles.
- * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, linked to the client.
- * - /clients/{clientId}/quizAnswers/{quizAnswerId}: Stores client quiz answers, linked to the client.
- * - /products/{productId}: Stores product information (publicly accessible).
- * - /banks/{bankId}: Stores bank information (publicly accessible).
- * - /sales/{saleId}: Stores sales data.
- * - /quizQuestions/{quizQuestionId}: Stores quiz questions (publicly accessible).
- *
- * Key Security Decisions:
- * - Users can only manage their own profiles.
- * - Quiz data can be accessed without authentication, in line with business requirements.
- * - Read-only collections (products, banks, quizQuestions) are publicly readable.
- * - All write operations are explicitly secured.
- *
- * Denormalization for Authorization:
- * - The 'Document' and 'QuizAnswer' entities include a 'clientId' field,
- *   allowing direct association with the client and simplifying security rules.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read and manage their own profile data.
+     * @description Grants owner-only access to user profiles.
      * @path /users/{userId}
-     * @allow (create) - User with ID 'user123' can create their profile with matching ID.
-     * @allow (get, update, delete) - User with ID 'user123' can get, update and delete their profile.
-     * @deny (create) - User with ID 'user456' cannot create a profile with ID 'user123'.
-     * @deny (update, delete) - User with ID 'user456' cannot update or delete the profile of 'user123'.
-     * @principle Enforces document ownership for writes; reads are open for prototyping.
+     * @allow (create) - User with UID 'user123' can create a profile at /users/user123.
+     * @allow (get) - User with UID 'user123' can read their profile at /users/user123.
+     * @allow (update) - User with UID 'user123' can update their profile at /users/user123.
+     * @allow (delete) - User with UID 'user123' can delete their profile at /users/user123.
+     * @deny (create) - User with UID 'user456' cannot create a profile at /users/user123.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get, list: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
       allow create: if isSignedIn() && isOwner(userId);
       allow update: if isSignedIn() && isExistingOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Allows anyone to read client profiles.
+     * @description Grants public read and write access to client profiles.
      * @path /clients/{clientId}
-     * @allow (get, list) - Any user can read client profiles.
-     * @deny (create, update, delete) - No one can create, update, or delete client profiles without authentication
-     * @principle Allows public reads for clients data for prototyping.
+     * @allow (create) - Any user can create a client profile.
+     * @allow (get) - Any user can read a client profile.
+     * @allow (update) - Any user can update a client profile.
+     * @allow (delete) - Any user can delete a client profile.
+     * @principle Allows open read and write access to all client profiles.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read and write documents uploaded by a specific client.
+     * @description Grants public read and write access to client documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list, create, update, delete) - Any user can read and write documents within a client's document collection.
-     * @principle Enables open access to client document data for prototyping.
+     * @allow (create) - Any user can create a client document.
+     * @allow (get) - Any user can read a client document.
+     * @allow (update) - Any user can update a client document.
+     * @allow (delete) - Any user can delete a client document.
+     * @principle Allows open read and write access to all client documents.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read and write answers to quiz questions submitted by a specific client.
+     * @description Grants public read and write access to quiz answers.
      * @path /clients/{clientId}/quizAnswers/{quizAnswerId}
-     * @allow (get, list, create, update, delete) - Any user can read and write quiz answers within a client's quiz answer collection.
-     * @principle Enables open access to client quiz answer data for prototyping.
+     * @allow (create) - Any user can create a quiz answer.
+     * @allow (get) - Any user can read a quiz answer.
+     * @allow (update) - Any user can update a quiz answer.
+     * @allow (delete) - Any user can delete a quiz answer.
+     * @principle Allows open read and write access to all quiz answers.
      */
     match /clients/{clientId}/quizAnswers/{quizAnswerId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read product information.
+     * @description Grants public read and write access to product information.
      * @path /products/{productId}
-     * @allow (get, list) - Any user can read product information.
-     * @deny (create, update, delete) - No one can create, update, or delete product information.
-     * @principle Allows public reads for product data; restricts writes.
+     * @allow (create) - Any user can create a product.
+     * @allow (get) - Any user can read a product.
+     * @allow (update) - Any user can update a product.
+     * @allow (delete) - Any user can delete a product.
+     * @principle Allows open read and write access to all products.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read bank information.
+     * @description Grants public read and write access to bank information.
      * @path /banks/{bankId}
-     * @allow (get, list) - Any user can read bank information.
-     * @deny (create, update, delete) - No one can create, update, or delete bank information.
-     * @principle Allows public reads for bank data; restricts writes.
+     * @allow (create) - Any user can create a bank.
+     * @allow (get) - Any user can read a bank.
+     * @allow (update) - Any user can update a bank.
+     * @allow (delete) - Any user can delete a bank.
+     * @principle Allows open read and write access to all banks.
      */
     match /banks/{bankId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read and write sales data.
+     * @description Grants public read and write access to sales information.
      * @path /sales/{saleId}
-     * @allow (get, list, create, update, delete) - Any user can read and write sales data.
-     * @principle Enables open access to sales data for prototyping.
+     * @allow (create) - Any user can create a sale.
+     * @allow (get) - Any user can read a sale.
+     * @allow (update) - Any user can update a sale.
+     * @allow (delete) - Any user can delete a sale.
+     * @principle Allows open read and write access to all sales.
      */
     match /sales/{saleId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Allows any user to read quiz questions.
+     * @description Grants public read and write access to quiz questions.
      * @path /quizQuestions/{quizQuestionId}
-     * @allow (get, list) - Any user can read quiz questions.
-     * @deny (create, update, delete) - No one can create, update, or delete quiz questions.
-     * @principle Allows public reads for quiz question data; restricts writes.
+     * @allow (create) - Any user can create a quiz question.
+     * @allow (get) - Any user can read a quiz question.
+     * @allow (update) - Any user can update a quiz question.
+     * @allow (delete) - Any user can delete a quiz question.
+     * @principle Allows open read and write access to all quiz questions.
      */
     match /quizQuestions/{quizQuestionId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
-    }
-
-    /**
-     * @description Helper function to check if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Helper function to check if the authenticated user is the owner of the resource.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Helper function to check if the authenticated user is the owner of an existing resource.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+        allow get, list, create, update, delete: if true;
     }
   }
 }

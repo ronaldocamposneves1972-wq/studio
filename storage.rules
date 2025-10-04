@@ -1,12 +1,7 @@
 
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Regra global: Permite acesso total de leitura e escrita a todos os arquivos.
-    // Qualquer usuário, autenticado ou não, pode realizar qualquer operação.
-    // AVISO: Isto é inseguro para produção. Usar apenas para depuração.
     match /{allPaths=**} {
       allow read, write: if true;
     }
