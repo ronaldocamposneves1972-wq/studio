@@ -213,39 +213,48 @@ export default function ClientDetailPage() {
     router.push('/dashboard/clients');
   }
 
-  const isProfileComplete = (client: Client | null): boolean => {
+ const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
 
+    // Helper to check if a value is filled
     const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
 
-    // Lista de campos obrigatórios para gerar o link.
+    // 1. Create a unified profile object, merging root fields and quiz answers.
+    const unifiedProfile: Record<string, any> = {};
+
+    // Copy all root properties from client
+    Object.assign(unifiedProfile, client);
+
+    // Override with quiz answers, normalizing keys (q-name -> name)
+    if (client.answers) {
+        for (const [key, value] of Object.entries(client.answers)) {
+            const normalizedKey = key.startsWith('q-') ? key.substring(2) : key;
+            // Handle variations like mothername vs motherName
+            const finalKey = normalizedKey.toLowerCase() === 'mothername' ? 'motherName' : normalizedKey;
+            unifiedProfile[finalKey] = value;
+        }
+    }
+    
+    // If quiz provided address and number, combine them.
+    if(isFilled(unifiedProfile.address) && isFilled(unifiedProfile.number)) {
+        unifiedProfile.address = `${unifiedProfile.address}, ${unifiedProfile.number}`;
+    }
+
+
+    // 2. Define the list of absolutely required fields. 'complement' is optional.
     const requiredFields = [
         'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName',
-        'cep', 'address' 
-        // 'complement' é opcional. 'number' está incluso no 'address'.
+        'cep', 'address'
     ];
 
-    // Checa se todos os campos obrigatórios estão preenchidos.
-    return requiredFields.every(fieldKey => {
-        // Tenta encontrar o valor no objeto principal (ex: client.name)
-        if (isFilled((client as any)[fieldKey])) {
-            return true;
+    // 3. Check if every required field in the unified profile is filled.
+    return requiredFields.every(field => {
+        const value = unifiedProfile[field];
+        const isOk = isFilled(value);
+        if (!isOk) {
+            console.log(`Validation failed for field: ${field}`);
         }
-
-        // Se não encontrar, tenta no objeto de respostas do quiz.
-        if (client.answers) {
-            // Verifica a chave do quiz (ex: 'q-name')
-            if (isFilled(client.answers[`q-${fieldKey}`])) {
-                return true;
-            }
-             // Verifica chaves com variações de capitalização (ex: 'q-birthdate')
-            if (isFilled(client.answers[`q-${fieldKey.toLowerCase()}`])) {
-                return true;
-            }
-        }
-        
-        // Se não encontrou em nenhum lugar, o campo está faltando.
-        return false;
+        return isOk;
     });
 }
 
