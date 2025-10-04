@@ -1,35 +1,46 @@
 {
   "entities": {
-    "User": {
+    "Client": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
+      "title": "Client",
       "type": "object",
-      "description": "Represents a user in the system.",
+      "description": "Represents a client in the consórcio and credit system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user."
+          "description": "Unique identifier for the Client entity."
         },
         "firstName": {
           "type": "string",
-          "description": "The first name of the user."
+          "description": "Client's first name."
         },
         "lastName": {
           "type": "string",
-          "description": "The last name of the user."
+          "description": "Client's last name."
         },
         "email": {
           "type": "string",
-          "description": "The email address of the user.",
+          "description": "Client's email address.",
           "format": "email"
         },
         "phone": {
           "type": "string",
-          "description": "The phone number of the user."
+          "description": "Client's phone number."
         },
-        "role": {
+        "quizId": {
           "type": "string",
-          "description": "The role of the user (e.g., Admin, Gestor, Atendente, Financeiro)."
+          "description": "Reference to Quiz. (Relationship: Client 1:1 Quiz)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Client's status (New, In Analysis, Pending, Approved, Rejected)."
+        },
+        "documentIds": {
+          "type": "array",
+          "description": "References to Documents uploaded by the client. (Relationship: Client 1:N Document)",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -37,145 +48,138 @@
         "firstName",
         "lastName",
         "email",
-        "role"
+        "phone"
       ]
     },
-    "Client": {
+    "Quiz": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Client",
+      "title": "Quiz",
       "type": "object",
-      "description": "Represents a client in the CRM.",
+      "description": "Represents a quiz or questionnaire for gathering client information.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the client."
+          "description": "Unique identifier for the Quiz entity."
         },
-        "name": {
+        "title": {
           "type": "string",
-          "description": "The full name of the client."
+          "description": "Title of the quiz."
         },
-        "email": {
+        "description": {
           "type": "string",
-          "description": "The email address of the client.",
-          "format": "email"
+          "description": "Description of the quiz."
         },
-        "phone": {
-          "type": "string",
-          "description": "The phone number of the client."
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the client (e.g., New, Em análise, Pendente, Aprovado, Reprovado)."
-        },
-        "quizId": {
-          "type": "string",
-          "description": "Reference to Quiz. (Relationship: Quiz 1:N Client)"
-        },
-        "cpf": {
-          "type": "string",
-          "description": "The client's CPF."
-        },
-        "birthDate": {
-          "type": "string",
-          "description": "The client's date of birth.",
-          "format": "date"
-        },
-        "motherName": {
-          "type": "string",
-          "description": "The name of the client's mother."
-        },
-        "cep": {
-          "type": "string",
-          "description": "The client's postal code (CEP)."
-        },
-        "address": {
-          "type": "string",
-          "description": "The client's full address."
-        },
-        "complement": {
-          "type": "string",
-          "description": "The client's address complement."
-        },
-        "neighborhood": {
-          "type": "string",
-          "description": "The client's neighborhood."
-        },
-        "city": {
-          "type": "string",
-          "description": "The client's city."
-        },
-        "state": {
-          "type": "string",
-          "description": "The client's state."
+        "questionIds": {
+          "type": "array",
+          "description": "References to Questions in the quiz. (Relationship: Quiz 1:N Question)",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "id",
-        "name",
-        "email",
-        "phone",
-        "status",
-        "cpf"
+        "title"
+      ]
+    },
+    "Question": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Question",
+      "type": "object",
+      "description": "Represents a question in a quiz.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Question entity."
+        },
+        "text": {
+          "type": "string",
+          "description": "Text of the question."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of question (multiple choice, text, upload)."
+        },
+        "options": {
+          "type": "array",
+          "description": "Possible options for multiple choice questions.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Indicates if the question is required."
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "type"
       ]
     },
     "Product": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product (Consórcio or Crédito).",
+      "description": "Represents a consórcio or credit product.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the product."
+          "description": "Unique identifier for the Product entity."
         },
         "name": {
           "type": "string",
-          "description": "The name of the product."
+          "description": "Name of the product."
         },
         "type": {
           "type": "string",
-          "description": "The type of the product (e.g., Consórcio, Crédito)."
+          "description": "Type of product (consórcio, credit)."
         },
         "rate": {
           "type": "number",
-          "description": "The interest rate for the product."
+          "description": "Interest rate for the product."
         },
-        "term": {
+        "termMin": {
           "type": "number",
-          "description": "The term (duration) of the product."
+          "description": "Minimum term for the product."
         },
-        "minValue": {
+        "termMax": {
           "type": "number",
-          "description": "The minimum value for the product."
+          "description": "Maximum term for the product."
         },
-        "maxValue": {
+        "valueMin": {
           "type": "number",
-          "description": "The maximum value for the product."
+          "description": "Minimum value for the product."
+        },
+        "valueMax": {
+          "type": "number",
+          "description": "Maximum value for the product."
         }
       },
       "required": [
         "id",
         "name",
-        "type",
-        "rate",
-        "term",
-        "minValue",
-        "maxValue"
+        "type"
       ]
     },
     "Bank": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Bank",
       "type": "object",
-      "description": "Represents a financial institution.",
+      "description": "Represents a financial institution or partner bank.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the bank."
+          "description": "Unique identifier for the Bank entity."
         },
         "name": {
           "type": "string",
-          "description": "The name of the bank."
+          "description": "Name of the bank."
+        },
+        "commissionRate": {
+          "type": "number",
+          "description": "Commission rate for the bank."
         }
       },
       "required": [
@@ -187,11 +191,11 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Sale",
       "type": "object",
-      "description": "Represents a sale/proposal.",
+      "description": "Represents a sale or proposal.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the sale."
+          "description": "Unique identifier for the Sale entity."
         },
         "clientId": {
           "type": "string",
@@ -205,17 +209,13 @@
           "type": "string",
           "description": "Reference to Bank. (Relationship: Bank 1:N Sale)"
         },
-        "salesRepId": {
-          "type": "string",
-          "description": "Reference to User (sales representative). (Relationship: User 1:N Sale)"
-        },
         "status": {
           "type": "string",
-          "description": "The status of the sale (e.g., Aberta, Em negociação, Finalizada, Cancelada)."
+          "description": "Status of the sale (Open, In Negotiation, Finalized, Cancelled)."
         },
-        "commission": {
-          "type": "number",
-          "description": "The commission amount for the sale."
+        "proposalDocumentId": {
+          "type": "string",
+          "description": "Reference to a Document representing the proposal. (Relationship: Sale 1:1 Document)"
         }
       },
       "required": [
@@ -223,130 +223,63 @@
         "clientId",
         "productId",
         "bankId",
-        "salesRepId",
-        "status",
-        "commission"
+        "status"
       ]
     },
-    "Quiz": {
+    "User": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Quiz",
+      "title": "User",
       "type": "object",
-      "description": "Represents a quiz form with questions.",
+      "description": "Represents a user of the system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the quiz."
+          "description": "Unique identifier for the User entity."
         },
-        "name": {
+        "username": {
           "type": "string",
-          "description": "The name of the quiz."
+          "description": "Username of the user."
         },
-        "placement": {
+        "role": {
           "type": "string",
-          "description": "Where the quiz will be displayed.",
-          "enum": ["landing_page", "client_link"]
-        },
-        "questions": {
-          "type": "array",
-          "description": "A list of questions in the quiz.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "text": { "type": "string" },
-              "type": { "type": "string", "enum": ["text", "number", "email", "tel", "radio", "checkbox", "file"] },
-              "options": {
-                "type": "array",
-                "items": { "type": "string" }
-              }
-            },
-             "required": ["id", "text", "type"]
-          }
+          "description": "Role of the user (Admin, Gestor, Atendente, Financeiro)."
         }
       },
       "required": [
         "id",
-        "name",
-        "questions"
+        "username",
+        "role"
       ]
     },
-    "Webhook": {
+    "Document": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Webhook",
+      "title": "Document",
       "type": "object",
-      "description": "Represents a webhook configuration.",
+      "description": "Represents a document uploaded by a client or generated by the system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the webhook."
+          "description": "Unique identifier for the Document entity."
+        },
+        "filename": {
+          "type": "string",
+          "description": "Name of the file."
         },
         "url": {
           "type": "string",
-          "description": "The URL to send the webhook data to.",
+          "description": "URL of the document.",
           "format": "uri"
         },
-        "events": {
-          "type": "array",
-          "description": "The events that trigger the webhook.",
-          "items": {
-            "type": "string"
-          }
+        "type": {
+          "type": "string",
+          "description": "Type of document (RG, CNH, proof of income, proof of residence, proposal)."
         }
       },
       "required": [
         "id",
-        "url",
-        "events"
+        "filename",
+        "url"
       ]
-    },
-    "Transaction": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Transaction",
-      "description": "Represents a financial transaction (income or expense).",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "description": { "type": "string" },
-        "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["income", "expense"] },
-        "category": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "paid", "overdue"] },
-        "dueDate": { "type": "string", "format": "date" },
-        "paymentDate": { "type": "string", "format": "date" },
-        "accountId": { "type": "string" }
-      },
-      "required": ["id", "description", "amount", "type", "status", "dueDate", "accountId"]
-    },
-    "Account": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Account",
-      "description": "Represents a bank or digital account.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "bankName": { "type": "string" },
-        "balance": { "type": "number" },
-        "type": { "type": "string", "enum": ["checking", "savings", "digital", "cash"] }
-      },
-      "required": ["id", "name", "bankName", "balance", "type"]
-    },
-    "PayableReceivable": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Payable/Receivable",
-      "description": "Represents an item in accounts payable or receivable.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "description": { "type": "string" },
-        "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["payable", "receivable"] },
-        "status": { "type": "string", "enum": ["pending", "paid", "overdue"] },
-        "dueDate": { "type": "string", "format": "date" },
-        "paymentDate": { "type": "string", "format": "date" }
-      },
-      "required": ["id", "description", "amount", "type", "status", "dueDate"]
     }
   },
   "auth": {
@@ -358,85 +291,17 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile information. Accessible only by the user and admins.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/sales/{saleId}",
-        "definition": {
-          "entityName": "Sale",
-          "schema": {
-            "$ref": "#/backend/entities/Sale"
-          },
-          "description": "Stores sales data associated with a specific user (sales representative). Accessible only by the user and admins.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user (sales representative)."
-            },
-            {
-              "name": "saleId",
-              "description": "The unique identifier of the sale."
-            }
-          ]
-        }
-      },
-      {
         "path": "/clients/{clientId}",
         "definition": {
           "entityName": "Client",
           "schema": {
             "$ref": "#/backend/entities/Client"
           },
-          "description": "Stores client information. Accessible by users with appropriate roles (e.g., Admin, Gestor, Atendente).",
+          "description": "Stores client data. Uses path-based ownership for security. Includes fields for personal information, quiz reference, document references, and client status.",
           "params": [
             {
               "name": "clientId",
-              "description": "The unique identifier of the client."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores product information (Consórcio and Crédito). Accessible by users with appropriate roles (e.g., Admin, Gestor).",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier of the product."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/banks/{bankId}",
-        "definition": {
-          "entityName": "Bank",
-          "schema": {
-            "$ref": "#/backend/entities/Bank"
-          },
-          "description": "Stores bank information. Accessible by users with appropriate roles (e.g., Admin, Gestor, Financeiro).",
-          "params": [
-            {
-              "name": "bankId",
-              "description": "The unique identifier of the bank."
+              "description": "The unique identifier for the client."
             }
           ]
         }
@@ -448,27 +313,107 @@
           "schema": {
             "$ref": "#/backend/entities/Quiz"
           },
-          "description": "Stores quiz configurations. Accessible by users with appropriate roles (e.g., Admin, Gestor).",
+          "description": "Stores quiz data. Contains quiz title, description, and question references.",
           "params": [
             {
               "name": "quizId",
-              "description": "The unique identifier of the quiz."
+              "description": "The unique identifier for the quiz."
             }
           ]
         }
       },
       {
-        "path": "/webhooks/{webhookId}",
+        "path": "/questions/{questionId}",
         "definition": {
-          "entityName": "Webhook",
+          "entityName": "Question",
           "schema": {
-            "$ref": "#/backend/entities/Webhook"
+            "$ref": "#/backend/entities/Question"
           },
-          "description": "Stores webhook configurations. Accessible by users with Admin role.",
+          "description": "Stores question data. Includes question text, type, options, and required status.",
           "params": [
             {
-              "name": "webhookId",
-              "description": "The unique identifier of the webhook."
+              "name": "questionId",
+              "description": "The unique identifier for the question."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product data. Includes product name, type, rate, and term/value ranges.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique identifier for the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/banks/{bankId}",
+        "definition": {
+          "entityName": "Bank",
+          "schema": {
+            "$ref": "#/backend/entities/Bank"
+          },
+          "description": "Stores bank data. Includes bank name and commission rate.",
+          "params": [
+            {
+              "name": "bankId",
+              "description": "The unique identifier for the bank."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sales data. Includes references to Client, Product, and Bank, as well as sale status and proposal document reference.",
+          "params": [
+            {
+              "name": "saleId",
+              "description": "The unique identifier for the sale."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data. Includes username and role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/documents/{documentId}",
+        "definition": {
+          "entityName": "Document",
+          "schema": {
+            "$ref": "#/backend/entities/Document"
+          },
+          "description": "Stores document data. Includes filename, URL, and type.",
+          "params": [
+            {
+              "name": "documentId",
+              "description": "The unique identifier for the document."
             }
           ]
         }
@@ -476,44 +421,68 @@
       {
         "path": "/roles_admin/{userId}",
         "definition": {
-          "entityName": "admin_role",
+          "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Documents in this collection indicate admin status. Existence implies admin role.",
+          "description": "Documents in this collection grant admin privileges to the specified user. Existence of a document grants the role.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier for the user."
             }
           ]
         }
       },
       {
-        "path": "/accounts/{accountId}",
+        "path": "/roles_gestor/{userId}",
         "definition": {
-          "entityName": "Account",
-          "schema": { "$ref": "#/backend/entities/Account" },
-          "description": "Stores bank and digital account information."
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection grant gestor privileges to the specified user. Existence of a document grants the role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
         }
       },
       {
-        "path": "/transactions/{transactionId}",
+        "path": "/roles_atendente/{userId}",
         "definition": {
-          "entityName": "Transaction",
-          "schema": { "$ref": "#/backend/entities/Transaction" },
-          "description": "Stores all financial transactions."
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection grant atendente privileges to the specified user. Existence of a document grants the role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
         }
       },
       {
-        "path": "/payablesReceivables/{prId}",
+        "path": "/roles_financeiro/{userId}",
         "definition": {
-          "entityName": "PayableReceivable",
-          "schema": { "$ref": "#/backend/entities/PayableReceivable" },
-          "description": "Stores accounts payable and receivable items."
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection grant financeiro privileges to the specified user. Existence of a document grants the role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support a comprehensive Consórcio and Crédito management system, including an admin dashboard, CRM, product management, sales pipelines, and financial reporting. It emphasizes Authorization Independence by denormalizing authorization data where necessary and uses structural segregation to ensure consistent security postures within collections.\n\n**Authorization Independence:**\nAuthorization Independence is achieved primarily through path-based ownership for user-specific data and membership maps for collaborative entities. For instance, sales data is nested under users (`/users/{userId}/sales/{saleId}`), ensuring that a user can only access their own sales. For collaborative data or data that requires broader access based on roles (e.g., access to clients based on the user's role), denormalization would be necessary. For instance, if sales data needed to be accessible by 'Gestor' roles, the 'sales' documents could denormalize a `managers` map containing the `userId` of all users with a `Gestor` role.\n\n**Structural Segregation:**\nStructural Segregation ensures that collections contain documents with similar security needs. This is evident in the separation of user data and client data, as well as the organization of sales data under individual users. This segregation simplifies security rules and makes the system more robust.\n\n**QAPs (Rules are not Filters):**\nThe structure supports secure `list` operations through clear ownership and role-based access control. For example, listing sales under a specific user is straightforward due to the hierarchical structure. To support listing clients based on their status or other criteria while maintaining security, it might be necessary to denormalize certain fields into a separate collection optimized for querying and listing with appropriate security rules based on user roles."
+    "reasoning": "The Firestore structure is designed to support a consórcio and credit system, focusing on clients, products, sales, and related data.  Authorization Independence is achieved through denormalization, especially for client-owned data.  For example, Client documents, stored under `/clients/{clientId}`, include all necessary data for authorization without needing to `get()` data from other collections.  This denormalization avoids hierarchical authorization dependencies and allows atomic operations.\n\nQAPs are supported by segregating data based on access requirements and utilizing path-based ownership for client-related data. Specific features supported by the data structure include:\n\n*   **Client Management:**  Client data is stored in `/clients/{clientId}`.  Document `id`s are used as references.  This supports listing all clients securely.\n*   **Quiz Management:** Quizzes and Questions are stored in their respective collections, allowing for separate management and listing.\n*   **Product and Bank Management:** Products and Banks are stored in their own top-level collections for easy access and management.\n*   **Sales/Proposals:**  Sales data is stored in `/sales/{saleId}` and includes denormalized information as needed. Sales are linked to Clients, Products and Banks using their respective IDs.\n*   **User Roles:** Users and their roles (Admin, Gestor, etc.) are stored in the `/users/{userId}` collection. Existence checks on documents in the `/roles_{role}/{userId}` collections are used to control access to sensitive operations.\n\nThis structure promotes clear authorization rules, simplifies queries, and maintains data integrity."
   }
 }
