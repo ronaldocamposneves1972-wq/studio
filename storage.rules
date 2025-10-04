@@ -1,21 +1,9 @@
 
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow anyone to upload files to the 'clients' folder and its subdirectories.
-    // This is necessary for the document upload form to work for unauthenticated users.
-    match /clients/{clientId}/{allPaths=**} {
-      allow write: if true;
-      
-      // Reading documents should be restricted to authenticated users.
-      // This prevents unauthorized users from listing or accessing uploaded files.
-      allow read: if request.auth != null;
-    }
-    
-    // For any other path, deny by default unless a more specific rule allows it.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
