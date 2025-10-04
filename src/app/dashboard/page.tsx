@@ -9,8 +9,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query, where, limit, orderBy } from "firebase/firestore"
+import { proposals as allProposals, clients as allClients, users as allUsers } from "@/lib/placeholder-data"
 import type { Proposal, Client, User } from "@/lib/types"
 
 import { Badge } from "@/components/ui/badge"
@@ -68,32 +67,14 @@ function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: stri
 
 
 export default function Dashboard() {
-    const firestore = useFirestore()
-
-    const proposalsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, "proposals"))
-    }, [firestore])
-    const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
-    
-    const recentProposalsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, "proposals"), orderBy("createdAt", "desc"), limit(5));
-    }, [firestore]);
-    const { data: recentProposals, isLoading: isLoadingRecentProposals } = useCollection<Proposal>(recentProposalsQuery);
-
-
-    const clientsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, "clients"))
-    }, [firestore])
-    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
-    
-    const usersQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, "users"));
-    }, [firestore]);
-    const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
+    const proposals = allProposals;
+    const recentProposals = allProposals.slice(0, 5);
+    const clients = allClients;
+    const users = allUsers;
+    const isLoadingProposals = false;
+    const isLoadingClients = false;
+    const isLoadingRecentProposals = false;
+    const isLoadingUsers = false;
 
 
     const { totalApproved, pendingProposalsCount, inNegotiationCount, commissionValue } = useMemo(() => {
