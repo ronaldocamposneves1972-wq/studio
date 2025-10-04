@@ -2,7 +2,7 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite que qualquer usuário autenticado leia, escreva e exclua qualquer arquivo.
+    // Permite que qualquer usuário autenticado leia e escreva qualquer arquivo.
     match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
