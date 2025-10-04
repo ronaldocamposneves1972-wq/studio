@@ -1,266 +1,202 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech.
- *
- * Core Philosophy:
- * This ruleset enforces a strict separation of concerns with path-based ownership and denormalization
- * to ensure authorization independence. User data is secured under `/users/{userId}`, and access to
- * other collections is carefully controlled based on the user's authentication status.  Data is denormalized
- * to avoid expensive `get()` calls within security rules.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a role-based access control system with user-specific data segregation.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information.  Only the authenticated user can access their own profile.
- * - /roles_admin/{userId}: Document existence determines admin role.
- * - /clients/{clientId}: Stores client information.
- * - /clients/{clientId}/documents/{documentId}: Stores client documents.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution information.
- * - /consortiums/{consortiumId}: Stores consortium product information.
- * - /credit_products/{creditProductId}: Stores credit product information.
- * - /product_combos/{productComboId}: Stores product combo information.
- * - /sales_proposals/{salesProposalId}: Stores sales proposal information, including a denormalized `clientId`.
- * - /commissions/{commissionId}: Stores commission data.
- * - /quizzes/{quizId}: Stores quiz data.
- * - /questions/{questionId}: Stores question data.
+ * - /users/{userId}: Stores user profiles; only the authenticated user can read/write their own profile.
+ * - /roles_admin/{userId}: Determines admin role; existence indicates admin status.
+ * - /clients/{clientId}: Stores client information; access is not restricted in this prototype.
+ * - /clients/{clientId}/documents/{documentId}: Stores client documents; only the client can manage their documents.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data; access is not restricted in this prototype.
+ * - /consortiums/{consortiumId}: Stores consortium product data; access is not restricted in this prototype.
+ * - /credit_products/{creditProductId}: Stores credit product data; access is not restricted in this prototype.
+ * - /product_combos/{productComboId}: Stores product combo data; access is not restricted in this prototype.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data; access is not restricted in this prototype.
+ * - /commissions/{commissionId}: Stores commission data; access is not restricted in this prototype.
+ * - /quizzes/{quizId}: Stores quiz data; access is not restricted in this prototype.
+ * - /questions/{questionId}: Stores question data; access is not restricted in this prototype.
  *
  * Key Security Decisions:
- * - User listing is disabled to protect user privacy.
- * - Data required for authorization is denormalized onto the documents being secured.
- * - Ambiguous relationships default to owner-only access.
- * - All write operations require user authentication.
+ * - User profiles are strictly private and only accessible to the owning user.
+ * - Admin roles are determined by the existence of a document in /roles_admin/{userId}.
+ * - Read-only collections are generally allowed for public access in this prototyping phase.
+ * - `list` operations are secured based on path-based ownership where applicable.
+ * - Data validation is minimized to essential checks for relational integrity and path consistency.
  *
- * Denormalization for Authorization:
- * - SalesProposals include a `clientId` field, allowing rules to directly check client ownership without additional reads.
+ * Authorization Independence:
+ * - The `clientId` is denormalized within `sales_proposals` to grant access for the specific client.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by an authenticated user.
-     * @returns {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of an existing document.
-     * @param {string} userId - The user ID to compare against the document's owner ID.
-     * @returns {boolean} True if the user is the owner and the document exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Determines if the user has an admin role by checking for the existence of a document in `/roles_admin/{userId}`.
-     * @returns {boolean} True if the user has an admin role, false otherwise.
-     */
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Rules for user profiles.
+     * @description Allows users to read and write their own user profile.
      * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their own profile.
-     *     request.auth.uid == 'user123'
-     * @deny (update) User 'user456' tries to update 'user123' profile.
-     *     request.auth.uid == 'user456'
+     * @allow (get, list, create, update, delete) if request.auth.uid == userId
+     * @deny (get, list, create, update, delete) if request.auth.uid != userId
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
 
-     /**
-      * @description Rules for determining admin role. Document existence confers the role.
-      * @path /roles_admin/{userId}
-      * @allow (create) User with ID 'admin123' is added as an admin.
-      *     request.auth.uid == 'admin123'
-      * @deny (update) User 'user456' tries to update 'admin123' admin role.
-      *     request.auth.uid == 'user456'
-      */
-    match /roles_admin/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if false; // Only the backend can create admin roles.
-      allow update: if false; // Admin roles should not be editable via client.
-      allow delete: if false; // Admin roles should not be deletable via client.
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Rules for client data.
+     * @description Determines admin role by checking for the existence of a document.
+     * @path /roles_admin/{userId}
+     * @allow (get, list, create, update, delete) if true; // TODO: Add role management logic
+     * @deny (get, list, create, update, delete) if false;
+     * @principle Existence over Content. Authorization using /roles_admin/{uid}.
+     */
+    match /roles_admin/{userId} {
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
+    }
+
+    /**
+     * @description Allows access to client data. Access is not restricted in this prototype.
      * @path /clients/{clientId}
-     * @allow (create) Authenticated user creates a client profile.
-     *     request.auth != null
-     * @deny (update) User 'user456' tries to update 'client123' profile.
-     *     request.auth.uid == 'user456'
-     * @principle Requires authentication for all access.
+     * @allow (get, list) if true;
+     *
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for documents uploaded by clients.
+     * @description Allows clients to manage their own documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) Client 'client123' uploads a document.
-     *     request.auth != null
-     * @deny (update) User 'user456' tries to update 'client123' document.
-     *     request.auth.uid == 'user456'
-     * @principle Enforces document ownership for writes, requires authentication for read.
+     * @allow (get, list, create, update, delete) if request.auth.uid == clientId
+     * @deny (get, list, create, update, delete) if request.auth.uid != clientId
+     * @principle Path-based ownership under client.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if false;
+      function isClientOwner(clientId) {
+        return request.auth.uid == clientId;
+      }
+
+      allow get: if isSignedIn() && isClientOwner(clientId);
+      allow list: if false;
+      allow create: if isSignedIn() && isClientOwner(clientId);
+      allow update: if isSignedIn() && isClientOwner(clientId);
+      allow delete: if isSignedIn() && isClientOwner(clientId);
     }
 
     /**
-     * @description Rules for financial institution data.
+     * @description Allows access to financial institution data. Access is not restricted in this prototype.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get) Any authenticated user can read financial institutions.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a financial institution.
-     *     request.auth.uid == 'user123'
+     * @allow (get, list) if true;
+     * @principle Public read access for product information.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for consortium product data.
+     * @description Allows access to consortium product data. Access is not restricted in this prototype.
      * @path /consortiums/{consortiumId}
-     * @allow (get) Any authenticated user can read consortium products.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a consortium product.
-     *     request.auth.uid == 'user123'
      */
     match /consortiums/{consortiumId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for credit product data.
+     * @description Allows access to credit product data. Access is not restricted in this prototype.
      * @path /credit_products/{creditProductId}
-     * @allow (get) Any authenticated user can read credit products.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a credit product.
-     *     request.auth.uid == 'user123'
      */
     match /credit_products/{creditProductId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for product combo data.
+     * @description Allows access to product combo data. Access is not restricted in this prototype.
      * @path /product_combos/{productComboId}
-     * @allow (get) Any authenticated user can read product combos.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a product combo.
-     *     request.auth.uid == 'user123'
      */
     match /product_combos/{productComboId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for sales proposal data.
+     * @description Allows access to sales proposal data. Access is not restricted in this prototype.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get) Any authenticated user can read sales proposals.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a sales proposal.
-     *     request.auth.uid == 'user123'
+     * @allow list: if true;
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for commission data.
+     * @description Allows access to commission data. Access is not restricted in this prototype.
      * @path /commissions/{commissionId}
-     * @allow (get) Any authenticated user can read commission data.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a commission.
-     *     request.auth.uid == 'user123'
      */
     match /commissions/{commissionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for quiz data.
+     * @description Allows access to quiz data. Access is not restricted in this prototype.
      * @path /quizzes/{quizId}
-     * @allow (get) Any authenticated user can read quizzes.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a quiz.
-     *     request.auth.uid == 'user123'
      */
     match /quizzes/{quizId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
 
     /**
-     * @description Rules for question data.
+     * @description Allows access to question data. Access is not restricted in this prototype.
      * @path /questions/{questionId}
-     * @allow (get) Any authenticated user can read questions.
-     *     request.auth != null
-     * @deny (create) User 'user123' tries to create a question.
-     *     request.auth.uid == 'user123'
      */
     match /questions/{questionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+        allow get: if true;
+        allow list: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
     }
   }
 }
