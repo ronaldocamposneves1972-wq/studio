@@ -215,33 +215,39 @@ export default function ClientDetailPage() {
 
   const isProfileComplete = (client: Client | null): boolean => {
     if (!client) return false;
-    
-    // Lista de campos obrigatórios e suas possíveis chaves no objeto do cliente ou no quiz
-    const requiredFieldsMap = {
-        name: ['name', 'q-name'],
-        cpf: ['cpf', 'q-cpf'],
-        birthDate: ['birthDate', 'q-birthdate'],
-        phone: ['phone', 'q-phone'],
-        email: ['email', 'q-email'],
-        motherName: ['motherName', 'q-mothername'],
-        cep: ['cep', 'q-cep'],
-        address: ['address', 'q-address'],
-        complement: ['complement', 'q-complement'], // complement is optional in logic, but required here for button
-    };
 
     const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
 
-    // Verifica se todos os campos obrigatórios estão preenchidos
-    return Object.values(requiredFieldsMap).every(possibleKeys => {
-        // Verifica se pelo menos uma das chaves possíveis tem um valor preenchido
-        return possibleKeys.some(key => {
-            if (key.startsWith('q-')) {
-                return isFilled(client.answers?.[key]);
+    // Lista de campos obrigatórios para gerar o link.
+    const requiredFields = [
+        'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName',
+        'cep', 'address' 
+        // 'complement' é opcional. 'number' está incluso no 'address'.
+    ];
+
+    // Checa se todos os campos obrigatórios estão preenchidos.
+    return requiredFields.every(fieldKey => {
+        // Tenta encontrar o valor no objeto principal (ex: client.name)
+        if (isFilled((client as any)[fieldKey])) {
+            return true;
+        }
+
+        // Se não encontrar, tenta no objeto de respostas do quiz.
+        if (client.answers) {
+            // Verifica a chave do quiz (ex: 'q-name')
+            if (isFilled(client.answers[`q-${fieldKey}`])) {
+                return true;
             }
-            return isFilled((client as any)[key]);
-        });
+             // Verifica chaves com variações de capitalização (ex: 'q-birthdate')
+            if (isFilled(client.answers[`q-${fieldKey.toLowerCase()}`])) {
+                return true;
+            }
+        }
+        
+        // Se não encontrou em nenhum lugar, o campo está faltando.
+        return false;
     });
-  }
+}
 
   const profileComplete = isProfileComplete(client);
 
@@ -571,5 +577,7 @@ export default function ClientDetailPage() {
     </div>
   )
 }
+
+    
 
     
