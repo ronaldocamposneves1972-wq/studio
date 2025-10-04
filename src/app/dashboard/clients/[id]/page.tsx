@@ -218,44 +218,29 @@ export default function ClientDetailPage() {
 
     const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
 
-    // 1. Create a unified profile object.
-    const unifiedProfile: Record<string, any> = { ...client };
+    // Create a unified profile object by merging root properties and quiz answers.
+    const unifiedProfile: Record<string, any> = { ...client, ...(client.answers || {}) };
 
-    // 2. Merge answers from the quiz, normalizing keys.
+    // Normalize keys from quiz answers (e.g., 'q-name' -> 'name')
     if (client.answers) {
-        for (const [key, value] of Object.entries(client.answers)) {
-            let normalizedKey = key.startsWith('q-') ? key.substring(2) : key;
-            if (normalizedKey === 'mothername') normalizedKey = 'motherName';
-            if (normalizedKey === 'birthdate') normalizedKey = 'birthDate';
-            unifiedProfile[normalizedKey] = value;
+      for (const [key, value] of Object.entries(client.answers)) {
+        if (key.startsWith('q-')) {
+          const normalizedKey = key.substring(2);
+          unifiedProfile[normalizedKey] = value;
         }
+      }
     }
     
-    // 3. Combine address parts if they exist in the quiz answers
-    const quizAddress = unifiedProfile.address; // From `q-address`
-    const quizNumber = unifiedProfile.number;   // From `q-number`
+    // Define the required fields based on the new rule.
+    const requiredFields = ['name', 'cpf', 'cep'];
 
-    if (isFilled(quizAddress)) {
-         // Create the full address from parts, only if `address` is from the quiz
-         // This check prevents overwriting an already complete address from the root client object
-         if(client.answers && client.answers['q-address']){
-            unifiedProfile.address = [quizAddress, quizNumber].filter(isFilled).join(', ');
-         }
-    }
-
-
-    // 4. Define required fields (complement is optional).
-    const requiredFields = [
-        'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName',
-        'cep', 'address', 'neighborhood', 'city', 'state'
-    ];
-
-    // 5. Check if all required fields are filled in the unified profile.
+    // Check if all required fields are filled in the unified profile.
     for (const field of requiredFields) {
-        if (!isFilled(unifiedProfile[field])) {
-            console.log(`Validation failed for required field: ${field}`);
-            return false;
-        }
+      if (!isFilled(unifiedProfile[field])) {
+        // Optional: Log which field is missing for debugging.
+        // console.log(`Validation failed for required field: ${field}`);
+        return false;
+      }
     }
 
     return true;
@@ -516,7 +501,7 @@ export default function ClientDetailPage() {
                                         <Info className="h-4 w-4" />
                                         <AlertTitle>Dados Incompletos</AlertTitle>
                                         <AlertDescription>
-                                            É necessário que todos os dados da "Ficha Inicial" estejam preenchidos para gerar o link de envio de documentos.
+                                            É necessário que o cliente tenha pelo menos <strong>Nome, CPF e CEP</strong> preenchidos para gerar o link.
                                         </AlertDescription>
                                         </Alert>
                                     )}
