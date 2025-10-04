@@ -127,7 +127,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
               <AppLogo className="h-5 w-5 transition-all group-hover:scale-110" />
               <span className="sr-only">ConsorciaTech</span>
             </Link>
-            {allNavItems.map((item) => (
+            {allNavItems && allNavItems.map((item) => (
                item.href ? (
                  <Link
                   key={item.label}
@@ -168,7 +168,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
       </div>
 
        <CommandDialog open={openCommand} onOpenChange={setOpenCommand}>
-         <DialogHeader className="sr-only">
+         <DialogHeader>
             <DialogTitle>Pesquisa Global</DialogTitle>
             <DialogDescription>Pesquise clientes por nome/CPF ou navegue para páginas do sistema.</DialogDescription>
         </DialogHeader>

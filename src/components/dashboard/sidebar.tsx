@@ -67,8 +67,6 @@ const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean })
   const ItemIcon = item.icon;
 
   const hasChildren = !!item.children;
-
-  // Ativo apenas se a rota atual for exatamente a do item
   const isActive = item.href ? pathname === item.href : false;
 
   return (
@@ -80,9 +78,10 @@ const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean })
       {hasChildren ? (
         <div
           className={cn(
-            "flex h-9 w-full items-center gap-2 px-3 text-sm cursor-pointer transition-colors",
-            isActive ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
-            isCollapsed && "w-12 justify-center p-0"
+            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm cursor-pointer transition-colors",
+            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
+            isCollapsed && "w-12 justify-center p-0",
+            "border-b border-gray-200" // separação entre itens
           )}
         >
           <ItemIcon className="h-5 w-5" />
@@ -93,9 +92,10 @@ const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean })
         <Link
           href={item.href || '#'}
           className={cn(
-            "flex h-9 w-full items-center gap-2 px-3 text-sm transition-colors",
-            isActive ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
-            isCollapsed && "justify-center p-0"
+            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm transition-colors",
+            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
+            isCollapsed && "justify-center p-0",
+            "border-b border-gray-200" // separação entre itens
           )}
         >
           <ItemIcon className="h-5 w-5" />
@@ -104,7 +104,7 @@ const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean })
       )}
 
       {hasChildren && isOpen && (
-        <div className="absolute left-full top-0 ml-1 w-48 bg-white shadow-lg z-50 rounded-md">
+        <div className="absolute left-full top-0 ml-1 w-48 bg-white shadow-lg z-50 rounded-md border border-gray-200">
           {item.children.map((child: any, index: number) => (
             <div key={child.label}>
               <SidebarItem item={child} isCollapsed={false} />
@@ -121,11 +121,12 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
 
   return (
     <aside className={cn(
-      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 bg-[#ffffff] transition-all",
+      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-white transition-all",
       isCollapsed ? "w-14" : "w-52"
     )}>
-      <div className={cn("flex h-16 items-center px-4", isCollapsed ? "justify-center" : "justify-start")}>
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-800">
+      {/* Logo com separação */}
+      <div className={cn("flex h-16 items-center border-b border-gray-200 px-4", isCollapsed ? "justify-center" : "justify-start")}>
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-700">
           <AppLogo className="h-8 w-8" />
           {!isCollapsed && <span>Consorcia</span>}
         </Link>
@@ -137,12 +138,13 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
         ))}
       </nav>
 
-      <div className="mt-auto p-2">
+      {/* Configurações */}
+      <div className="mt-auto p-2 border-t border-gray-200">
         <Link
           href="/dashboard/settings"
           className={cn(
             "flex h-9 w-full items-center justify-center gap-2 px-3 text-sm transition-colors",
-            pathname === '/dashboard/settings' ? "font-bold text-gray-900" : "text-gray-500 hover:text-gray-900",
+            pathname === '/dashboard/settings' ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
             isCollapsed && "justify-center p-0"
           )}
         >
