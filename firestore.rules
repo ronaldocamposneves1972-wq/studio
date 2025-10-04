@@ -1,168 +1,206 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech
+ * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset provides authenticated users with full access to the database. No authorization checks are performed. This setup is intended for rapid prototyping and should be replaced with a more restrictive ruleset before production.
+ * This ruleset grants authenticated users full access (create, read, update, delete) to all data,
+ * effectively disabling authorization controls for prototyping purposes.  This should NEVER be used in production.
  *
  * Data Structure:
- * The database is organized into top-level collections such as `users`, `clients`, `financial_institutions`, `consortiums`, `credit_products`, `product_combos`, `sales_proposals`, `commissions`, `quizzes`, and `questions`.
- * Subcollections are used to nest data, such as `documents` under `clients`.
+ * The Firestore database contains collections for users, clients, financial institutions, products (consortiums and credit products),
+ * product combos, sales proposals, commissions, quizzes, and questions.  Data is organized into top-level collections.
  *
  * Key Security Decisions:
- * - All authenticated users have read and write access to all data.
+ * - All authenticated users have full access.
+ * - No schema validation is performed during this phase.
  *
- * WARNING: This ruleset is insecure and should only be used for prototyping.
+ * WARNING: This ruleset is for PROTOTYPING ONLY and is INSECURE.  It should be replaced with a proper authorization model before deployment.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     /**
-     * @description Allows authenticated users to read and write user data.
+     * @description Grants authenticated users full access to user data.
      * @path /users/{userId}
      * @allow (create) - Any authenticated user can create a user document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete user documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a user document.
+     * @allow (list) - Any authenticated user can list user documents.
+     * @allow (update) - Any authenticated user can update a user document.
+     * @allow (delete) - Any authenticated user can delete a user document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /users/{userId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write admin role data.
+     * @description Grants authenticated users full access to admin role data.
      * @path /roles_admin/{userId}
      * @allow (create) - Any authenticated user can create an admin role document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete admin role documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read an admin role document.
+     * @allow (list) - Any authenticated user can list admin role documents.
+     * @allow (update) - Any authenticated user can update an admin role document.
+     * @allow (delete) - Any authenticated user can delete an admin role document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /roles_admin/{userId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write client data.
+     * @description Grants authenticated users full access to client data.
      * @path /clients/{clientId}
      * @allow (create) - Any authenticated user can create a client document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete client documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a client document.
+     * @allow (list) - Any authenticated user can list client documents.
+     * @allow (update) - Any authenticated user can update a client document.
+     * @allow (delete) - Any authenticated user can delete a client document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /clients/{clientId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write client document data.
+     * @description Grants authenticated users full access to client document data.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) - Any authenticated user can create a client document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete client documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (create) - Any authenticated user can create a document for a client.
+     * @allow (get) - Any authenticated user can read a document for a client.
+     * @allow (list) - Any authenticated user can list documents for a client.
+     * @allow (update) - Any authenticated user can update a document for a client.
+     * @allow (delete) - Any authenticated user can delete a document for a client.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write financial institution data.
+     * @description Grants authenticated users full access to financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
      * @allow (create) - Any authenticated user can create a financial institution document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete financial institution documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a financial institution document.
+     * @allow (list) - Any authenticated user can list financial institution documents.
+     * @allow (update) - Any authenticated user can update a financial institution document.
+     * @allow (delete) - Any authenticated user can delete a financial institution document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write consortium data.
+     * @description Grants authenticated users full access to consortium data.
      * @path /consortiums/{consortiumId}
      * @allow (create) - Any authenticated user can create a consortium document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete consortium documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a consortium document.
+     * @allow (list) - Any authenticated user can list consortium documents.
+     * @allow (update) - Any authenticated user can update a consortium document.
+     * @allow (delete) - Any authenticated user can delete a consortium document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /consortiums/{consortiumId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write credit product data.
+     * @description Grants authenticated users full access to credit product data.
      * @path /credit_products/{creditProductId}
      * @allow (create) - Any authenticated user can create a credit product document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete credit product documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a credit product document.
+     * @allow (list) - Any authenticated user can list credit product documents.
+     * @allow (update) - Any authenticated user can update a credit product document.
+     * @allow (delete) - Any authenticated user can delete a credit product document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /credit_products/{creditProductId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write product combo data.
+     * @description Grants authenticated users full access to product combo data.
      * @path /product_combos/{productComboId}
      * @allow (create) - Any authenticated user can create a product combo document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete product combo documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a product combo document.
+     * @allow (list) - Any authenticated user can list product combo documents.
+     * @allow (update) - Any authenticated user can update a product combo document.
+     * @allow (delete) - Any authenticated user can delete a product combo document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /product_combos/{productComboId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write sales proposal data.
+     * @description Grants authenticated users full access to sales proposal data.
      * @path /sales_proposals/{salesProposalId}
      * @allow (create) - Any authenticated user can create a sales proposal document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete sales proposal documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a sales proposal document.
+     * @allow (list) - Any authenticated user can list sales proposal documents.
+     * @allow (update) - Any authenticated user can update a sales proposal document.
+     * @allow (delete) - Any authenticated user can delete a sales proposal document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /sales_proposals/{salesProposalId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write commission data.
+     * @description Grants authenticated users full access to commission data.
      * @path /commissions/{commissionId}
      * @allow (create) - Any authenticated user can create a commission document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete commission documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a commission document.
+     * @allow (list) - Any authenticated user can list commission documents.
+     * @allow (update) - Any authenticated user can update a commission document.
+     * @allow (delete) - Any authenticated user can delete a commission document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /commissions/{commissionId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write quiz data.
+     * @description Grants authenticated users full access to quiz data.
      * @path /quizzes/{quizId}
      * @allow (create) - Any authenticated user can create a quiz document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete quiz documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a quiz document.
+     * @allow (list) - Any authenticated user can list quiz documents.
+     * @allow (update) - Any authenticated user can update a quiz document.
+     * @allow (delete) - Any authenticated user can delete a quiz document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /quizzes/{quizId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Allows authenticated users to read and write question data.
+     * @description Grants authenticated users full access to question data.
      * @path /questions/{questionId}
      * @allow (create) - Any authenticated user can create a question document.
-     * @allow (get, list, update, delete) - Any authenticated user can read, list, update, or delete question documents.
-     * @deny (none) - No requests are denied.
-     * @principle Allows all authenticated users to perform any operation.
+     * @allow (get) - Any authenticated user can read a question document.
+     * @allow (list) - Any authenticated user can list question documents.
+     * @allow (update) - Any authenticated user can update a question document.
+     * @allow (delete) - Any authenticated user can delete a question document.
+     * @deny (none) - All requests are allowed for authenticated users.
+     * @principle Allows any authenticated user full access.
      */
     match /questions/{questionId} {
-      allow read, write: if isSignedIn();
+      allow read, write, create, update, delete: if isSignedIn();
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
 }
