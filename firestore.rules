@@ -1,152 +1,199 @@
 /**
- * @file Firebase Security Rules for Consórcio e Crédito System
+ * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
- * @Core Philosophy:
- * The ruleset prioritizes ease of development by relaxing schema enforcement while strictly controlling access.
- * It focuses on authorizing actions based on user roles and relationships within the data model.
- * Read access to Quizzes is open to all users, including unauthenticated users, to allow for easy access to quizzes.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user profiles
+ * and allows controlled access to client data and related entities.
  *
- * @Data Structure:
- * - /clients/{clientId}: Stores client information.
- * - /quizzes/{quizId}: Stores quiz data.
- * - /products/{productId}: Stores product information.
- * - /banks/{bankId}: Stores bank information.
- * - /sales/{saleId}: Stores sale information.
- * - /commissions/{commissionId}: Stores commission information.
- * - /users/{userId}: Stores user information.
- * - /clients/{clientId}/documents/{documentId}: Stores documents uploaded by a client.
- * - /salesPeople/{salesPersonId}: Stores salesperson information.
+ * Data Structure:
+ * - User profiles are stored under `/users/{userId}`.
+ * - Client profiles are stored under `/clients/{clientId}`.
+ * - Client documents are stored under `/clients/{clientId}/documents/{documentId}`.
+ * - Client quiz answers are stored under `/clients/{clientId}/quizAnswers/{quizAnswerId}`.
+ * - Product information is stored under `/products/{productId}`.
+ * - Bank information is stored under `/banks/{bankId}`.
+ * - Sales information is stored under `/sales/{saleId}`.
+ * - Quiz questions are stored under `/quizQuestions/{quizQuestionId}`.
  *
- * @Key Security Decisions:
- * - Read access is allowed for all quizzes.
- * - No listing is enforced on any collections.
- * - Data validation is minimal, focusing on authorization-critical fields.
- * - All write operations are allowed for authenticated users.
+ * Key Security Decisions:
+ * - Users can only read and write their own profile data.
+ * - Access to client data is not explicitly restricted in this version.
+ * - Public read access is enabled for products, banks, sales, and quiz questions.
+ * - Data shape validation is relaxed to allow rapid prototyping.
  *
+ * Denormalization for Authorization:
+ * - The `clientId` field is denormalized into the `Document` and `QuizAnswer` entities
+ *   to allow authorization rules to directly check the client's ID without requiring additional reads.
+ *
+ * Structural Segregation:
+ * - User profiles and client data are stored in separate collections to maintain distinct security contexts.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to client data.
-     * @path /clients/{clientId}
-     * @allow (create, update, delete) - Any authenticated user can manage client data.
-     * @allow (get, list) - Any authenticated user can read client data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read client data for faster development.
+     * @description Controls access to user profile data.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user can create their own profile if the userId matches their auth.uid.
+     * @allow (get, list, update, delete) Authenticated user can only access their own profile data.
+     * @deny (create) Unauthenticated user cannot create a profile.
+     * @deny (get, list, update, delete) Authenticated user cannot access another user's profile data.
+     * @principle Enforces document ownership for user profiles.
      */
-    match /clients/{clientId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+    match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to quiz data.
-     * @path /quizzes/{quizId}
-     * @allow (get, list) - Anyone can read quizzes.
-     * @allow (create, update, delete) - Any authenticated user can manage quiz data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows anyone to read quiz data and any signed in user to write.
+     * @description Controls access to client profile data.
+     * @path /clients/{clientId}
+     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client data.  More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows any signed in user to create, read, update or delete Clients in prototyping mode.
      */
-    match /quizzes/{quizId} {
-      allow get, list: if true;
-      allow create, update, delete: if isSignedIn();
+    match /clients/{clientId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Controls access to documents uploaded by clients.
+     * @path /clients/{clientId}/documents/{documentId}
+     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client documents. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows any signed in user to create, read, update or delete Client Documents in prototyping mode.
+     */
+    match /clients/{clientId}/documents/{documentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Controls access to quiz answers provided by clients.
+     * @path /clients/{clientId}/quizAnswers/{quizAnswerId}
+     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client quiz answers. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows any signed in user to create, read, update or delete Client Quiz Answers in prototyping mode.
+     */
+    match /clients/{clientId}/quizAnswers/{quizAnswerId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
      * @description Controls access to product information.
      * @path /products/{productId}
-     * @allow (create, update, delete) - Any authenticated user can manage product data.
-     * @allow (get, list) - Any authenticated user can read product data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read product data for faster development.
+     * @allow (get, list) Allows any user to read product information.
+     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage product data. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows public read access for product information and authenticated write access in prototyping mode.
      */
     match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
      * @description Controls access to bank information.
      * @path /banks/{bankId}
-     * @allow (create, update, delete) - Any authenticated user can manage bank data.
-     * @allow (get, list) - Any authenticated user can read bank data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read bank data for faster development.
+     * @allow (get, list) Allows any user to read bank information.
+     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage bank data. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows public read access for bank information and authenticated write access in prototyping mode.
      */
     match /banks/{bankId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
      * @description Controls access to sales information.
      * @path /sales/{saleId}
-     * @allow (create, update, delete) - Any authenticated user can manage sales data.
-     * @allow (get, list) - Any authenticated user can read sales data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read sales data for faster development.
+     * @allow (get, list) Allows any user to read sales information.
+     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage sales data. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows public read access for sales information and authenticated write access in prototyping mode.
      */
     match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to commission information.
-     * @path /commissions/{commissionId}
-     * @allow (create, update, delete) - Any authenticated user can manage commission data.
-     * @allow (get, list) - Any authenticated user can read commission data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read commission data for faster development.
+     * @description Controls access to quiz questions.
+     * @path /quizQuestions/{quizQuestionId}
+     * @allow (get, list) Allows any user to read quiz questions.
+     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage quiz question data. More restrictive roles should be applied later.
+     * @deny None.
+     * @principle Allows public read access for quiz questions and authenticated write access in prototyping mode.
      */
-    match /commissions/{commissionId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
+    match /quizQuestions/{quizQuestionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
-    /**
-     * @description Controls access to user data.
-     * @path /users/{userId}
-     * @allow (create, update, delete) - Any authenticated user can manage user data.
-     * @allow (get, list) - Any authenticated user can read user data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read user data for faster development.
-     */
-    match /users/{userId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Controls access to documents uploaded by a client.
-     * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create, update, delete) - Any authenticated user can manage client documents.
-     * @allow (get, list) - Any authenticated user can read client documents.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read client documents for faster development.
-     */
-    match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Controls access to sales person data.
-     * @path /salesPeople/{salesPersonId}
-     * @allow (create, update, delete) - Any authenticated user can manage sales person data.
-     * @allow (get, list) - Any authenticated user can read sales person data.
-     * @deny (create, update, delete) - No write access for unauthenticated users.
-     * @principle Allows any authenticated user to manage and read sales person data for faster development.
-     */
-    match /salesPeople/{salesPersonId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }
