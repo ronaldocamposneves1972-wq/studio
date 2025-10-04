@@ -1,3 +1,4 @@
+
 'use client'
 
 import {
@@ -7,12 +8,11 @@ import {
   DollarSign,
   Users,
 } from "lucide-react"
+import Link from "next/link"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, query, where, limit, orderBy } from "firebase/firestore"
+import type { Proposal, Client, User } from "@/lib/types"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,8 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import Link from "next/link"
-
 import {
   Bar,
   BarChart,
@@ -40,77 +38,136 @@ import {
   YAxis,
   Tooltip,
 } from "recharts"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useMemo } from "react"
 
-import { clients, proposals, users } from "@/lib/placeholder-data"
 
+function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: string, icon: React.ElementType, value: string, subtext: string, isLoading: boolean }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <>
+                        <Skeleton className="h-8 w-3/4" />
+                        <Skeleton className="h-4 w-1/2 mt-1" />
+                    </>
+                ) : (
+                    <>
+                        <div className="text-2xl font-bold">{value}</div>
+                        <p className="text-xs text-muted-foreground">{subtext}</p>
+                    </>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
 
-const salesData = [
-  { name: users[2].name.split(' ')[0], total: Math.floor(Math.random() * 500000) + 100000 },
-  { name: 'Maria P.', total: Math.floor(Math.random() * 500000) + 100000 },
-  { name: 'João V.', total: Math.floor(Math.random() * 500000) + 100000 },
-  { name: 'Lucas F.', total: Math.floor(Math.random() * 500000) + 100000 },
-  { name: 'Sofia L.', total: Math.floor(Math.random() * 500000) + 100000 },
-]
 
 export default function Dashboard() {
-  const totalApproved = proposals.filter(p => p.status === 'Finalizada').reduce((sum, p) => sum + p.value, 0)
-  const pendingProposals = proposals.filter(p => p.status === 'Aberta' || p.status === 'Em negociação')
-  
+    const firestore = useFirestore()
+
+    const proposalsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, "proposals"))
+    }, [firestore])
+    const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
+    
+    const recentProposalsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, "proposals"), orderBy("createdAt", "desc"), limit(5));
+    }, [firestore]);
+    const { data: recentProposals, isLoading: isLoadingRecentProposals } = useCollection<Proposal>(recentProposalsQuery);
+
+
+    const clientsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, "clients"))
+    }, [firestore])
+    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+    
+    const usersQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, "users"));
+    }, [firestore]);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
+
+
+    const { totalApproved, pendingProposalsCount, inNegotiationCount, commissionValue } = useMemo(() => {
+        if (!proposals) return { totalApproved: 0, pendingProposalsCount: 0, inNegotiationCount: 0, commissionValue: 0 };
+        const approved = proposals.filter(p => p.status === 'Finalizada');
+        const total = approved.reduce((sum, p) => sum + p.value, 0);
+        const commission = total * 0.025; // Assuming 2.5% commission
+        return {
+            totalApproved: total,
+            pendingProposalsCount: proposals.filter(p => p.status === 'Aberta').length,
+            inNegotiationCount: proposals.filter(p => p.status === 'Em negociação').length,
+            commissionValue: commission,
+        };
+    }, [proposals]);
+
+    const newClientsCount = useMemo(() => {
+        if (!clients) return 0;
+        return clients.filter(c => c.status === 'Novo').length;
+    }, [clients]);
+    
+    const salesData = useMemo(() => {
+        if (!proposals || !users) return [];
+        
+        const salesByRep: Record<string, number> = {};
+
+        proposals.forEach(proposal => {
+            if (proposal.status === 'Finalizada' && proposal.salesRepName) {
+                if (!salesByRep[proposal.salesRepName]) {
+                    salesByRep[proposal.salesRepName] = 0;
+                }
+                salesByRep[proposal.salesRepName] += proposal.value;
+            }
+        });
+
+        return Object.entries(salesByRep)
+            .map(([name, total]) => ({ name: name.split(' ')[0], total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
+
+    }, [proposals, users]);
+
+  const isLoading = isLoadingProposals || isLoadingClients || isLoadingRecentProposals || isLoadingUsers;
+
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Volume Aprovado
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">R$ {totalApproved.toLocaleString('pt-BR')}</div>
-            <p className="text-xs text-muted-foreground">
-              +20.1% em relação ao mês passado
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Novos Clientes
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+{clients.filter(c => c.status === 'Novo').length}</div>
-            <p className="text-xs text-muted-foreground">
-              +180.1% em relação ao mês passado
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Propostas Abertas</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingProposals.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {proposals.filter(p => p.status === 'Em negociação').length} em negociação
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Comissões (Mês)</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">R$ {(totalApproved * 0.025).toLocaleString('pt-BR')}</div>
-            <p className="text-xs text-muted-foreground">
-              +19% em relação ao mês passado
-            </p>
-          </CardContent>
-        </Card>
+        <KPICard
+            title="Volume Aprovado"
+            icon={DollarSign}
+            value={`R$ ${totalApproved.toLocaleString('pt-BR')}`}
+            subtext="+20.1% em relação ao mês passado"
+            isLoading={isLoading}
+        />
+        <KPICard
+            title="Novos Clientes"
+            icon={Users}
+            value={`+${newClientsCount}`}
+            subtext="+180.1% em relação ao mês passado"
+            isLoading={isLoading}
+        />
+        <KPICard
+            title="Propostas Abertas"
+            icon={CreditCard}
+            value={`${pendingProposalsCount + inNegotiationCount}`}
+            subtext={`${inNegotiationCount} em negociação`}
+            isLoading={isLoading}
+        />
+        <KPICard
+            title="Comissões (Mês)"
+            icon={Activity}
+            value={`R$ ${commissionValue.toLocaleString('pt-BR')}`}
+            subtext="+19% em relação ao mês passado"
+            isLoading={isLoading}
+        />
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -136,7 +193,6 @@ export default function Dashboard() {
                   <TableHead className="hidden xl:table-column">
                     Produto
                   </TableHead>
-                  
                   <TableHead className="hidden md:table-cell">
                     Status
                   </TableHead>
@@ -144,25 +200,40 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {proposals.slice(0,5).map(proposal => (
-                <TableRow key={proposal.id}>
-                  <TableCell>
-                    <div className="font-medium">{proposal.clientName}</div>
-                    <div className="hidden text-sm text-muted-foreground md:inline">
-                      {clients.find(c => c.name === proposal.clientName)?.email}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden xl:table-column">
-                    {proposal.productName}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge className="text-xs" variant={proposal.status === 'Finalizada' ? 'default' : 'secondary'}>
-                      {proposal.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">R$ {proposal.value.toLocaleString('pt-BR')}</TableCell>
-                </TableRow>
-                ))}
+                {isLoadingRecentProposals ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-5 w-32"/></TableCell>
+                            <TableCell className="hidden xl:table-column"><Skeleton className="h-5 w-24"/></TableCell>
+                            <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-20 rounded-full"/></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto"/></TableCell>
+                        </TableRow>
+                    ))
+                ) : recentProposals?.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center h-24">Nenhuma proposta recente.</TableCell>
+                    </TableRow>
+                ) : (
+                    recentProposals?.map(proposal => (
+                        <TableRow key={proposal.id}>
+                        <TableCell>
+                            <div className="font-medium">{proposal.clientName}</div>
+                            <div className="hidden text-sm text-muted-foreground md:inline">
+                                {clients?.find(c => c.name === proposal.clientName)?.email}
+                            </div>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-column">
+                            {proposal.productName}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                            <Badge className="text-xs" variant={proposal.status === 'Finalizada' ? 'default' : 'secondary'}>
+                            {proposal.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">R$ {proposal.value.toLocaleString('pt-BR')}</TableCell>
+                        </TableRow>
+                    ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -175,30 +246,41 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={salesData}>
-                <XAxis
-                  dataKey="name"
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#888888"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `R$${Number(value) / 1000}k`}
-                />
-                <Tooltip
-                  cursor={{fill: 'hsl(var(--accent))', opacity: 0.1}}
-                  formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR')}`}
-                  contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
-                 />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+                <div className="h-[350px] w-full flex items-center justify-center">
+                    <Skeleton className="h-full w-full"/>
+                </div>
+            ) : salesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={salesData}>
+                    <XAxis
+                    dataKey="name"
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    />
+                    <YAxis
+                    stroke="#888888"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `R$${Number(value) / 1000}k`}
+                    />
+                    <Tooltip
+                    cursor={{fill: 'hsl(var(--accent))', opacity: 0.1}}
+                    formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR')}`}
+                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+                </ResponsiveContainer>
+            ) : (
+                <div className="h-[350px] flex flex-col items-center justify-center text-center text-muted-foreground">
+                    <p>Nenhuma venda finalizada ainda.</p>
+                    <p className="text-xs">O ranking aparecerá aqui quando as vendas forem concluídas.</p>
+                </div>
+            )}
           </CardContent>
         </Card>
       </div>
