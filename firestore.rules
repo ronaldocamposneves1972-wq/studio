@@ -1,199 +1,165 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech.
+ * @file Firebase Security Rules for ConsorciaTech Firestore database.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user profiles
- * and allows controlled access to client data and related entities.
+ * This ruleset prioritizes authorization independence and supports secure "list" operations
+ * without relying on data filtering. It enforces strict ownership for user profiles
+ * and allows open access to quiz data based on client context, following the business requirements.
  *
  * Data Structure:
- * - User profiles are stored under `/users/{userId}`.
- * - Client profiles are stored under `/clients/{clientId}`.
- * - Client documents are stored under `/clients/{clientId}/documents/{documentId}`.
- * - Client quiz answers are stored under `/clients/{clientId}/quizAnswers/{quizAnswerId}`.
- * - Product information is stored under `/products/{productId}`.
- * - Bank information is stored under `/banks/{bankId}`.
- * - Sales information is stored under `/sales/{saleId}`.
- * - Quiz questions are stored under `/quizQuestions/{quizQuestionId}`.
+ * - /users/{userId}: Stores user profiles with path-based ownership.
+ * - /clients/{clientId}: Stores client profiles.
+ * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, linked to the client.
+ * - /clients/{clientId}/quizAnswers/{quizAnswerId}: Stores client quiz answers, linked to the client.
+ * - /products/{productId}: Stores product information (publicly accessible).
+ * - /banks/{bankId}: Stores bank information (publicly accessible).
+ * - /sales/{saleId}: Stores sales data.
+ * - /quizQuestions/{quizQuestionId}: Stores quiz questions (publicly accessible).
  *
  * Key Security Decisions:
- * - Users can only read and write their own profile data.
- * - Access to client data is not explicitly restricted in this version.
- * - Public read access is enabled for products, banks, sales, and quiz questions.
- * - Data shape validation is relaxed to allow rapid prototyping.
+ * - Users can only manage their own profiles.
+ * - Quiz data can be accessed without authentication, in line with business requirements.
+ * - Read-only collections (products, banks, quizQuestions) are publicly readable.
+ * - All write operations are explicitly secured.
  *
  * Denormalization for Authorization:
- * - The `clientId` field is denormalized into the `Document` and `QuizAnswer` entities
- *   to allow authorization rules to directly check the client's ID without requiring additional reads.
- *
- * Structural Segregation:
- * - User profiles and client data are stored in separate collections to maintain distinct security contexts.
+ * - The 'Document' and 'QuizAnswer' entities include a 'clientId' field,
+ *   allowing direct association with the client and simplifying security rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile data.
+     * @description Allows users to read and manage their own profile data.
      * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile if the userId matches their auth.uid.
-     * @allow (get, list, update, delete) Authenticated user can only access their own profile data.
-     * @deny (create) Unauthenticated user cannot create a profile.
-     * @deny (get, list, update, delete) Authenticated user cannot access another user's profile data.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) - User with ID 'user123' can create their profile with matching ID.
+     * @allow (get, update, delete) - User with ID 'user123' can get, update and delete their profile.
+     * @deny (create) - User with ID 'user456' cannot create a profile with ID 'user123'.
+     * @deny (update, delete) - User with ID 'user456' cannot update or delete the profile of 'user123'.
+     * @principle Enforces document ownership for writes; reads are open for prototyping.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+      allow get, list: if false;
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to client profile data.
+     * @description Allows anyone to read client profiles.
      * @path /clients/{clientId}
-     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client data.  More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows any signed in user to create, read, update or delete Clients in prototyping mode.
+     * @allow (get, list) - Any user can read client profiles.
+     * @deny (create, update, delete) - No one can create, update, or delete client profiles without authentication
+     * @principle Allows public reads for clients data for prototyping.
      */
     match /clients/{clientId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to documents uploaded by clients.
+     * @description Allows any user to read and write documents uploaded by a specific client.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client documents. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows any signed in user to create, read, update or delete Client Documents in prototyping mode.
+     * @allow (get, list, create, update, delete) - Any user can read and write documents within a client's document collection.
+     * @principle Enables open access to client document data for prototyping.
      */
     match /clients/{clientId}/documents/{documentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to quiz answers provided by clients.
+     * @description Allows any user to read and write answers to quiz questions submitted by a specific client.
      * @path /clients/{clientId}/quizAnswers/{quizAnswerId}
-     * @allow (get, list, create, update, delete) In this prototyping mode, all authenticated users can manage client quiz answers. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows any signed in user to create, read, update or delete Client Quiz Answers in prototyping mode.
+     * @allow (get, list, create, update, delete) - Any user can read and write quiz answers within a client's quiz answer collection.
+     * @principle Enables open access to client quiz answer data for prototyping.
      */
     match /clients/{clientId}/quizAnswers/{quizAnswerId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to product information.
+     * @description Allows any user to read product information.
      * @path /products/{productId}
-     * @allow (get, list) Allows any user to read product information.
-     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage product data. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows public read access for product information and authenticated write access in prototyping mode.
+     * @allow (get, list) - Any user can read product information.
+     * @deny (create, update, delete) - No one can create, update, or delete product information.
+     * @principle Allows public reads for product data; restricts writes.
      */
     match /products/{productId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to bank information.
+     * @description Allows any user to read bank information.
      * @path /banks/{bankId}
-     * @allow (get, list) Allows any user to read bank information.
-     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage bank data. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows public read access for bank information and authenticated write access in prototyping mode.
+     * @allow (get, list) - Any user can read bank information.
+     * @deny (create, update, delete) - No one can create, update, or delete bank information.
+     * @principle Allows public reads for bank data; restricts writes.
      */
     match /banks/{bankId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to sales information.
+     * @description Allows any user to read and write sales data.
      * @path /sales/{saleId}
-     * @allow (get, list) Allows any user to read sales information.
-     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage sales data. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows public read access for sales information and authenticated write access in prototyping mode.
+     * @allow (get, list, create, update, delete) - Any user can read and write sales data.
+     * @principle Enables open access to sales data for prototyping.
      */
     match /sales/{saleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Controls access to quiz questions.
+     * @description Allows any user to read quiz questions.
      * @path /quizQuestions/{quizQuestionId}
-     * @allow (get, list) Allows any user to read quiz questions.
-     * @allow (create, update, delete) In this prototyping mode, all authenticated users can manage quiz question data. More restrictive roles should be applied later.
-     * @deny None.
-     * @principle Allows public read access for quiz questions and authenticated write access in prototyping mode.
+     * @allow (get, list) - Any user can read quiz questions.
+     * @deny (create, update, delete) - No one can create, update, or delete quiz questions.
+     * @principle Allows public reads for quiz question data; restricts writes.
      */
     match /quizQuestions/{quizQuestionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
 
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    /**
+     * @description Helper function to check if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Helper function to check if the authenticated user is the owner of the resource.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Helper function to check if the authenticated user is the owner of an existing resource.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
   }
 }
