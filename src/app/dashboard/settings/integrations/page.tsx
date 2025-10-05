@@ -1,6 +1,7 @@
 
 'use client'
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -13,17 +14,96 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase"
+import { doc } from "firebase/firestore"
+import { Skeleton } from "@/components/ui/skeleton"
+
+type IntegrationSettings = {
+  cloudinaryCloudName?: string;
+  cloudinaryApiKey?: string;
+  cloudinaryApiSecret?: string;
+  whatsappApiKey?: string;
+}
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
+    const firestore = useFirestore()
+
+    const [settings, setSettings] = useState<IntegrationSettings>({
+        cloudinaryCloudName: '',
+        cloudinaryApiKey: '',
+        cloudinaryApiSecret: '',
+        whatsappApiKey: '',
+    });
+    const [isSaving, setIsSaving] = useState(false)
+
+    const settingsDocRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'settings', 'integrations');
+    }, [firestore]);
+
+    const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
+
+    useEffect(() => {
+        if (savedSettings) {
+            setSettings({
+                cloudinaryCloudName: savedSettings.cloudinaryCloudName || '',
+                cloudinaryApiKey: savedSettings.cloudinaryApiKey || '',
+                cloudinaryApiSecret: '', // Don't expose saved secret in the input
+                whatsappApiKey: savedSettings.whatsappApiKey || '',
+            });
+        }
+    }, [savedSettings]);
+
 
     const handleSave = () => {
-        // In a real application, you would save these values securely.
-        // For this demo, we'll just show a toast notification.
+        if (!settingsDocRef) {
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Não foi possível conectar ao banco de dados.",
+            });
+            return;
+        }
+        setIsSaving(true);
+        
+        // Prepare data to be saved. Only include the secret if it has been changed.
+        const dataToSave = { ...savedSettings, ...settings };
+        if (!settings.cloudinaryApiSecret) {
+          delete dataToSave.cloudinaryApiSecret; // Don't overwrite with an empty string
+        }
+
+        setDocumentNonBlocking(settingsDocRef, dataToSave, { merge: true });
+
         toast({
             title: "Configurações Salvas!",
             description: "Suas chaves de API foram salvas com sucesso.",
         })
+        setIsSaving(false);
+    }
+    
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setSettings(prev => ({ ...prev, [id]: value }));
+    }
+
+    if (isLoadingSettings) {
+        return (
+            <Card>
+                <CardHeader>
+                  <Skeleton className="h-7 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
+                </CardContent>
+                 <CardFooter className="border-t px-6 py-4">
+                    <Skeleton className="h-10 w-32" />
+                </CardFooter>
+            </Card>
+        )
     }
 
     return (
@@ -36,25 +116,27 @@ export default function IntegrationsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="cloudinary-cloud-name">Cloudinary Cloud Name</Label>
-                <Input id="cloudinary-cloud-name" placeholder="Seu cloud name do Cloudinary" defaultValue={process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME} />
+                <Label htmlFor="cloudinaryCloudName">Cloudinary Cloud Name</Label>
+                <Input id="cloudinaryCloudName" placeholder="Seu cloud name do Cloudinary" value={settings.cloudinaryCloudName} onChange={handleInputChange} />
               </div>
                <div className="space-y-2">
-                <Label htmlFor="cloudinary-api-key">Cloudinary API Key</Label>
-                <Input id="cloudinary-api-key" placeholder="Sua API key do Cloudinary" defaultValue={process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY} />
+                <Label htmlFor="cloudinaryApiKey">Cloudinary API Key</Label>
+                <Input id="cloudinaryApiKey" placeholder="Sua API key do Cloudinary" value={settings.cloudinaryApiKey} onChange={handleInputChange} />
               </div>
                <div className="space-y-2">
-                <Label htmlFor="cloudinary-api-secret">Cloudinary API Secret</Label>
-                <Input id="cloudinary-api-secret" type="password" placeholder="Seu API secret do Cloudinary" />
-                 <p className="text-xs text-muted-foreground">Seu API secret é confidencial e não será exibido aqui.</p>
+                <Label htmlFor="cloudinaryApiSecret">Cloudinary API Secret</Label>
+                <Input id="cloudinaryApiSecret" type="password" placeholder="Preencha para alterar o segredo" value={settings.cloudinaryApiSecret} onChange={handleInputChange}/>
+                 <p className="text-xs text-muted-foreground">Seu API secret é confidencial e não será exibido. Deixe em branco para não alterar.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="whatsapp-api-key">Chave de API do WhatsApp</Label>
-                <Input id="whatsapp-api-key" type="password" placeholder="Cole sua chave de API aqui" />
+                <Label htmlFor="whatsappApiKey">Chave de API do WhatsApp</Label>
+                <Input id="whatsappApiKey" type="password" placeholder="Cole sua chave de API aqui" value={settings.whatsappApiKey} onChange={handleInputChange} />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave}>Salvar Alterações</Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? "Salvando..." : "Salvar Alterações"}
+              </Button>
             </CardFooter>
           </Card>
     )
