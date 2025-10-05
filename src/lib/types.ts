@@ -9,8 +9,13 @@ export type User = {
 export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado';
 
 export type ClientDocument = {
-  name: string;
-  url: string;
+  id: string;
+  clientId: string;
+  fileType: string;
+  fileName: string;
+  cloudinaryPublicId: string;
+  secureUrl: string;
+  uploadedAt: string;
 };
 
 export type Client = {

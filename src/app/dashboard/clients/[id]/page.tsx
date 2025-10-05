@@ -1,5 +1,3 @@
-
-
 'use client'
 
 import Image from "next/image"
@@ -25,9 +23,10 @@ import {
   Pencil,
   Info,
   Download,
-  FileText
+  FileText,
+  Loader2,
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams } from 'next/navigation'
 
 
@@ -78,7 +77,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
+import { useDoc, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
 import { doc, collection, query, where } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
@@ -155,44 +154,24 @@ export default function ClientDetailPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(0);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (cooldown > 0) {
-      timer = setInterval(() => {
-        setCooldown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [cooldown]);
-
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clientRef = useMemoFirebase(() => {
     if (!firestore || !clientId) return null
     return doc(firestore, 'clients', clientId)
   }, [firestore, clientId])
 
+  const documentsQuery = useMemoFirebase(() => {
+    if (!firestore || !clientId) return null;
+    return query(collection(firestore, 'clients', clientId, 'documents'));
+  }, [firestore, clientId]);
+
+
   const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
+  const { data: documents, isLoading: isLoadingDocuments } = useCollection<ClientDocument>(documentsQuery);
 
-  // TODO: Fetch proposals from Firestore
   const proposals = allProposals.filter(p => p.clientName === client?.name)
-
-  const copyToClipboard = (text: string, message: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-        toast({ title: 'Sucesso!', description: message });
-    }).catch(err => {
-        toast({ variant: 'destructive', title: 'Erro!', description: 'Não foi possível copiar o link.' });
-    });
-  };
-
-  const handleGenerateDocLink = () => {
-    const quizLink = `${window.location.origin}/q/${client?.id}`;
-    setGeneratedLink(quizLink);
-    setCooldown(600); // 10 minutes in seconds
-    toast({ title: 'Link Gerado!', description: 'O link para envio de documentos foi criado e está visível abaixo.' });
-  }
 
   const handleStatusChange = (newStatus: ClientStatus) => {
     if (!clientRef) return;
@@ -213,59 +192,96 @@ export default function ClientDetailPage() {
     router.push('/dashboard/clients');
   }
 
- const isProfileComplete = (client: Client | null): boolean => {
-    if (!client) return false;
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
 
-    const isFilled = (value: any) => value !== undefined && value !== null && value !== '';
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !clientId || !firestore) return;
 
-    // Create a unified profile object by merging root properties and quiz answers.
-    const unifiedProfile: Record<string, any> = { ...client, ...(client.answers || {}) };
+    setIsUploading(true);
+    toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
 
-    // Normalize keys from quiz answers (e.g., 'q-name' -> 'name')
-    if (client.answers) {
-      for (const [key, value] of Object.entries(client.answers)) {
-        if (key.startsWith('q-')) {
-          const normalizedKey = key.substring(2);
-          unifiedProfile[normalizedKey] = value;
-        }
+    try {
+      // 1. Get signature from our API
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      const paramsToSign = {
+        timestamp: timestamp,
+        folder: `clients/${clientId}`,
+        public_id: `${Date.now()}-${file.name}`,
+      };
+
+      const signResponse = await fetch('/api/sign-cloudinary-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paramsToSign }),
+      });
+
+      if (!signResponse.ok) throw new Error('Falha ao obter assinatura do servidor.');
+      
+      const { signature } = await signResponse.json();
+
+      // 2. Upload file to Cloudinary
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY!);
+      formData.append('timestamp', String(timestamp));
+      formData.append('signature', signature);
+      formData.append('folder', `clients/${clientId}`);
+      formData.append('public_id', paramsToSign.public_id);
+      
+      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) throw new Error('Falha no upload para o Cloudinary.');
+
+      const cloudinaryData = await uploadResponse.json();
+
+      // 3. Save file metadata to Firestore
+      const newDocument: Omit<ClientDocument, 'id'> = {
+        clientId: clientId,
+        fileName: file.name,
+        fileType: cloudinaryData.resource_type || 'raw',
+        cloudinaryPublicId: cloudinaryData.public_id,
+        secureUrl: cloudinaryData.secure_url,
+        uploadedAt: new Date().toISOString(),
+      };
+      
+      const documentsCollection = collection(firestore, 'clients', clientId, 'documents');
+      await addDocumentNonBlocking(documentsCollection, newDocument);
+
+      toast({
+        title: 'Arquivo enviado!',
+        description: `${file.name} foi adicionado com sucesso.`,
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro no Upload',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     }
-    
-    // Define the required fields based on the new rule.
-    const requiredFields = ['name', 'cpf', 'cep'];
+  };
 
-    // Check if all required fields are filled in the unified profile.
-    for (const field of requiredFields) {
-      if (!isFilled(unifiedProfile[field])) {
-        // Optional: Log which field is missing for debugging.
-        // console.log(`Validation failed for required field: ${field}`);
-        return false;
-      }
-    }
-
-    return true;
-}
-
-  const profileComplete = isProfileComplete(client);
 
   const translatedLabels: { [key: string]: string } = {
-    'name': 'Nome',
-    'email': 'Email',
-    'phone': 'Telefone',
-    'cpf': 'CPF',
-    'birthdate': 'Data de Nascimento',
-    'mothername': 'Nome da Mãe',
-    'cep': 'CEP',
-    'address': 'Endereço',
-    'complement': 'Complemento',
-    'number': 'Número',
-    'neighborhood': 'Bairro',
-    'city': 'Cidade',
-    'state': 'Estado',
+    'name': 'Nome', 'email': 'Email', 'phone': 'Telefone', 'cpf': 'CPF', 'birthdate': 'Data de Nascimento',
+    'mothername': 'Nome da Mãe', 'cep': 'CEP', 'address': 'Endereço', 'complement': 'Complemento', 'number': 'Número',
+    'neighborhood': 'Bairro', 'city': 'Cidade', 'state': 'Estado',
   };
 
   const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'number', 'complement', 'neighborhood', 'city', 'state'];
-
 
   if (isLoadingClient) {
      return (
@@ -294,12 +310,8 @@ export default function ClientDetailPage() {
     return (
       <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-[80vh]">
         <div className="flex flex-col items-center gap-1 text-center">
-          <h3 className="text-2xl font-bold tracking-tight">
-            Cliente não encontrado
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            O cliente que você está procurando não existe ou foi excluído.
-          </p>
+          <h3 className="text-2xl font-bold tracking-tight">Cliente não encontrado</h3>
+          <p className="text-sm text-muted-foreground">O cliente que você está procurando não existe ou foi excluído.</p>
           <Button className="mt-4" asChild>
             <Link href="/dashboard/clients">Voltar para Clientes</Link>
           </Button>
@@ -318,26 +330,15 @@ export default function ClientDetailPage() {
                     <CardHeader className="pb-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-4">
-                                <Image
-                                    alt="Avatar do Cliente"
-                                    className="aspect-square rounded-full object-cover"
-                                    height="64"
-                                    src={`https://picsum.photos/seed/${client.id}/100/100`}
-                                    width="64"
-                                    data-ai-hint="person portrait"
-                                />
+                                <Image alt="Avatar do Cliente" className="aspect-square rounded-full object-cover" height="64" src={`https://picsum.photos/seed/${client.id}/100/100`} width="64" data-ai-hint="person portrait" />
                                 <div className="grid gap-1">
                                     <CardTitle className="text-2xl">{client.name}</CardTitle>
-                                    <CardDescription>
-                                    {client.email} &middot; {client.phone}
-                                    </CardDescription>
+                                    <CardDescription>{client.email} &middot; {client.phone}</CardDescription>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Select onValueChange={handleStatusChange} value={client.status}>
-                                    <SelectTrigger className="w-[160px]">
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
+                                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Novo"><Badge variant="secondary" className="mr-2"/>Novo</SelectItem>
                                         <SelectItem value="Em análise"><Badge variant="secondary" className="mr-2"/>Em análise</SelectItem>
@@ -347,40 +348,24 @@ export default function ClientDetailPage() {
                                     </SelectContent>
                                 </Select>
                                  <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="icon" variant="outline">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
+                                  <DropdownMenuTrigger asChild><Button size="icon" variant="outline"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem>
-                                      <Pencil className="mr-2 h-4 w-4" />
-                                      Editar Cliente
-                                    </DropdownMenuItem>
+                                    <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" /> Editar Cliente</DropdownMenuItem>
                                      <DropdownMenuSeparator />
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem
-                                          onSelect={(e) => e.preventDefault()}
-                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Excluir Cliente
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                          <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
                                         </DropdownMenuItem>
                                       </AlertDialogTrigger>
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
                                           <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.
-                                          </AlertDialogDescription>
+                                          <AlertDialogDescription>Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.</AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                          <AlertDialogAction
-                                            onClick={handleDeleteClient}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                          >
+                                          <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                                             Sim, excluir
                                           </AlertDialogAction>
                                         </AlertDialogFooter>
@@ -412,7 +397,6 @@ export default function ClientDetailPage() {
                                         const answerKey = `q-${fieldKey.toLowerCase().replace(' ', '')}`;
                                         const value = client.answers![answerKey];
                                         if (value === undefined) return null;
-
                                         const questionLabel = translatedLabels[fieldKey.toLowerCase() as keyof typeof translatedLabels] || fieldKey;
                                         return (
                                           <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
@@ -441,12 +425,8 @@ export default function ClientDetailPage() {
                         </TabsContent>
                         <TabsContent value="history">
                            <Card>
-                               <CardHeader>
-                                   <CardTitle>Linha do Tempo</CardTitle>
-                               </CardHeader>
-                               <CardContent>
-                                  <Timeline events={client.timeline} />
-                               </CardContent>
+                               <CardHeader><CardTitle>Linha do Tempo</CardTitle></CardHeader>
+                               <CardContent><Timeline events={client.timeline} /></CardContent>
                            </Card>
                         </TabsContent>
                         <TabsContent value="documents">
@@ -456,34 +436,46 @@ export default function ClientDetailPage() {
                               <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {(!client.documents || client.documents.length === 0) && (
+                                {(isLoadingDocuments || (!documents || documents.length === 0)) && (
                                     <div className={cn(
-                                        "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6",
-                                        generatedLink && "hidden"
+                                        "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6"
                                     )}>
-                                        <Upload className="h-12 w-12 text-muted-foreground" />
-                                        <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
-                                        <p className="text-muted-foreground">Solicite os documentos do cliente gerando um link seguro.</p>
+                                        {isLoadingDocuments ? (
+                                            <>
+                                                <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
+                                                <h3 className="text-xl font-semibold">Carregando documentos...</h3>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="h-12 w-12 text-muted-foreground" />
+                                                <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
+                                                <p className="text-muted-foreground">Clique no botão abaixo para adicionar documentos.</p>
+                                            </>
+                                        )}
                                     </div>
                                 )}
-                                {client.documents && client.documents.length > 0 && (
+                                {documents && documents.length > 0 && (
                                      <Table>
                                         <TableHeader>
                                             <TableRow>
                                             <TableHead>Nome do Arquivo</TableHead>
+                                            <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                                            <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
                                             <TableHead className="text-right">Ações</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {client.documents.map((doc, index) => (
-                                                <TableRow key={index}>
+                                            {documents.map((doc) => (
+                                                <TableRow key={doc.id}>
                                                     <TableCell className="font-medium flex items-center gap-2">
                                                         <FileText className="h-4 w-4 text-muted-foreground" />
-                                                        {doc.name}
+                                                        {doc.fileName}
                                                     </TableCell>
+                                                    <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
+                                                    <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="outline" size="sm" asChild>
-                                                            <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                                            <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer">
                                                                 <Download className="mr-2 h-4 w-4" />
                                                                 Baixar
                                                             </a>
@@ -494,50 +486,20 @@ export default function ClientDetailPage() {
                                         </TableBody>
                                     </Table>
                                 )}
-                                 <Separator className="my-4" />
-                                 <div className="space-y-4">
-                                    {!profileComplete && (
-                                        <Alert>
-                                        <Info className="h-4 w-4" />
-                                        <AlertTitle>Dados Incompletos</AlertTitle>
-                                        <AlertDescription>
-                                            É necessário que o cliente tenha pelo menos <strong>Nome, CPF e CEP</strong> preenchidos para gerar o link.
-                                        </AlertDescription>
-                                        </Alert>
-                                    )}
-                                    {generatedLink ? (
-                                    <div className="w-full space-y-4">
-                                        <p className="text-sm text-muted-foreground">O link abaixo foi gerado para o cliente enviar a documentação. Você pode copiá-lo e enviar via WhatsApp ou E-mail.</p>
-                                        <div className="flex items-center space-x-2">
-                                            <Input value={generatedLink} readOnly />
-                                            <Button onClick={() => copyToClipboard(generatedLink, "Link copiado para a área de transferência!")}><Copy className="h-4 w-4" /></Button>
-                                        </div>
-                                        {cooldown > 0 && (
-                                            <p className="text-xs text-muted-foreground text-center">
-                                                Você poderá gerar um novo link em {Math.floor(cooldown / 60)}:{(cooldown % 60).toString().padStart(2, '0')}
-                                            </p>
-                                        )}
-                                    </div>
-                                    ) : (
-                                        <div className="flex justify-center">
-                                            <Button onClick={handleGenerateDocLink} disabled={!profileComplete || cooldown > 0}>
-                                                <Link2 className="mr-2 h-4 w-4" />
-                                                { 'Gerar Link de Documentos'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                 </div>
                             </CardContent>
-                             <CardFooter className="border-t px-6 py-4 flex justify-end">
-                                <Button disabled={!client.documents || client.documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                             <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
+                               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                               <Button onClick={handleFileSelect} disabled={isUploading}>
+                                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                   {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
+                               </Button>
+                                <Button disabled={!documents || documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
                              </CardFooter>
                           </Card>
                         </TabsContent>
                         <TabsContent value="proposals">
                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Propostas</CardTitle>
-                                </CardHeader>
+                                <CardHeader><CardTitle>Propostas</CardTitle></CardHeader>
                                 <CardContent>
                                 <Table>
                                     <TableHeader>
@@ -574,7 +536,3 @@ export default function ClientDetailPage() {
     </div>
   )
 }
-
-    
-
-    
