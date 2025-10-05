@@ -36,11 +36,20 @@ export default function IntegrationsPage() {
         whatsappApiKey: '',
     });
     const [isSaving, setIsSaving] = useState(false)
+    const [isReady, setIsReady] = useState(false);
+
+    useEffect(() => {
+        // Garante que o Firestore esteja pronto antes de criar a referência
+        if (firestore) {
+            setIsReady(true);
+        }
+    }, [firestore]);
+
 
     const settingsDocRef = useMemoFirebase(() => {
-        if (!firestore) return null;
+        if (!isReady) return null;
         return doc(firestore, 'settings', 'integrations');
-    }, [firestore]);
+    }, [firestore, isReady]);
 
     const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
 
@@ -50,7 +59,7 @@ export default function IntegrationsPage() {
                 cloudinaryCloudName: savedSettings.cloudinaryCloudName || '',
                 cloudinaryApiKey: savedSettings.cloudinaryApiKey || '',
                 cloudinaryApiSecret: '', // Don't expose saved secret in the input
-                whatsappApiKey: savedSettings.whatsappApiKey || '',
+                whatsappApiKey: '', // Don't expose saved secret
             });
         }
     }, [savedSettings]);
@@ -67,10 +76,16 @@ export default function IntegrationsPage() {
         }
         setIsSaving(true);
         
-        // Prepare data to be saved. Only include the secret if it has been changed.
-        const dataToSave = { ...savedSettings, ...settings };
-        if (!settings.cloudinaryApiSecret) {
-          delete dataToSave.cloudinaryApiSecret; // Don't overwrite with an empty string
+        // Prepare data to be saved. Only include secrets if they have been changed.
+        const dataToSave: Partial<IntegrationSettings> = {
+            cloudinaryCloudName: settings.cloudinaryCloudName,
+            cloudinaryApiKey: settings.cloudinaryApiKey,
+        };
+        if (settings.cloudinaryApiSecret) {
+          dataToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
+        }
+        if (settings.whatsappApiKey) {
+            dataToSave.whatsappApiKey = settings.whatsappApiKey;
         }
 
         setDocumentNonBlocking(settingsDocRef, dataToSave, { merge: true });
@@ -87,7 +102,7 @@ export default function IntegrationsPage() {
         setSettings(prev => ({ ...prev, [id]: value }));
     }
 
-    if (isLoadingSettings) {
+    if (isLoadingSettings || !isReady) {
         return (
             <Card>
                 <CardHeader>
