@@ -41,10 +41,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/command"
+import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 
 const flattenNavItems = (items: any[]): any[] => {
