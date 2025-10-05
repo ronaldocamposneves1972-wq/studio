@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import Image from "next/image"
@@ -13,8 +12,6 @@ import {
   Trash2,
   Pencil
 } from "lucide-react"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, query, doc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
@@ -64,6 +61,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { clients as placeholderClients } from "@/lib/placeholder-data"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -81,43 +79,19 @@ const getStatusVariant = (status: ClientStatus) => {
   }
 }
 
-function ClientRowSkeleton() {
-  return (
-    <TableRow>
-      <TableCell className="font-medium">
-        <div className="flex items-center gap-2">
-            <Skeleton className="h-2.5 w-2.5 rounded-full" />
-            <Skeleton className="h-4 w-32" />
-        </div>
-      </TableCell>
-      <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-40" /></TableCell>
-      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
-      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
-    </TableRow>
-  )
-}
-
 export default function ClientsPage() {
-  const firestore = useFirestore()
   const router = useRouter()
   const { toast } = useToast()
   
-  const clientsQuery = useMemoFirebase(() => {
-    if (!firestore) return null
-    return query(collection(firestore, "clients"))
-  }, [firestore])
-
-  const { data: clients, isLoading } = useCollection<Client>(clientsQuery)
+  // Using placeholder data directly
+  const clients = placeholderClients;
+  const isLoading = false; // Data is local, so it's never loading
 
   const handleDeleteClient = (client: Client) => {
-    if (!firestore) return;
-    const clientRef = doc(firestore, 'clients', client.id);
-    deleteDocumentNonBlocking(clientRef);
+    // This is a mock delete, it won't persist
     toast({
-      title: "Cliente excluído!",
-      description: `O cliente "${client.name}" foi removido.`,
+      title: "Função de Exclusão (Demonstração)",
+      description: `O cliente "${client.name}" seria removido aqui.`,
     });
   }
   
@@ -127,18 +101,6 @@ export default function ClientsPage() {
   }
 
   const renderTableContent = (clientList: Client[]) => {
-     if (isLoading) {
-      return (
-        <>
-          <ClientRowSkeleton />
-          <ClientRowSkeleton />
-          <ClientRowSkeleton />
-          <ClientRowSkeleton />
-          <ClientRowSkeleton />
-        </>
-      )
-    }
-
     if (clientList.length === 0) {
       return (
         <TableRow>
