@@ -10,17 +10,17 @@ import {
   FileQuestion,
 } from "lucide-react"
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 
 const navLinks = [
-  { href: "/dashboard/settings/users", label: "Usuários", icon: Users, tab: "users" },
-  { href: "/dashboard/settings/quizzes", label: "Quizzes", icon: FileQuestion, tab: "quizzes" },
-  { href: "/dashboard/settings/integrations", label: "Integrações", icon: KeyRound, tab: "integrations" },
-  { href: "/dashboard/settings/notifications", label: "Notificações", icon: Bell, tab: "notifications" },
-  { href: "/dashboard/settings/branding", label: "Marca", icon: Palette, tab: "branding" },
-  { href: "/dashboard/settings/webhooks", label: "Webhooks", icon: Webhook, tab: "webhooks" },
+  { href: "/dashboard/settings/users", label: "Usuários", icon: Users },
+  { href: "/dashboard/settings/quizzes", label: "Quizzes", icon: FileQuestion },
+  { href: "/dashboard/settings/integrations", label: "Integrações", icon: KeyRound },
+  { href: "/dashboard/settings/notifications", label: "Notificações", icon: Bell },
+  { href: "/dashboard/settings/branding", label: "Marca", icon: Palette },
+  { href: "/dashboard/settings/webhooks", label: "Webhooks", icon: Webhook },
 ]
 
 
@@ -30,8 +30,6 @@ export default function SettingsLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const currentTab = searchParams.get('tab')
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -49,7 +47,7 @@ export default function SettingsLayout({
               href={link.href}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                pathname.startsWith(link.href) || currentTab === link.tab
+                pathname.startsWith(link.href)
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/50"
               )}
