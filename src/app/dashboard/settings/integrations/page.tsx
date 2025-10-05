@@ -15,16 +15,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
   cloudinaryApiKey?: string;
-  cloudinaryApiSecret?: string;
+  cloudinaryApiSecret?: string; // This will not be fetched back, only written
   whatsappApiKey?: string;
 }
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
+    const firestore = useFirestore()
 
     const [settings, setSettings] = useState<IntegrationSettings>({
         cloudinaryCloudName: '',
@@ -33,34 +36,57 @@ export default function IntegrationsPage() {
         whatsappApiKey: '',
     });
     const [isSaving, setIsSaving] = useState(false)
-    const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
-    // Simulate loading for 1 second to give feedback to the user
+    const settingsDocRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'settings', 'integrations');
+    }, [firestore]);
+
+    const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
+    
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsLoadingSettings(false);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const handleSave = () => {
-        setIsSaving(true);
-        
-        // Simulate a save operation
-        setTimeout(() => {
-            toast({
-                title: "Configurações Salvas!",
-                description: "Suas chaves de API foram salvas com sucesso (simulação).",
-            })
-            setIsSaving(false);
-
-            // Clear the secret fields after "saving"
+        if (savedSettings) {
             setSettings(prev => ({
                 ...prev,
-                cloudinaryApiSecret: '',
-                whatsappApiKey: '',
+                cloudinaryCloudName: savedSettings.cloudinaryCloudName || '',
+                cloudinaryApiKey: savedSettings.cloudinaryApiKey || '',
+                whatsappApiKey: savedSettings.whatsappApiKey || '',
+                // Important: Do not set the secret here for security reasons
+                cloudinaryApiSecret: '', 
             }));
-        }, 1000);
+        }
+    }, [savedSettings]);
+
+
+    const handleSave = () => {
+        if (!settingsDocRef) {
+            toast({ variant: "destructive", title: "Erro", description: "O serviço do Firestore não está disponível." });
+            return;
+        }
+        setIsSaving(true);
+        
+        // Prepare data to save. Don't save empty secret.
+        const dataToSave: Partial<IntegrationSettings> = {
+            cloudinaryCloudName: settings.cloudinaryCloudName,
+            cloudinaryApiKey: settings.cloudinaryApiKey,
+            whatsappApiKey: settings.whatsappApiKey,
+        };
+
+        if (settings.cloudinaryApiSecret) {
+            dataToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
+        }
+
+        updateDocumentNonBlocking(settingsDocRef, dataToSave);
+        
+        toast({
+            title: "Configurações Salvas!",
+            description: "Suas chaves de API foram salvas com sucesso.",
+        });
+
+        // Clear the secret field after saving
+        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
+
+        setIsSaving(false);
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +137,7 @@ export default function IntegrationsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="whatsappApiKey">Chave de API do WhatsApp</Label>
-                <Input id="whatsappApiKey" type="password" placeholder="Cole sua chave de API aqui" value={settings.whatsappApiKey} onChange={handleInputChange} />
+                <Input id="whatsappApiKey" type="password" placeholder="Preencha para alterar a chave" value={settings.whatsappApiKey} onChange={handleInputChange} />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
