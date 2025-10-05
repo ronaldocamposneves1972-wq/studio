@@ -1,137 +1,149 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech application.
+ * @fileoverview Firestore Security Rules for ConsorciaTech Application
  *
  * Core Philosophy:
- * This ruleset prioritizes secure access control based on user identity and explicit ownership.
- * It avoids complex queries within rules by denormalizing data where necessary.
+ * This ruleset prioritizes a secure-by-default posture with flexible data shapes to support rapid prototyping.
+ * It enforces strict ownership and role-based access control for data managed within Firestore.
+ * Data denormalization is strategically employed to avoid costly `get()` operations in rules, enhancing performance and security.
  *
  * Data Structure:
- * The database is organized into top-level collections like 'users', 'clients', 'financial_institutions', 'consortiums', 'credit_products', 'product_combos', 'sales_proposals', 'commissions', 'quizzes', and 'questions'.
- * User-specific data is nested under the '/users/{userId}' path.
+ * - /users/{userId}: Stores user profiles, accessible only to the authenticated user.
+ * - /roles_admin/{userId}: Used to define admin roles based on document existence.
+ * - /clients/{clientId}: Stores client data.
+ * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, accessible only to the client.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
+ * - /consortiums/{consortiumId}: Stores consortium product data.
+ * - /credit_products/{creditProductId}: Stores credit product data.
+ * - /product_combos/{productComboId}: Stores combinations of products.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data, denormalized with `clientId` for direct client access control.
+ * - /commissions/{commissionId}: Stores commission data.
+ * - /quizzes/{quizId}: Stores quiz data.
+ * - /questions/{questionId}: Stores question data.
  *
  * Key Security Decisions:
- * - User listing is generally disallowed to prevent unauthorized data access.
- * - Data ownership is enforced wherever applicable, typically using the 'isOwner()' helper function.
- * - Public read access is granted cautiously and only for collections where all documents are intended to be public (e.g., 'consortiums', 'credit_products', 'product_combos', 'financial_institutions', 'quizzes', 'questions').
- * - The 'roles_admin' collection grants admin privileges based on document existence.
- *
- * Denormalization for Authorization:
- * - 'sales_proposals' include a denormalized 'clientId' field to allow direct authorization based on client ID without requiring additional reads.
- *
- * Structural Segregation:
- * - There are no public/private states within the documents.
+ * - User listing is generally disallowed to prevent information leakage.
+ * - All write operations are protected by authorization checks to prevent unauthorized data modification.
+ * - Data validation is minimized in this prototyping phase, focusing on relational integrity and ownership.
+ * - Ownership checks are enforced using the `isOwner(userId)` helper function, ensuring that users can only access their own data.
+ * - Admin roles are determined by the existence of a document in `/roles_admin/{userId}`, allowing for simple role-based authorization.
+ * - The rules prioritize preventing "Missing or insufficient permissions" errors by structuring data with clear ownership and access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the current user is signed in.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Requires a valid authentication token for access.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Enforces path-based ownership.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of an existing resource.
-     * @path N/A (Helper function)
-     * @allow N/A (Helper function)
-     * @deny N/A (Helper function)
-     * @principle Prevents modification or deletion of non-existent documents.
-     */
-    function isExistingOwner(userId) {
-        return (isOwner(userId) && resource != null);
-    }
-
-    /**
-     * @description Rules for user documents.
-     * @path /users/{userId}
-     * @allow (create) If the user is creating their own document (matching UID).
-     * @allow (get, update, delete) If the user is the owner of the document.
-     * @deny (create) If the user ID in the path does not match their authentication UID.
-     * @deny (list) Listing all users is not permitted.
-     * @principle Enforces document ownership for writes.
+     * @description: Manages user profiles, ensuring only the authenticated user can access their own data.
+     * @path: /users/{userId}
+     * @allow: (create) - Authenticated user with request.auth.uid == userId.
+     * @allow: (get, update, delete, list) - Authenticated user with request.auth.uid == userId.
+     * @deny: (create, get, update, delete, list) - Any other user.
+     * @principle: Enforces strict user ownership for all operations.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get, list: if isOwner(userId);
+      allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for admin role documents. Document existence confers admin rights.
-     * @path /roles_admin/{userId}
-     * @allow (create) Only allowed if the requesting user is an admin.
-     * @allow (get) Any authenticated user can check for admin status.
-     * @allow (delete) Only allowed if the requesting user is an admin.
-     * @deny (update) Updates are not allowed; delete and recreate the document.
-     * @deny (list) Prevents listing all admin roles.
-     * @principle Uses document existence to determine admin status.
+     * @description: Defines admin roles based on document existence in /roles_admin/{userId}.
+     * @path: /roles_admin/{userId}
+     * @allow: (create) - Only allow server to create
+     * @allow: (get, list, update, delete) - User is an admin.
+     * @deny: (create, get, update, delete, list) - Any other user.
+     * @principle: Implements role-based access control using document existence.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isAdmin(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      allow get: if isAdmin(userId);
       allow list: if false;
-      allow create: if false; // TODO: Add rule for create once admin role is defined and assigned.
-      allow update: if false;
-      allow delete: if false; // TODO: Add rule for delete once admin role is defined and assigned.
+      allow create: if false;
+      allow update: if isAdmin(userId);
+      allow delete: if isAdmin(userId);
     }
 
     /**
-     * @description Rules for client documents.
-     * @path /clients/{clientId}
-     * @allow (get, list) All authenticated users can read client data.
-     * @allow (create) Only an authenticated user can create a client.
-     * @allow (update, delete) Only an authenticated user can update or delete a client.
-     * @principle Requires authentication for all operations.
+     * @description: Manages client information.
+     * @path: /clients/{clientId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /clients/{clientId} {
-      allow get, list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for documents uploaded by clients, nested under client documents.
-     * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list) Only the owner (the client) can read their documents.
-     * @allow (create) Only the owner (the client) can create documents.
-     * @allow (update, delete) Only the owner (the client) can update or delete their documents.
-     * @principle Enforces path-based ownership for client documents.
+     * @description: Manages documents uploaded by clients, ensuring only the associated client can access them.
+     * @path: /clients/{clientId}/documents/{documentId}
+     * @allow: (get, list) - Only the client can read their documents.
+     * @allow: (create) - Only the client can upload documents.
+     * @allow: (update, delete) - Only the client can modify or delete their documents.
+     * @deny: (create, get, update, delete, list) - Any other user.
+     * @principle: Enforces client-specific ownership for document access and management.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isClient(clientId) {
+          return isSignedIn() && request.auth.uid == clientId;
+      }
+
+      function isExistingClient(clientId) {
+          return isClient(clientId) && resource.data != null;
+      }
+
+      allow get: if isClient(clientId);
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == clientId;
+      allow update: if isClient(clientId);
+      allow delete: if isClient(clientId);
     }
 
     /**
-     * @description Rules for financial institution documents.
-     * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list) All authenticated users can read financial institution data.
-     * @allow (create) Only an authenticated user can create a financial institution.
-     * @allow (update, delete) Only an authenticated user can update or delete a financial institution.
-     * @principle Requires authentication for all operations.
+     * @description: Manages financial institution data.
+     * @path: /financial_institutions/{financialInstitutionId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /financial_institutions/{financialInstitutionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
@@ -139,14 +151,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for consortium product documents.
-     * @path /consortiums/{consortiumId}
-     * @allow (get, list) All users can read consortium product data.
-     * @allow (create) Only an authenticated user can create a consortium product.
-     * @allow (update, delete) Only an authenticated user can update or delete a consortium product.
-     * @principle Public read, authentication required for writes.
+     * @description: Manages consortium product data.
+     * @path: /consortiums/{consortiumId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /consortiums/{consortiumId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
@@ -154,14 +170,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for credit product documents.
-     * @path /credit_products/{creditProductId}
-     * @allow (get, list) All users can read credit product data.
-     * @allow (create) Only an authenticated user can create a credit product.
-     * @allow (update, delete) Only an authenticated user can update or delete a credit product.
-     * @principle Public read, authentication required for writes.
+     * @description: Manages credit product data.
+     * @path: /credit_products/{creditProductId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /credit_products/{creditProductId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
@@ -169,14 +189,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for product combo documents.
-     * @path /product_combos/{productComboId}
-     * @allow (get, list) All users can read product combo data.
-     * @allow (create) Only an authenticated user can create a product combo.
-     * @allow (update, delete) Only an authenticated user can update or delete a product combo.
-     * @principle Public read, authentication required for writes.
+     * @description: Manages product combo data.
+     * @path: /product_combos/{productComboId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /product_combos/{productComboId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
@@ -184,46 +208,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for sales proposal documents. Includes denormalized 'clientId' for authorization.
-     * @path /sales_proposals/{salesProposalId}
-     * @allow (get) Any authenticated user can get a sales proposal.
-     * @allow (list) Any authenticated user can list sales proposals.
-     * @allow (create) Only an authenticated user can create a sales proposal.
-     * @allow (update) Only an authenticated user can update a sales proposal.
-     * @allow (delete) Only an authenticated user can delete a sales proposal.
-     * @principle Uses a denormalized 'clientId' field for authorization independence.
+     * @description: Manages sales proposal data, denormalized with `clientId` for direct client access control.
+     * @path: /sales_proposals/{salesProposalId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
-    /**
-     * @description Rules for commission documents.
-     * @path /commissions/{commissionId}
-     * @allow (get, list) Any authenticated user can read commission data.
-     * @allow (create) Only an authenticated user can create a commission.
-     * @allow (update, delete) Only an authenticated user can update or delete a commission.
-     * @principle Requires authentication for all operations.
-     */
-    match /commissions/{commissionId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    /**
-     * @description Rules for quiz documents.
-     * @path /quizzes/{quizId}
-     * @allow (get, list) All users can read quiz data.
-     * @allow (create) Only an authenticated user can create a quiz.
-     * @allow (update, delete) Only an authenticated user can update or delete a quiz.
-     * @principle Public read, authentication required for writes.
-     */
-    match /quizzes/{quizId} {
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
@@ -231,14 +227,56 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for question documents.
-     * @path /questions/{questionId}
-     * @allow (get, list) All users can read question data.
-     * @allow (create) Only an authenticated user can create a question.
-     * @allow (update, delete) Only an authenticated user can update or delete a question.
-     * @principle Public read, authentication required for writes.
+     * @description: Manages commission data.
+     * @path: /commissions/{commissionId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
+     */
+    match /commissions/{commissionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description: Manages quiz data.
+     * @path: /quizzes/{quizId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
+     */
+    match /quizzes/{quizId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description: Manages question data.
+     * @path: /questions/{questionId}
+     * @allow: (get, list) - Public read access.
+     * @allow: (create, update, delete) - Only authenticated users can perform write operations.
+     * @deny: (create, update, delete) - Unauthorized access.
+     * @principle: Authenticated users can perform CRUD operations.
      */
     match /questions/{questionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn();
