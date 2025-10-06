@@ -995,5 +995,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
