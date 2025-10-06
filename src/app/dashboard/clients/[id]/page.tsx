@@ -495,6 +495,7 @@ export default function ClientDetailPage() {
         if (!firestore || !user || !client || !clientRef) return;
     
         const batch = writeBatch(firestore);
+        const now = new Date().toISOString();
     
         try {
             // 1. Create the main proposal document in 'sales_proposals'
@@ -508,7 +509,8 @@ export default function ClientDetailPage() {
                 clientName: client.name,
                 salesRepId: user.uid,
                 salesRepName: user.displayName || user.email,
-                createdAt: new Date().toISOString(),
+                createdAt: now,
+                approvedAt: '', // Initially empty
                 status: 'Aberta'
             };
             batch.set(newProposalRef, newProposalData);
@@ -518,7 +520,9 @@ export default function ClientDetailPage() {
                 id: newProposalRef.id,
                 productName: data.productName,
                 value: data.value,
-                status: 'Aberta'
+                status: 'Aberta',
+                createdAt: now,
+                approvedAt: ''
             };
     
             // 3. Create the timeline event
@@ -526,7 +530,7 @@ export default function ClientDetailPage() {
                 id: `tl-${Date.now()}-proposal`,
                 activity: `Nova proposta "${data.productName}" criada.`,
                 details: `Valor: R$ ${data.value.toLocaleString('pt-br')}`,
-                timestamp: new Date().toISOString(),
+                timestamp: now,
                 user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
             };
     
@@ -569,7 +573,7 @@ export default function ClientDetailPage() {
         // 2. Update all proposal summaries in the client document
         const updatedProposals = client.proposals?.map(p => {
             if (p.id === acceptedProposal.id) {
-                return { ...p, status: 'Finalizada' as ProposalStatus };
+                return { ...p, status: 'Finalizada' as ProposalStatus, approvedAt: now };
             }
             if (p.status === 'Aberta' || p.status === 'Em negociação') {
                 return { ...p, status: 'Cancelada' as ProposalStatus };
@@ -582,7 +586,7 @@ export default function ClientDetailPage() {
         client.proposals?.forEach(p => {
             const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
             if (p.id === acceptedProposal.id) {
-                batch.update(proposalDocRef, { status: 'Finalizada' });
+                batch.update(proposalDocRef, { status: 'Finalizada', approvedAt: now });
             } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
                 batch.update(proposalDocRef, { status: 'Cancelada' });
             }
@@ -1072,15 +1076,17 @@ export default function ClientDetailPage() {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Produto</TableHead>
+                                                <TableHead>Valor</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Valor</TableHead>
+                                                <TableHead>Criado em</TableHead>
+                                                <TableHead>Aprovado em</TableHead>
                                                 <TableHead className="text-right">Ações</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {isLoadingProposals ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center">
+                                                    <TableCell colSpan={6} className="h-24 text-center">
                                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                                     </TableCell>
                                                 </TableRow>
@@ -1088,8 +1094,10 @@ export default function ClientDetailPage() {
                                                 proposals.map(p => (
                                                 <TableRow key={p.id}>
                                                     <TableCell>{p.productName}</TableCell>
+                                                    <TableCell>R$ {p.value.toLocaleString('pt-BR')}</TableCell>
                                                     <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
-                                                    <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                                    <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                                                    <TableCell>{p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
@@ -1135,7 +1143,7 @@ export default function ClientDetailPage() {
                                                 ))
                                             ) : (
                                                 <TableRow>
-                                                    <TableCell colSpan={4} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
+                                                    <TableCell colSpan={6} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>
@@ -1188,5 +1196,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    

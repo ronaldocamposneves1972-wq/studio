@@ -31,6 +31,8 @@ export type ProposalSummary = {
   productName: string;
   value: number;
   status: ProposalStatus;
+  createdAt: string;
+  approvedAt?: string;
 }
 
 export type Client = {
@@ -80,6 +82,7 @@ export type Proposal = {
   value: number;
   status: ProposalStatus;
   createdAt: string;
+  approvedAt?: string;
   salesRepId: string;
   salesRepName: string;
 };
@@ -155,5 +158,3 @@ export type Transaction = {
   accountId: string;
   accountName?: string;
 };
-
-    
