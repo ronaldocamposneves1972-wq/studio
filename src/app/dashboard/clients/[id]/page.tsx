@@ -81,7 +81,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
+import { useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase"
 import { doc, arrayUnion, arrayRemove } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
@@ -209,6 +209,8 @@ export default function ClientDetailPage() {
   
   const handleDeleteClient = () => {
     if (!clientRef) return;
+    // This is a non-blocking delete. We might need a blocking one if we navigate away.
+    // For now, let's assume it's okay.
     deleteDocumentNonBlocking(clientRef);
     toast({
       title: "Cliente excluído!",
@@ -284,18 +286,43 @@ export default function ClientDetailPage() {
     }
   };
 
-  const handleDeleteDocument = (docToDelete: ClientDocument) => {
+  const handleDeleteDocument = async (docToDelete: ClientDocument) => {
     if (!clientRef) return;
-    
-    updateDocumentNonBlocking(clientRef, {
-      documents: arrayRemove(docToDelete)
-    });
-    
-    toast({
-      title: "Documento excluído",
-      description: `${docToDelete.fileName} foi removido.`
-    })
-  }
+
+    try {
+        // Step 1: Call the API to delete the file from Cloudinary
+        const response = await fetch('/api/upload', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ public_id: docToDelete.cloudinaryPublicId }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha ao deletar arquivo no Cloudinary.');
+        }
+
+        // Step 2: If Cloudinary deletion is successful, remove the reference from Firestore
+        updateDocumentNonBlocking(clientRef, {
+            documents: arrayRemove(docToDelete)
+        });
+
+        toast({
+            title: "Documento excluído",
+            description: `${docToDelete.fileName} foi removido com sucesso.`
+        });
+
+    } catch (error) {
+        console.error("Error deleting document:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao Excluir",
+            description: error instanceof Error ? error.message : "Não foi possível excluir o documento.",
+        });
+    }
+}
 
 
   const translatedLabels: { [key: string]: string } = {
@@ -532,7 +559,7 @@ export default function ClientDetailPage() {
                                                                     <AlertDialogHeader>
                                                                     <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
                                                                     <AlertDialogDescription>
-                                                                        Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido.
+                                                                        Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido permanentemente do Cloudinary e do sistema.
                                                                     </AlertDialogDescription>
                                                                     </AlertDialogHeader>
                                                                     <AlertDialogFooter>
@@ -621,7 +648,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
-
-    
