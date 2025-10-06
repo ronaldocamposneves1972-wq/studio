@@ -6,7 +6,7 @@ import { useState } from 'react';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings, ChevronRight,
   FilePlus, FileX, LineChart, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
@@ -26,8 +26,11 @@ export const navItems = [
   },
   {
     label: 'Cadastro', icon: FilePlus, children: [
-      { href: '/dashboard/proposals/new', label: 'Nova Proposta', icon: FilePlus },
-      { href: '/dashboard/restrictions', label: 'Restrição', icon: FileX },
+      { href: '/dashboard/products', label: 'Produtos', icon: Package },
+      { href: '/dashboard/banks', label: 'Bancos', icon: Landmark },
+      { href: '/dashboard/financials/accounts', label: 'Contas Bancária', icon: CreditCard },
+      { href: '/dashboard/settings/users', label: 'Vendedores', icon: Users },
+      { href: '/dashboard/settings/users', label: 'Usúarios', icon: Users },
     ],
   },
   {
