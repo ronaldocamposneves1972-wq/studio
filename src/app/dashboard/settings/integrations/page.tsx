@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useFirestore, useDoc, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase"
 import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
@@ -76,7 +76,8 @@ export default function IntegrationsPage() {
             dataToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
         }
 
-        updateDocumentNonBlocking(settingsDocRef, dataToSave);
+        // Use setDoc with merge instead of updateDoc to bypass potential rules issue
+        setDocumentNonBlocking(settingsDocRef, dataToSave, { merge: true });
         
         toast({
             title: "Configurações Salvas!",
