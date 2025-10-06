@@ -29,6 +29,7 @@ export type ClientDocument = {
 export type ProposalSummary = {
   id: string;
   productName: string;
+  bankName?: string;
   value: number;
   status: ProposalStatus;
   createdAt: string;

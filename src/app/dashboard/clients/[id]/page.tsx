@@ -519,6 +519,7 @@ export default function ClientDetailPage() {
             const proposalSummary: ProposalSummary = {
                 id: newProposalRef.id,
                 productName: data.productName,
+                bankName: data.bankName,
                 value: data.value,
                 status: 'Aberta',
                 createdAt: now,
@@ -1093,7 +1094,10 @@ export default function ClientDetailPage() {
                                             ) : proposals?.length > 0 ? (
                                                 proposals.map(p => (
                                                 <TableRow key={p.id}>
-                                                    <TableCell>{p.productName}</TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium">{p.productName}</div>
+                                                        <div className="text-sm text-muted-foreground">{p.bankName}</div>
+                                                    </TableCell>
                                                     <TableCell>R$ {p.value.toLocaleString('pt-BR')}</TableCell>
                                                     <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
                                                     <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>

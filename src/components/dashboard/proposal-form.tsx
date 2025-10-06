@@ -70,6 +70,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
     const fullData = {
         ...data,
         productName: selectedProduct.name, // Denormalize product name for easy display
+        bankName: selectedProduct.bankName, // Denormalize bank name
     }
 
     await onSave(fullData);
