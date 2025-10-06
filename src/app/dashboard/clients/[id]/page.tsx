@@ -717,20 +717,23 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             <AlertDialogHeader>
                 <AlertDialogTitle>Aceitar Proposta e Formalizar</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Revise os detalhes e insira o link de formalização do contrato para finalizar a aprovação.
+                    Para finalizar, confirme os detalhes e insira o link de formalização do contrato. Este campo é obrigatório.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="space-y-4 text-sm">
-                <p><strong>Produto:</strong> {proposalToAccept?.productName}</p>
-                <p><strong>Valor:</strong> R$ {proposalToAccept?.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>
-                {proposalToAccept?.installments && <p><strong>Parcelas:</strong> {proposalToAccept.installments}x de R$ {proposalToAccept.installmentValue?.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>}
+            <div className="space-y-4 py-2">
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                    <p><strong>Produto:</strong> {proposalToAccept?.productName}</p>
+                    <p><strong>Valor:</strong> R$ {proposalToAccept?.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>
+                    {proposalToAccept?.installments && <p><strong>Parcelas:</strong> {proposalToAccept.installments}x de R$ {proposalToAccept.installmentValue?.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>}
+                </div>
                  <div className="space-y-2">
-                    <Label htmlFor="formalization-link">Link de Formalização do Contrato</Label>
+                    <Label htmlFor="formalization-link" className={cn(!formalizationLink && 'text-destructive')}>Link de Formalização (Obrigatório)</Label>
                     <Input
                         id="formalization-link"
                         value={formalizationLink}
                         onChange={(e) => setFormalizationLink(e.target.value)}
                         placeholder="https://banco.com/contrato/assinar/xyz"
+                        className={cn(!formalizationLink && 'border-destructive focus-visible:ring-destructive')}
                     />
                 </div>
             </div>
@@ -1192,7 +1195,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                             )}
                                         </TableBody>
                                     </Table>
-
+                                    
                                     {client.status === 'Pendente' && (
                                         <div className="text-center py-6 border-t">
                                             <h3 className="text-lg font-semibold mb-2">Gerenciar Oportunidades</h3>
