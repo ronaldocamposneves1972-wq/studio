@@ -467,7 +467,7 @@ export default function ClientDetailPage() {
     };
 
     const handleSendToCreditAnalysis = async () => {
-        if (!clientRef || !user) return;
+        if (!clientRef || !user || !client) return;
         
         const timelineEvent: TimelineEvent = {
             id: `tl-${Date.now()}`,
@@ -518,7 +518,6 @@ export default function ClientDetailPage() {
                 description: "A nova proposta foi adicionada ao cliente."
             });
             setIsProposalDialogOpen(false);
-            // Optional: refresh proposals data
         } catch (error) {
             console.error("Error saving proposal:", error);
             toast({
