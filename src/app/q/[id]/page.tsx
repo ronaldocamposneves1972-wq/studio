@@ -36,8 +36,6 @@ export default function StandaloneQuizPage() {
     formData.append('file', file);
     formData.append('clientId', clientId);
 
-    toast({ title: `Enviando ${file.name}...`, description: 'Por favor, aguarde.' });
-
     const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
@@ -50,88 +48,74 @@ export default function StandaloneQuizPage() {
         } catch (e) {
              throw new Error(`O servidor respondeu com status ${response.status}`);
         }
-        throw new Error(errorData.error || 'Falha no upload do servidor.');
+        throw new Error(errorData.error || `Falha no upload de ${file.name}.`);
     }
 
     return response.json();
   };
 
-  const handleStepFileUpload = async (questionId: string, files: FileList): Promise<boolean> => {
-    if (!firestore || !clientId) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'ID do cliente ou conexão não disponível.' });
-      return false;
-    }
-    
-    const clientRef = doc(firestore, 'clients', clientId);
-    const fileUploadPromises = [];
-
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        fileUploadPromises.push(uploadFileToCloudinary(file, clientId));
-    }
-
-    try {
-        const uploadResults = await Promise.all(fileUploadPromises);
-
-        const newDocuments: ClientDocument[] = uploadResults.map((uploadData, index) => ({
-            id: uploadData.public_id,
-            clientId: clientId,
-            fileName: uploadData.original_filename || files[index].name,
-            fileType: uploadData.resource_type || 'raw',
-            cloudinaryPublicId: uploadData.public_id,
-            secureUrl: uploadData.secure_url,
-            uploadedAt: new Date().toISOString(),
-        }));
-
-        if (newDocuments.length > 0) {
-            updateDocumentNonBlocking(clientRef, {
-                documents: arrayUnion(...newDocuments)
-            });
-        }
-        
-        toast({ title: "Arquivo(s) enviado(s)!", description: `${files.length} arquivo(s) foram adicionados com sucesso.`});
-        return true;
-    } catch (error) {
-        console.error(error);
-        const errorMessage = error instanceof Error ? error.message : 'Falha no upload de um ou mais arquivos.';
-        toast({ variant: 'destructive', title: 'Erro no Upload', description: errorMessage });
-        return false;
-    }
-  }
-
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
+    toast({ title: 'Enviando respostas e arquivos...', description: 'Por favor, aguarde.' });
+    
     try {
         if (!firestore || !clientId) {
             throw new Error("Firestore ou ID do cliente não disponível");
         }
 
         const clientRef = doc(firestore, 'clients', clientId);
-        const serializableAnswers: Record<string, any> = {};
+        const fileUploadPromises: Promise<any>[] = [];
+        const nonFileAnswers: Record<string, any> = {};
+        const fileAnswerKeys: string[] = [];
 
-        // Filter out any file objects, as they are handled by handleStepFileUpload
+        // Separate files from other answers and prepare upload promises
         for (const key in answers) {
-            if (!(answers[key] instanceof File) && !(answers[key] instanceof FileList)) {
-                serializableAnswers[key] = answers[key];
+            const value = answers[key];
+            if (value instanceof FileList && value.length > 0) {
+                 fileAnswerKeys.push(key);
+                 for (let i = 0; i < value.length; i++) {
+                    const file = value[i];
+                    fileUploadPromises.push(uploadFileToCloudinary(file, clientId));
+                }
+            } else if (!(value instanceof FileList)) {
+                nonFileAnswers[key] = value;
             }
         }
         
+        // Execute all file uploads in parallel
+        const uploadResults = await Promise.all(fileUploadPromises);
+
+        const newDocuments: ClientDocument[] = uploadResults.map((uploadData) => ({
+            id: uploadData.public_id,
+            clientId: clientId,
+            fileName: uploadData.original_filename,
+            fileType: uploadData.resource_type || 'raw',
+            cloudinaryPublicId: uploadData.public_id,
+            secureUrl: uploadData.secure_url,
+            uploadedAt: new Date().toISOString(),
+        }));
+
+        // Now, update Firestore with all data at once
         const clientSnap = await getDoc(clientRef);
         if (!clientSnap.exists()) {
             throw new Error("Documento do cliente não encontrado.");
         }
         const clientData = clientSnap.data() as Client;
-
+        
         const updatePayload: Record<string, any> = {
-            answers: { ...clientData.answers, ...serializableAnswers },
+            answers: { ...clientData.answers, ...nonFileAnswers },
             status: 'Em análise',
         };
+
+        if (newDocuments.length > 0) {
+            updatePayload.documents = arrayUnion(...(clientData.documents || []), ...newDocuments);
+        }
 
         updateDocumentNonBlocking(clientRef, updatePayload);
 
         toast({
             title: 'Respostas recebidas!',
-            description: 'Obrigado por enviar seus dados. Em breve nossa equipe continuará o processo.',
+            description: 'Seus dados e arquivos foram enviados com sucesso.',
         });
         setIsSubmitted(true);
 
@@ -178,7 +162,7 @@ export default function StandaloneQuizPage() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} onFileUpload={handleStepFileUpload} />;
+      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
     }
 
     return (

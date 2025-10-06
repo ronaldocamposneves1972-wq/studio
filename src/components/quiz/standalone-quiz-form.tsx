@@ -45,12 +45,10 @@ interface StandaloneQuizFormProps {
     isSubmitting: boolean;
     initialAnswers?: Record<string, any>;
     onCEPChange?: (cep: string) => Promise<void>;
-    onFileUpload?: (questionId: string, files: FileList) => Promise<boolean>;
 }
 
-export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange, onFileUpload }: StandaloneQuizFormProps) {
+export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange }: StandaloneQuizFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
-    const [isUploadingStep, setIsUploadingStep] = useState(false);
     const totalSteps = quiz.questions.length;
     
     const form = useForm<FormData>({
@@ -69,19 +67,6 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         // Handle CEP change if function is provided
         if (currentQuestion.id === 'q-cep' && onCEPChange) {
             await onCEPChange(form.getValues(currentQuestion.id));
-        }
-
-        // Handle file upload for the current step
-        if (currentQuestion.type === 'file' && onFileUpload) {
-            const files = form.getValues(currentQuestion.id) as FileList;
-            if (files && files.length > 0) {
-                setIsUploadingStep(true);
-                const uploadSuccess = await onFileUpload(currentQuestion.id, files);
-                setIsUploadingStep(false);
-                if (!uploadSuccess) {
-                    return; // Stop if upload fails
-                }
-            }
         }
 
         if (currentStep < totalSteps - 1) {
@@ -177,9 +162,8 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     };
 
     const isFinalStep = currentStep === totalSteps - 1;
-    const buttonDisabled = isSubmitting || isUploadingStep;
+    const buttonDisabled = isSubmitting;
     const getButtonText = () => {
-        if (isUploadingStep) return 'Enviando Arquivo...';
         if (isSubmitting) return 'Finalizando...';
         return isFinalStep ? 'Finalizar' : 'Continuar';
     }
