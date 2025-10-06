@@ -718,7 +718,7 @@ export default function ClientDetailPage() {
                                                               </Button>
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
-                                                              <DropdownMenuItem onSelect={()={() => handleViewDocument(doc)}}>
+                                                              <DropdownMenuItem onSelect={() => handleViewDocument(doc)}>
                                                                   <Eye className="mr-2 h-4 w-4" />
                                                                   Ver
                                                               </DropdownMenuItem>
