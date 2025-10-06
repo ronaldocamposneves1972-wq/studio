@@ -62,7 +62,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query } from "firebase/firestore"
+import { collection, doc, query, writeBatch } from "firebase/firestore"
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -103,6 +103,33 @@ export default function ClientsPage() {
       title: "Cliente excluído!",
       description: `O cliente "${client.name}" foi removido com sucesso.`,
     });
+    setSelectedRows(prev => prev.filter(id => id !== client.id));
+  }
+
+  const handleDeleteSelected = async () => {
+    if (!firestore || selectedRows.length === 0) return;
+
+    const batch = writeBatch(firestore);
+    selectedRows.forEach(clientId => {
+        const clientRef = doc(firestore, 'clients', clientId);
+        batch.delete(clientRef);
+    });
+
+    try {
+        await batch.commit();
+        toast({
+            title: `${selectedRows.length} cliente(s) excluído(s)!`,
+            description: "Os clientes selecionados foram removidos com sucesso.",
+        });
+        setSelectedRows([]);
+    } catch (error) {
+        console.error("Error deleting multiple clients:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao excluir",
+            description: "Não foi possível excluir os clientes selecionados.",
+        });
+    }
   }
   
   const filteredClients = (status: ClientStatus | 'all') => {
@@ -257,10 +284,31 @@ export default function ClientsPage() {
                     <span className="text-sm text-muted-foreground">
                         {numSelected} selecionado(s)
                     </span>
-                    <Button variant="outline" size="sm" className="h-8 gap-1">
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Excluir
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 gap-1">
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Excluir
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir clientes selecionados?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta ação não pode ser desfeita. {numSelected} cliente(s) serão permanentemente excluídos.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                onClick={handleDeleteSelected}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                Sim, excluir
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             )}
           <DropdownMenu>
@@ -342,5 +390,3 @@ export default function ClientsPage() {
     </Tabs>
   )
 }
-
-    
