@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -25,31 +27,57 @@ type IntegrationSettings = {
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
+    const firestore = useFirestore()
     
-    const [settings, setSettings] = useState<IntegrationSettings>({
-        cloudinaryCloudName: '',
-        cloudinaryApiKey: '',
-        cloudinaryApiSecret: '',
-        whatsappApiKey: '',
-    });
+    const [settings, setSettings] = useState<IntegrationSettings>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoadingSettings, setIsLoadingSettings] = useState(false); // Simulating loading state
+
+    const settingsDocRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'settings', 'integrations');
+    }, [firestore]);
+
+    const { data: loadedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
+
+    useEffect(() => {
+        if (loadedSettings) {
+            setSettings({
+                cloudinaryCloudName: loadedSettings.cloudinaryCloudName || '',
+                cloudinaryApiKey: loadedSettings.cloudinaryApiKey || '',
+                whatsappApiKey: loadedSettings.whatsappApiKey || '',
+                cloudinaryApiSecret: '', // Always keep secret blank in UI
+            });
+        }
+    }, [loadedSettings]);
 
     const handleSave = () => {
+        if (!settingsDocRef) {
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "A referência do banco de dados não está pronta.",
+            });
+            return;
+        }
         setIsSaving(true);
         
-        // Simulate a network request
-        setTimeout(() => {
-            toast({
-                title: "Configurações Salvas!",
-                description: "Suas chaves de API foram salvas localmente.",
-            });
-            
-            // Optimistically clear secret field from UI state
-            setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
+        const settingsToSave: Partial<IntegrationSettings> = { ...settings };
+        // Only include the secret if it has been changed
+        if (!settings.cloudinaryApiSecret) {
+            delete settingsToSave.cloudinaryApiSecret;
+        }
 
-            setIsSaving(false);
-        }, 500);
+        setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+
+        toast({
+            title: "Configurações Salvas!",
+            description: "Suas chaves de API foram enviadas para o banco de dados.",
+        });
+        
+        // Optimistically clear secret field from UI state after saving
+        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
+
+        setIsSaving(false);
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +132,7 @@ export default function IntegrationsPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} disabled={isSaving}>
+              <Button onClick={handleSave} disabled={isSaving || isLoadingSettings}>
                 {isSaving ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </CardFooter>
