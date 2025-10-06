@@ -15,8 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase"
-import { collection, query, orderBy, limit } from "firebase/firestore"
+import { useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -37,62 +37,55 @@ export default function IntegrationsPage() {
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    const settingsQuery = useMemoFirebase(() => {
+    // Fetch a single, specific document instead of a collection
+    const settingsDocRef = useMemoFirebase(() => {
         if (!firestore) return null;
-        // Query for the most recent settings document
-        return query(collection(firestore, 'settings'), orderBy('savedAt', 'desc'), limit(1));
+        return doc(firestore, 'settings', 'integrations');
     }, [firestore]);
 
-    const { data: latestSettings, isLoading: isLoadingSettings } = useCollection<IntegrationSettings & { savedAt: any }>(settingsQuery);
+    const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
 
     useEffect(() => {
-        if (latestSettings && latestSettings.length > 0) {
-            // Load the most recent settings, but don't display the secret
-            const { cloudinaryApiSecret, whatsappApiKey, ...displaySettings } = latestSettings[0];
+        if (savedSettings) {
+            // Load settings, but keep secret fields blank in the UI for security
+            const { cloudinaryApiSecret, whatsappApiKey, ...displaySettings } = savedSettings;
             setSettings({
                 ...displaySettings,
                 cloudinaryApiSecret: '', // Always keep secret field blank in UI
                 whatsappApiKey: '', // Always keep secret field blank in UI
             });
         }
-    }, [latestSettings]);
+    }, [savedSettings]);
 
 
     const handleSave = () => {
         setIsSaving(true);
-        if (!firestore) {
+        if (!settingsDocRef) {
             toast({ variant: 'destructive', title: "Erro", description: "O serviço do Firestore não está disponível." });
             setIsSaving(false);
             return;
         }
 
-        const settingsCollection = collection(firestore, 'settings');
-        const settingsToSave = {
-            ...settings,
-            savedAt: new Date().toISOString()
-        };
+        // Prepare data to save. Only include secrets if they have been changed.
+        const settingsToSave: IntegrationSettings = { ...settings };
+        if (!settings.cloudinaryApiSecret) {
+            delete (settingsToSave as Partial<IntegrationSettings>).cloudinaryApiSecret;
+        }
+         if (!settings.whatsappApiKey) {
+            delete (settingsToSave as Partial<IntegrationSettings>).whatsappApiKey;
+        }
 
-        addDocumentNonBlocking(settingsCollection, settingsToSave)
-            .then(() => {
-                toast({
-                    title: "Configurações Salvas!",
-                    description: "Suas chaves de API foram salvas com sucesso.",
-                });
-                // Clear the secret field from state after saving
-                setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
-            })
-            .catch((error) => {
-                // This catch block will likely not be hit due to the global error handler,
-                // but it's good practice to have it.
-                toast({
-                    variant: "destructive",
-                    title: "Erro ao Salvar",
-                    description: "Não foi possível salvar as configurações. Verifique os logs.",
-                });
-            })
-            .finally(() => {
-                setIsSaving(false);
-            });
+        // Use setDoc with merge to create or update the single document
+        setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+
+        toast({
+            title: "Configurações Salvas!",
+            description: "Suas chaves de API foram salvas com sucesso.",
+        });
+
+        // Clear secret fields from UI state after saving
+        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
+        setIsSaving(false);
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
