@@ -63,6 +63,7 @@ export type Client = {
   neighborhood?: string;
   city?: string;
   state?: string;
+  reprovalDate?: string;
 };
 
 export type TimelineEvent = {

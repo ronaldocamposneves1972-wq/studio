@@ -20,7 +20,6 @@ export const navItems = [
       { href: '/dashboard/pipeline/Documentacao', label: 'Documentação', icon: Users },
       { href: '/dashboard/pipeline/valor', label: 'Valor', icon: DollarSign },
       { href: '/dashboard/pipeline/clearance', label: 'Clearance', icon: Check },
-      { href: '/dashboard/pipeline/proposal', label: 'Proposal', icon: FileText },
       { href: '/dashboard/pipeline/ledger', label: 'Ledger', icon: Receipt },
     ],
   },

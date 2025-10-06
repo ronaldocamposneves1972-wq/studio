@@ -257,6 +257,39 @@ export default function ClientDetailPage() {
         })
     }
   }
+
+  const handleReproveAndMoveToOpportunityPanel = async () => {
+    if (!clientRef || !user) return;
+
+    const now = new Date().toISOString();
+    const timelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}`,
+        activity: `Cliente movido para o Painel de Oportunidades`,
+        details: `Status alterado para "Reprovado". Nova análise em 30 dias.`,
+        timestamp: now,
+        user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+    };
+
+    try {
+      await updateDoc(clientRef, { 
+        status: 'Reprovado',
+        reprovalDate: now,
+        timeline: arrayUnion(timelineEvent) 
+      });
+      toast({
+        title: "Cliente movido!",
+        description: "O cliente foi movido para o Painel de Oportunidades para reanálise futura.",
+      });
+      router.push('/dashboard/opportunity-panel');
+    } catch (e) {
+      console.error(e)
+      toast({
+        variant: "destructive",
+        title: "Erro ao mover cliente",
+        description: "Não foi possível completar a operação."
+      })
+    }
+  }
   
   const handleDeleteClient = async () => {
     if (!clientRef) return;
@@ -1212,15 +1245,15 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
-                                                            <AlertDialogTitle>Confirmar Reprovação?</AlertDialogTitle>
+                                                            <AlertDialogTitle>Mover para Painel de Oportunidades?</AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Deseja mover o cliente <strong>{client.name}</strong> para o status "Reprovado"? Essa ação pode ser revertida manualmente mais tarde.
+                                                                Deseja mover o cliente <strong>{client.name}</strong> para "Reprovado" e acompanhá-lo no Painel de Oportunidades para uma futura reanálise em 30 dias?
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleStatusChange('Reprovado')} className="bg-destructive hover:bg-destructive/90">
-                                                                Sim, Reprovar
+                                                            <AlertDialogAction onClick={handleReproveAndMoveToOpportunityPanel} className="bg-destructive hover:bg-destructive/90">
+                                                                Sim, Mover e Reprovar
                                                             </AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
