@@ -374,10 +374,23 @@ export default function ClientDetailPage() {
 
     const getDocumentViewUrl = (doc: ClientDocument | null): string => {
         if (!doc) return '';
-        
-        // Always return the direct secureUrl for simplicity now
+        if (doc.fileName.toLowerCase().endsWith('.pdf')) {
+            // For PDFs, just return the secure URL and let the browser handle it.
+            return doc.secureUrl;
+        }
+        // For other types (images), we can try to optimize.
         return doc.secureUrl;
     };
+    
+    const handleViewDocument = (doc: ClientDocument) => {
+        const isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            window.open(getDocumentViewUrl(doc), '_blank');
+        } else {
+            setViewingDocument(doc);
+        }
+    };
+
 
   if (isLoadingClient) {
      return (
@@ -425,12 +438,10 @@ export default function ClientDetailPage() {
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
-            <DialogDescription>Visualizando documento. <a href={getDocumentViewUrl(viewingDocument)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
+            <DialogDescription>Visualizando imagem. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {viewingDocument && (
-                <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
-            )}
+            {viewingDocument && <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />}
           </div>
         </DialogContent>
       </Dialog>
@@ -594,13 +605,13 @@ export default function ClientDetailPage() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent>
-                                                            <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
+                                                            <DropdownMenuItem onSelect={() => handleViewDocument(doc)}>
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
-                                                             <DropdownMenuItem onSelect={() => window.open(doc.secureUrl, '_blank')}>
+                                                             <DropdownMenuItem onSelect={() => window.open(getDocumentViewUrl(doc), '_blank')}>
                                                                 <Download className="mr-2 h-4 w-4" />
-                                                                Baixar
+                                                                Abrir / Baixar
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem onSelect={() => handleToggleValidation(doc)}>
                                                                 <Check className="mr-2 h-4 w-4" />
@@ -707,5 +718,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
