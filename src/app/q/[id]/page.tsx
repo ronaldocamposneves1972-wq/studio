@@ -4,16 +4,15 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase, useStorage } from '@/firebase';
-import { doc, collection, query, where, limit, getDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
+import { doc, collection, query, where, limit, getDoc, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
 import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Quiz, Client } from '@/lib/types';
+import type { Quiz, Client, ClientDocument } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
 
@@ -23,7 +22,6 @@ export default function StandaloneQuizPage() {
   const { toast } = useToast();
   const params = useParams();
   const firestore = useFirestore();
-  const storage = useStorage();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const quizQuery = useMemoFirebase(() => {
@@ -34,12 +32,29 @@ export default function StandaloneQuizPage() {
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
   const quiz = quizzes?.[0];
 
-  const uploadFile = async (file: File, clientId: string) => {
-    if (!storage) throw new Error("Firebase Storage not available");
-    const storageRef = ref(storage, `clients/${clientId}/documents/${Date.now()}-${file.name}`);
-    await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(storageRef);
-    return { name: file.name, url: downloadURL };
+  const uploadFileToCloudinary = async (file: File, clientId: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('clientId', clientId);
+
+    toast({ title: `Enviando ${file.name}...`, description: 'Por favor, aguarde.' });
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch (e) {
+             throw new Error(`O servidor respondeu com status ${response.status}`);
+        }
+        throw new Error(errorData.error || 'Falha no upload do servidor.');
+    }
+
+    return response.json();
   };
 
   const handleSubmit = async (answers: Record<string, any>) => {
@@ -50,16 +65,15 @@ export default function StandaloneQuizPage() {
         }
 
         const clientRef = doc(firestore, 'clients', clientId);
-        const fileUploadPromises: Promise<{ key: string, newDoc: { name: string, url: string } }>[] = [];
+        const fileUploadPromises: Promise<{ key: string, uploadData: any, originalFile: File }>[] = [];
         const serializableAnswers: Record<string, any> = {};
 
         // Separate files from other answers and create upload promises
         for (const key in answers) {
             if (answers[key] instanceof File) {
                 const file = answers[key] as File;
-                toast({ title: `Enviando ${file.name}...`, description: 'Por favor, aguarde.' });
                 fileUploadPromises.push(
-                    uploadFile(file, clientId).then(newDoc => ({ key, newDoc }))
+                    uploadFileToCloudinary(file, clientId).then(uploadData => ({ key, uploadData, originalFile: file }))
                 );
             } else {
                 serializableAnswers[key] = answers[key];
@@ -68,11 +82,20 @@ export default function StandaloneQuizPage() {
 
         // Wait for all file uploads to complete
         const uploadedFiles = await Promise.all(fileUploadPromises);
-        const newDocuments = uploadedFiles.map(file => file.newDoc);
+        
+        const newDocuments: ClientDocument[] = uploadedFiles.map(({ uploadData, originalFile }) => ({
+            id: uploadData.public_id,
+            clientId: clientId,
+            fileName: uploadData.original_filename || originalFile.name,
+            fileType: uploadData.resource_type || 'raw',
+            cloudinaryPublicId: uploadData.public_id,
+            secureUrl: uploadData.secure_url,
+            uploadedAt: new Date().toISOString(),
+        }));
 
-        // Add file info to serializableAnswers
-        uploadedFiles.forEach(({ key, newDoc }) => {
-            serializableAnswers[key] = { name: newDoc.name, url: newDoc.url };
+        // Add file info to serializableAnswers, so it's recorded in the `answers` field
+        uploadedFiles.forEach(({ key, uploadData }) => {
+            serializableAnswers[key] = { name: uploadData.original_filename, url: uploadData.secure_url };
         });
 
         const clientSnap = await getDoc(clientRef);
@@ -84,8 +107,11 @@ export default function StandaloneQuizPage() {
         const updatePayload: Record<string, any> = {
             answers: { ...clientData.answers, ...serializableAnswers },
             status: 'Em análise',
-            documents: [...(clientData.documents || []), ...newDocuments],
         };
+
+        if (newDocuments.length > 0) {
+            updatePayload.documents = arrayUnion(...newDocuments)
+        }
 
         updateDocumentNonBlocking(clientRef, updatePayload);
 
