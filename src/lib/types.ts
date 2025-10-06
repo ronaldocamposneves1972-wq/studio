@@ -36,6 +36,7 @@ export type ProposalSummary = {
   status: ProposalStatus;
   createdAt: string;
   approvedAt?: string;
+  formalizationLink?: string;
 }
 
 export type Client = {
@@ -91,6 +92,7 @@ export type Proposal = {
   approvedAt?: string;
   salesRepId: string;
   salesRepName: string;
+  formalizationLink?: string;
 };
 
 export type ProductType = {

@@ -195,6 +195,9 @@ export default function ClientDetailPage() {
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
   const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
+  const [proposalToAccept, setProposalToAccept] = useState<ProposalSummary | null>(null);
+  const [formalizationLink, setFormalizationLink] = useState('');
+
 
   const proposalRef = useMemoFirebase(() => {
     if (!firestore || !viewingProposalId) return null;
@@ -561,64 +564,66 @@ export default function ClientDetailPage() {
         }
     };
     
-    const handleAcceptProposal = async (acceptedProposal: ProposalSummary) => {
-        if (!firestore || !client || !clientRef || !user) return;
-        
-        toast({ title: 'Processando aceitação...' });
-        
-        const batch = writeBatch(firestore);
-        const now = new Date().toISOString();
+const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: string) => {
+    if (!firestore || !client || !clientRef || !user || !link) return;
+    
+    toast({ title: 'Processando aceitação...' });
+    
+    const batch = writeBatch(firestore);
+    const now = new Date().toISOString();
 
-        // 1. Update the client status to "Aprovado"
-        batch.update(clientRef, { status: 'Aprovado' });
+    // 1. Update the client status to "Aprovado"
+    batch.update(clientRef, { status: 'Aprovado' });
 
-        // 2. Update all proposal summaries in the client document
-        const updatedProposals = client.proposals?.map(p => {
-            if (p.id === acceptedProposal.id) {
-                return { ...p, status: 'Finalizada' as ProposalStatus, approvedAt: now };
-            }
-            if (p.status === 'Aberta' || p.status === 'Em negociação') {
-                return { ...p, status: 'Cancelada' as ProposalStatus };
-            }
-            return p;
-        });
-        batch.update(clientRef, { proposals: updatedProposals });
-
-        // 3. Update the full proposal documents in 'sales_proposals'
-        client.proposals?.forEach(p => {
-            const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
-            if (p.id === acceptedProposal.id) {
-                batch.update(proposalDocRef, { status: 'Finalizada', approvedAt: now });
-            } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
-                batch.update(proposalDocRef, { status: 'Cancelada' });
-            }
-        });
-
-        // 4. Add a timeline event
-        const timelineEvent: TimelineEvent = {
-            id: `tl-${Date.now()}-accepted`,
-            activity: `Proposta "${acceptedProposal.productName}" aceita.`,
-            details: `Cliente movido para "Aprovado".`,
-            timestamp: now,
-            user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
-        };
-        batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
-
-        try {
-            await batch.commit();
-            toast({
-                title: "Proposta Aceita!",
-                description: `O cliente ${client.name} foi marcado como Aprovado.`
-            });
-        } catch (error) {
-            console.error("Error accepting proposal: ", error);
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao aceitar proposta',
-                description: 'Não foi possível completar a operação.'
-            });
+    // 2. Update all proposal summaries in the client document
+    const updatedProposals = client.proposals?.map(p => {
+        if (p.id === acceptedProposal.id) {
+            return { ...p, status: 'Finalizada' as ProposalStatus, approvedAt: now, formalizationLink: link };
         }
+        if (p.status === 'Aberta' || p.status === 'Em negociação') {
+            return { ...p, status: 'Cancelada' as ProposalStatus };
+        }
+        return p;
+    });
+    batch.update(clientRef, { proposals: updatedProposals });
+
+    // 3. Update the full proposal documents in 'sales_proposals'
+    client.proposals?.forEach(p => {
+        const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
+        if (p.id === acceptedProposal.id) {
+            batch.update(proposalDocRef, { status: 'Finalizada', approvedAt: now, formalizationLink: link });
+        } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
+            batch.update(proposalDocRef, { status: 'Cancelada' });
+        }
+    });
+
+    // 4. Add a timeline event
+    const timelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}-accepted`,
+        activity: `Proposta "${acceptedProposal.productName}" aceita.`,
+        details: `Cliente movido para "Aprovado". Link de formalização adicionado.`,
+        timestamp: now,
+        user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
     };
+    batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
+
+    try {
+        await batch.commit();
+        toast({
+            title: "Proposta Aceita!",
+            description: `O cliente ${client.name} foi marcado como Aprovado.`
+        });
+        setProposalToAccept(null);
+        setFormalizationLink('');
+    } catch (error) {
+        console.error("Error accepting proposal: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Erro ao aceitar proposta',
+            description: 'Não foi possível completar a operação.'
+        });
+    }
+};
 
 
     const handleDeleteProposal = async (proposalToDelete: ProposalSummary) => {
@@ -707,6 +712,36 @@ export default function ClientDetailPage() {
           onSave={handleSaveProposal}
           client={client}
       />
+       <AlertDialog open={!!proposalToAccept} onOpenChange={(open) => !open && setProposalToAccept(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Aceitar Proposta e Formalizar</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Revise os detalhes e insira o link de formalização do contrato para finalizar a aprovação.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 text-sm">
+                <p><strong>Produto:</strong> {proposalToAccept?.productName}</p>
+                <p><strong>Valor:</strong> R$ {proposalToAccept?.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>
+                {proposalToAccept?.installments && <p><strong>Parcelas:</strong> {proposalToAccept.installments}x de R$ {proposalToAccept.installmentValue?.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>}
+                 <div className="space-y-2">
+                    <Label htmlFor="formalization-link">Link de Formalização do Contrato</Label>
+                    <Input
+                        id="formalization-link"
+                        value={formalizationLink}
+                        onChange={(e) => setFormalizationLink(e.target.value)}
+                        placeholder="https://banco.com/contrato/assinar/xyz"
+                    />
+                </div>
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => { setProposalToAccept(null); setFormalizationLink(''); }}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleAcceptProposal(proposalToAccept!, formalizationLink)} disabled={!formalizationLink}>
+                    Confirmar Aceite
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
       <Dialog open={!!viewingProposalId} onOpenChange={(open) => !open && setViewingProposalId(null)}>
         <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
@@ -1126,20 +1161,9 @@ export default function ClientDetailPage() {
                                                                         <DropdownMenuItem onSelect={() => setViewingProposalId(p.id)}>
                                                                             <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
                                                                         </DropdownMenuItem>
-                                                                        <AlertDialog>
-                                                                            <AlertDialogTrigger asChild>
-                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
-                                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
-                                                                                </DropdownMenuItem>
-                                                                            </AlertDialogTrigger>
-                                                                            <AlertDialogContent>
-                                                                                <AlertDialogHeader><AlertDialogTitle>Aceitar esta proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> no valor de R$ {p.value.toLocaleString('pt-br')} será marcada como "Finalizada" e as outras serão "Canceladas". O cliente será movido para "Aprovado".</AlertDialogDescription></AlertDialogHeader>
-                                                                                <AlertDialogFooter>
-                                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                                    <AlertDialogAction onClick={() => handleAcceptProposal(p)}>Sim, aceitar</AlertDialogAction>
-                                                                                </AlertDialogFooter>
-                                                                            </AlertDialogContent>
-                                                                        </AlertDialog>
+                                                                        <DropdownMenuItem onSelect={() => setProposalToAccept(p)} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
+                                                                            <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
+                                                                        </DropdownMenuItem>
                                                                         <DropdownMenuSeparator />
                                                                         <AlertDialog>
                                                                             <AlertDialogTrigger asChild>
