@@ -31,6 +31,8 @@ export type ProposalSummary = {
   productName: string;
   bankName?: string;
   value: number;
+  installments?: number;
+  installmentValue?: number;
   status: ProposalStatus;
   createdAt: string;
   approvedAt?: string;

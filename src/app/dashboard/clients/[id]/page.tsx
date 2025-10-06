@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -99,7 +100,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
+import { cn, calculateMonthlyRate } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -520,6 +521,8 @@ export default function ClientDetailPage() {
                 productName: data.productName,
                 bankName: data.bankName,
                 value: data.value,
+                installments: data.installments,
+                installmentValue: data.installmentValue,
                 status: 'Aberta',
                 createdAt: now
             };
@@ -816,12 +819,12 @@ export default function ClientDetailPage() {
                       </div>
                   </CardHeader>
                   <CardContent>
-                     <Tabs defaultValue="quiz">
+                     <Tabs defaultValue="proposals">
                       <TabsList className="mb-4">
+                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
                         <TabsTrigger value="documents">Documentos</TabsTrigger>
                         <TabsTrigger value="history">Histórico</TabsTrigger>
-                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                       </TabsList>
                        <TabsContent value="quiz">
                           <Card>
@@ -1079,7 +1082,10 @@ export default function ClientDetailPage() {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Produto</TableHead>
-                                                <TableHead>Valor</TableHead>
+                                                <TableHead>Valor Principal</TableHead>
+                                                <TableHead>Parcelas</TableHead>
+                                                <TableHead>Juros (Mês)</TableHead>
+                                                <TableHead>Juros (Ano)</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead>Criado em</TableHead>
                                                 <TableHead>Aprovado em</TableHead>
@@ -1089,67 +1095,75 @@ export default function ClientDetailPage() {
                                         <TableBody>
                                             {isLoadingProposals ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="h-24 text-center">
+                                                    <TableCell colSpan={9} className="h-24 text-center">
                                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                                     </TableCell>
                                                 </TableRow>
                                             ) : proposals?.length > 0 ? (
-                                                proposals.map(p => (
-                                                <TableRow key={p.id}>
-                                                    <TableCell>
-                                                        <div className="font-medium">{p.productName}</div>
-                                                        <div className="text-sm text-muted-foreground">{p.bankName}</div>
-                                                    </TableCell>
-                                                    <TableCell>R$ {p.value.toLocaleString('pt-BR')}</TableCell>
-                                                    <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
-                                                    <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>
-                                                    <TableCell>{p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onSelect={() => setViewingProposalId(p.id)}>
-                                                                    <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
-                                                                </DropdownMenuItem>
-                                                                <AlertDialog>
-                                                                    <AlertDialogTrigger asChild>
-                                                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
-                                                                            <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
+                                                proposals.map(p => {
+                                                    const monthlyRate = p.installments && p.installmentValue ? calculateMonthlyRate(p.value, p.installments, p.installmentValue) : 0;
+                                                    const annualRate = monthlyRate > 0 ? (Math.pow(1 + monthlyRate, 12) - 1) : 0;
+
+                                                    return (
+                                                        <TableRow key={p.id}>
+                                                            <TableCell>
+                                                                <div className="font-medium">{p.productName}</div>
+                                                                <div className="text-sm text-muted-foreground">{p.bankName}</div>
+                                                            </TableCell>
+                                                            <TableCell>R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</TableCell>
+                                                            <TableCell>{p.installments ? `${p.installments}x de R$ ${p.installmentValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'N/A'}</TableCell>
+                                                            <TableCell className="font-mono">{(monthlyRate * 100).toFixed(2)}%</TableCell>
+                                                            <TableCell className="font-mono">{(annualRate * 100).toFixed(2)}%</TableCell>
+                                                            <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
+                                                            <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                                                            <TableCell>{p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>
+                                                            <TableCell className="text-right">
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger asChild>
+                                                                        <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end">
+                                                                        <DropdownMenuItem onSelect={() => setViewingProposalId(p.id)}>
+                                                                            <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
                                                                         </DropdownMenuItem>
-                                                                    </AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader><AlertDialogTitle>Aceitar esta proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> no valor de R$ {p.value.toLocaleString('pt-br')} será marcada como "Finalizada" e as outras serão "Canceladas". O cliente será movido para "Aprovado".</AlertDialogDescription></AlertDialogHeader>
-                                                                        <AlertDialogFooter>
-                                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                            <AlertDialogAction onClick={() => handleAcceptProposal(p)}>Sim, aceitar</AlertDialogAction>
-                                                                        </AlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
-                                                                <DropdownMenuSeparator />
-                                                                 <AlertDialog>
-                                                                    <AlertDialogTrigger asChild>
-                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                                                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                                                                        </DropdownMenuItem>
-                                                                    </AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader><AlertDialogTitle>Excluir Proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> será permanentemente removida.</AlertDialogDescription></AlertDialogHeader>
-                                                                        <AlertDialogFooter>
-                                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                            <AlertDialogAction onClick={() => handleDeleteProposal(p)} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
-                                                                        </AlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                                ))
+                                                                        <AlertDialog>
+                                                                            <AlertDialogTrigger asChild>
+                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
+                                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
+                                                                                </DropdownMenuItem>
+                                                                            </AlertDialogTrigger>
+                                                                            <AlertDialogContent>
+                                                                                <AlertDialogHeader><AlertDialogTitle>Aceitar esta proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> no valor de R$ {p.value.toLocaleString('pt-br')} será marcada como "Finalizada" e as outras serão "Canceladas". O cliente será movido para "Aprovado".</AlertDialogDescription></AlertDialogHeader>
+                                                                                <AlertDialogFooter>
+                                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                    <AlertDialogAction onClick={() => handleAcceptProposal(p)}>Sim, aceitar</AlertDialogAction>
+                                                                                </AlertDialogFooter>
+                                                                            </AlertDialogContent>
+                                                                        </AlertDialog>
+                                                                        <DropdownMenuSeparator />
+                                                                        <AlertDialog>
+                                                                            <AlertDialogTrigger asChild>
+                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                                                                </DropdownMenuItem>
+                                                                            </AlertDialogTrigger>
+                                                                            <AlertDialogContent>
+                                                                                <AlertDialogHeader><AlertDialogTitle>Excluir Proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> será permanentemente removida.</AlertDialogDescription></AlertDialogHeader>
+                                                                                <AlertDialogFooter>
+                                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                    <AlertDialogAction onClick={() => handleDeleteProposal(p)} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
+                                                                                </AlertDialogFooter>
+                                                                            </AlertDialogContent>
+                                                                        </AlertDialog>
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })
                                             ) : (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
+                                                    <TableCell colSpan={9} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>
