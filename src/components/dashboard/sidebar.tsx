@@ -17,6 +17,7 @@ export const navItems = [
   {
     label: 'Esteira', icon: CircuitBoard, children: [
       { href: '/dashboard/pipeline/discovery', label: 'Discovery', icon: Users },
+      { href: '/dashboard/pipeline/Documentacao', label: 'Documentação', icon: Users },
       { href: '/dashboard/pipeline/valor', label: 'Valor', icon: DollarSign },
       { href: '/dashboard/pipeline/clearance', label: 'Clearance', icon: Check },
       { href: '/dashboard/pipeline/proposal', label: 'Proposal', icon: FileText },

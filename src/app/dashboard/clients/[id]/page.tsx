@@ -81,7 +81,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase"
+import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase"
 import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
@@ -396,6 +396,16 @@ export default function ClientDetailPage() {
        setViewingDocument(doc);
     };
 
+    const handleInitiateDocumentation = () => {
+        if (!clientRef) return;
+        updateDocumentNonBlocking(clientRef, { status: 'Em análise' });
+        toast({
+            title: "Cliente movido para Documentação",
+            description: `${client?.name} agora está na etapa de coleta de documentos.`
+        });
+        router.push('/dashboard/pipeline/Documentacao');
+    };
+
 
   if (isLoadingClient) {
      return (
@@ -556,7 +566,15 @@ export default function ClientDetailPage() {
                                 <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
                               )}
                             </CardContent>
-                            {client.quizId && (
+                             {client.status === 'Novo' && (
+                                <CardFooter className="border-t px-6 py-4 flex justify-end">
+                                    <Button onClick={handleInitiateDocumentation}>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Iniciar Coleta de Documentos
+                                    </Button>
+                                </CardFooter>
+                            )}
+                            {client.quizId && ! (client.status === 'Novo') && (
                             <CardFooter className="border-t px-6 py-4">
                                 <p className="text-sm text-muted-foreground">Quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
                             </CardFooter>
@@ -645,7 +663,7 @@ export default function ClientDetailPage() {
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
-                                                             <DropdownMenuItem onSelect={() => handleDownload(doc)}>
+                                                             <DropdownMenuItem onClick={() => handleDownload(doc)}>
                                                                 <Download className="mr-2 h-4 w-4" />
                                                                 Baixar
                                                             </DropdownMenuItem>
@@ -735,7 +753,7 @@ export default function ClientDetailPage() {
                                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
                            </Button>
-                            <Button disabled={!allDocumentsValidated}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                            <Button disabled={!allDocumentsValidated}> <Send className="h-4 w-4 mr-2"/> Enviar para Análise de Crédito</Button>
                          </CardFooter>
                       </Card>
                     </TabsContent>
@@ -799,6 +817,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
-
