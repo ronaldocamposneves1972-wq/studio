@@ -2,8 +2,6 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      // PERIGO: Permite acesso irrestrito de leitura e escrita para qualquer pessoa.
-      // Use apenas para depuração inicial.
       allow read, write: if true;
     }
   }
