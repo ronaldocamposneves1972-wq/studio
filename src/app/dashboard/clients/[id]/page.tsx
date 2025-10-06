@@ -428,7 +428,7 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
-  const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image') && !viewingDocument.fileName.toLowerCase().endsWith('.pdf'));
+  const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image'));
 
 
   return (
@@ -604,9 +604,13 @@ export default function ClientDetailPage() {
                                                     break;
                                            }
                                            
-                                           const isFinalStatus = doc.validationStatus === 'validated' || doc.validationStatus === 'rejected';
                                            const oneHour = 60 * 60 * 1000;
+                                           const isFinalStatus = doc.validationStatus === 'validated' || doc.validationStatus === 'rejected';
                                            const isLocked = isFinalStatus && doc.statusUpdatedAt && (new Date().getTime() - new Date(doc.statusUpdatedAt).getTime()) > oneHour;
+                                           
+                                           const canValidate = !isLocked && status !== 'validated';
+                                           const canReject = !isLocked && status !== 'rejected';
+                                           const canMarkPending = !isLocked && status !== 'pending';
 
                                            return (
                                             <TableRow key={doc.id}>
@@ -639,7 +643,7 @@ export default function ClientDetailPage() {
 
                                                             <AlertDialog>
                                                                 <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isLocked}>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!canValidate}>
                                                                         <CheckCircle2 className="mr-2 h-4 w-4" />
                                                                         Validar
                                                                     </DropdownMenuItem>
@@ -660,7 +664,7 @@ export default function ClientDetailPage() {
 
                                                             <AlertDialog>
                                                                 <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isLocked}>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!canReject}>
                                                                         <XCircle className="mr-2 h-4 w-4" />
                                                                         Rejeitar
                                                                     </DropdownMenuItem>
@@ -679,7 +683,7 @@ export default function ClientDetailPage() {
                                                                 </AlertDialogContent>
                                                             </AlertDialog>
 
-                                                             <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')} disabled={isLocked}>
+                                                             <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')} disabled={!canMarkPending}>
                                                                 <Clock className="mr-2 h-4 w-4" />
                                                                 Marcar como Pendente
                                                             </DropdownMenuItem>
@@ -785,3 +789,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
