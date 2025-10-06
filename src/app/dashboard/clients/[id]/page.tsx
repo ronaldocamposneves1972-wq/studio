@@ -914,7 +914,7 @@ export default function ClientDetailPage() {
                                   <CardTitle>Propostas</CardTitle>
                                   <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
                               </CardHeader>
-                               {client.status === 'Pendente' ? (
+                              {client.status === 'Pendente' ? (
                                   <CardContent className="text-center py-10">
                                       <div className="flex flex-col items-center gap-4">
                                           <h3 className="text-lg font-semibold">Aguardando Análise de Propostas</h3>
@@ -995,3 +995,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
