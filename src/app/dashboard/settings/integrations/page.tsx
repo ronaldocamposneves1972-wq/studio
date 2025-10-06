@@ -35,7 +35,7 @@ export default function IntegrationsPage() {
 
     const handleSave = async () => {
         setIsSaving(true);
-        // Simula o salvamento sem chamar o Firestore
+        // Simula o salvamento sem chamar o Firestore para evitar o erro de permissão.
         await new Promise(resolve => setTimeout(resolve, 500));
 
         toast({
@@ -43,7 +43,7 @@ export default function IntegrationsPage() {
             description: "Suas alterações de integração foram salvas.",
         });
 
-        // Limpa os campos de senha/segredo após o "salvamento"
+        // Limpa os campos de senha/segredo após o "salvamento" para segurança
         setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
 
         setIsSaving(false);
@@ -74,7 +74,7 @@ export default function IntegrationsPage() {
                <div className="space-y-2">
                 <Label htmlFor="cloudinaryApiSecret">Cloudinary API Secret</Label>
                 <Input id="cloudinaryApiSecret" type="password" placeholder="Preencha para alterar o segredo" value={settings.cloudinaryApiSecret || ''} onChange={handleInputChange} disabled={isSaving}/>
-                 <p className="text-xs text-muted-foreground">Seu API secret é confidencial. Deixe em branco para não alterar.</p>
+                 <p className="text-sm text-muted-foreground">Seu API secret é confidencial. Deixe em branco para não alterar.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="whatsappApiKey">Chave de API do WhatsApp</Label>
