@@ -806,28 +806,36 @@ export default function ClientDetailPage() {
                                   </Table>
                               )}
                           </CardContent>
-                           <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
-                             <div className="flex-grow flex items-center gap-2 min-w-[300px]">
-                                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                                 <Button onClick={handleFileSelect} disabled={isUploading}>
-                                     {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                     {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
-                                 </Button>
-                                 <div className="flex-1">
-                                      <div className="flex gap-2">
-                                          <Input id="quiz-link" value={quizLink} readOnly className="h-9 bg-muted/50" />
-                                          <Button variant="outline" size="icon" className="h-9 w-9" onClick={handleCopyLink}>
-                                              {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                          </Button>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground mt-1">Envie este link para o cliente solicitar a documentação.</p>
-                                  </div>
-                              </div>
-                              <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
-                                  <Send className="h-4 w-4 mr-2"/> 
-                                  Enviar para Análise de Crédito
-                              </Button>
-                           </CardFooter>
+                          {client.status === 'Em análise' ? (
+                            <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
+                                <div className="flex-grow flex items-center gap-2 min-w-[300px]">
+                                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                    <Button onClick={handleFileSelect} disabled={isUploading}>
+                                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                        {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
+                                    </Button>
+                                    <div className="flex-1">
+                                        <div className="flex gap-2">
+                                            <Input id="quiz-link" value={quizLink} readOnly className="h-9 bg-muted/50" />
+                                            <Button variant="outline" size="icon" className="h-9 w-9" onClick={handleCopyLink}>
+                                                {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">Envie este link para o cliente solicitar a documentação.</p>
+                                    </div>
+                                </div>
+                                <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
+                                    <Send className="h-4 w-4 mr-2"/> 
+                                    Enviar para Análise de Crédito
+                                </Button>
+                            </CardFooter>
+                          ) : (
+                             <CardFooter className="border-t px-6 py-4">
+                               <p className="text-sm text-muted-foreground">
+                                O cliente já avançou no processo. Não é mais possível adicionar documentos ou enviar para análise.
+                               </p>
+                             </CardFooter>
+                          )}
                         </Card>
                       </TabsContent>
                       <TabsContent value="proposals">
