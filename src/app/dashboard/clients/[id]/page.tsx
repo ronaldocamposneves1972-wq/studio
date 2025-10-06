@@ -436,6 +436,26 @@ export default function ClientDetailPage() {
         router.push('/dashboard/pipeline/Documentacao');
     };
 
+    const handleSendToCreditAnalysis = async () => {
+        if (!clientRef || !user) return;
+        
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}`,
+            activity: `Status alterado para "Pendente"`,
+            details: "Aguardando análise e geração de propostas.",
+            timestamp: new Date().toISOString(),
+            user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+        };
+
+        await updateDoc(clientRef, { status: 'Pendente', timeline: arrayUnion(timelineEvent) });
+        
+        toast({
+            title: "Enviado para Análise de Crédito",
+            description: `${client?.name} está na etapa de cotação de valor.`
+        });
+        router.push('/dashboard/pipeline/valor');
+    };
+
 
   if (isLoadingClient) {
      return (
@@ -793,7 +813,10 @@ export default function ClientDetailPage() {
                                     <p className="text-xs text-muted-foreground mt-1">Envie este link para o cliente solicitar a documentação.</p>
                                 </div>
                             </div>
-                            <Button disabled={!allDocumentsValidated}> <Send className="h-4 w-4 mr-2"/> Enviar para Análise de Crédito</Button>
+                            <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
+                                <Send className="h-4 w-4 mr-2"/> 
+                                Enviar para Análise de Crédito
+                            </Button>
                          </CardFooter>
                       </Card>
                     </TabsContent>
@@ -835,5 +858,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
