@@ -81,8 +81,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase"
-import { doc, arrayUnion, arrayRemove } from "firebase/firestore"
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase"
+import { doc, arrayUnion, arrayRemove, updateDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -194,29 +194,45 @@ export default function ClientDetailPage() {
     return doc(firestore, 'clients', clientId)
   }, [firestore, clientId])
 
-  const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
+  const { data: client, isLoading: isLoadingClient, error } = useDoc<Client>(clientRef);
 
   const proposals = allProposals.filter(p => p.clientName === client?.name)
 
-  const handleStatusChange = (newStatus: ClientStatus) => {
+  const handleStatusChange = async (newStatus: ClientStatus) => {
     if (!clientRef) return;
-    updateDocumentNonBlocking(clientRef, { status: newStatus });
-    toast({
-      title: "Status atualizado!",
-      description: `O status do cliente foi alterado para ${newStatus}.`,
-    })
+    try {
+      await updateDoc(clientRef, { status: newStatus });
+      toast({
+        title: "Status atualizado!",
+        description: `O status do cliente foi alterado para ${newStatus}.`,
+      })
+    } catch(e) {
+        console.error(e)
+        toast({
+            variant: "destructive",
+            title: "Erro ao atualizar",
+            description: "Não foi possível atualizar o status."
+        })
+    }
   }
   
-  const handleDeleteClient = () => {
+  const handleDeleteClient = async () => {
     if (!clientRef) return;
-    // This is a non-blocking delete. We might need a blocking one if we navigate away.
-    // For now, let's assume it's okay.
-    deleteDocumentNonBlocking(clientRef);
-    toast({
-      title: "Cliente excluído!",
-      description: "O cliente foi removido com sucesso.",
-    });
-    router.push('/dashboard/clients');
+    try {
+        await deleteDoc(clientRef);
+        toast({
+        title: "Cliente excluído!",
+        description: "O cliente foi removido com sucesso.",
+        });
+        router.push('/dashboard/clients');
+    } catch(e) {
+        console.error(e)
+        toast({
+            variant: "destructive",
+            title: "Erro ao excluir",
+            description: "Não foi possível excluir o cliente."
+        })
+    }
   }
 
   const handleFileSelect = () => {
@@ -262,7 +278,7 @@ export default function ClientDetailPage() {
         uploadedAt: new Date().toISOString(),
       };
       
-      updateDocumentNonBlocking(clientRef, {
+      await updateDoc(clientRef, {
         documents: arrayUnion(newDocument)
       });
 
@@ -305,7 +321,7 @@ export default function ClientDetailPage() {
         }
 
         // Step 2: If Cloudinary deletion is successful, remove the reference from Firestore
-        updateDocumentNonBlocking(clientRef, {
+        await updateDoc(clientRef, {
             documents: arrayRemove(docToDelete)
         });
 
@@ -362,6 +378,7 @@ export default function ClientDetailPage() {
         <div className="flex flex-col items-center gap-1 text-center">
           <h3 className="text-2xl font-bold tracking-tight">Cliente não encontrado</h3>
           <p className="text-sm text-muted-foreground">O cliente que você está procurando não existe ou foi excluído.</p>
+           {error && <p className="text-xs text-destructive mt-2">{error.message}</p>}
           <Button className="mt-4" asChild>
             <Link href="/dashboard/clients">Voltar para Clientes</Link>
           </Button>
@@ -380,7 +397,7 @@ export default function ClientDetailPage() {
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
             <DialogDescription>Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
           </DialogHeader>
-          <div className="h-full w-full">
+          <div className="h-full w-full relative">
             {viewingDocument && (
               viewingDocument.fileType.startsWith('image') ? (
                 <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
@@ -404,14 +421,14 @@ export default function ClientDetailPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Select onValueChange={handleStatusChange} value={client.status}>
+                            <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status}>
                                 <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Novo"><Badge variant="secondary" className="mr-2"/>Novo</SelectItem>
-                                    <SelectItem value="Em análise"><Badge variant="secondary" className="mr-2"/>Em análise</SelectItem>
-                                    <SelectItem value="Pendente"><Badge variant="outline" className="mr-2"/>Pendente</SelectItem>
-                                    <SelectItem value="Aprovado"><Badge variant="default" className="mr-2"/>Aprovado</SelectItem>
-                                    <SelectItem value="Reprovado"><Badge variant="destructive" className="mr-2"/>Reprovado</SelectItem>
+                                    <SelectItem value="Novo">Novo</SelectItem>
+                                    <SelectItem value="Em análise">Em análise</SelectItem>
+                                    <SelectItem value="Pendente">Pendente</SelectItem>
+                                    <SelectItem value="Aprovado">Aprovado</SelectItem>
+                                    <SelectItem value="Reprovado">Reprovado</SelectItem>
                                 </SelectContent>
                             </Select>
                              <DropdownMenu>
@@ -648,3 +665,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
