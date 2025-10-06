@@ -382,7 +382,7 @@ export default function ClientDetailPage() {
             if (urlParts.length === 2) {
                 // Ensure `fl_inline` is added correctly, even with existing transformations
                 const pathParts = urlParts[1].split('/');
-                const transformations = pathParts.slice(0, -2); // Assumes version and public_id are last parts
+                const transformations = pathParts.slice(0, pathParts.length - 2); 
                 const version = pathParts[pathParts.length - 2];
                 const publicId = pathParts[pathParts.length - 1];
 
@@ -445,10 +445,10 @@ export default function ClientDetailPage() {
           </DialogHeader>
           <div className="h-full w-full relative bg-muted">
             {viewingDocument && (
-              viewingDocument.fileType.startsWith('image') || !viewingDocument.fileName.toLowerCase().endsWith('.pdf') ? (
-                <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
-              ) : (
+              viewingDocument.fileName.toLowerCase().endsWith('.pdf') ? (
                 <iframe src={getDocumentViewUrl(viewingDocument)} className="h-full w-full border-0" title={viewingDocument.fileName} />
+              ) : (
+                <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
               )
             )}
           </div>
@@ -723,3 +723,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
