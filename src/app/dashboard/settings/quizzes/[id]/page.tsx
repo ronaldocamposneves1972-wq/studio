@@ -33,6 +33,17 @@ import { useFirestore, useUser, useDoc, updateDocumentNonBlocking, useMemoFireba
 import type { Quiz, QuizPlacement } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
@@ -243,16 +254,37 @@ export default function EditQuizPage() {
                 <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
                 {fields.map((field, index) => (
                   <div key={field.id} className="grid gap-4 border p-4 rounded-lg relative">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-7 w-7"
-                      onClick={() => remove(index)}
-                      disabled={isSubmitting}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                         <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7"
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir pergunta?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. A pergunta "{field.text || `Pergunta ${index + 1}`}" será removida.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => remove(index)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Sim, excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    
                     <div className="grid md:grid-cols-3 gap-4">
                        <FormField
                           control={form.control}

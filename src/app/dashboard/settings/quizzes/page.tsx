@@ -90,12 +90,17 @@ export default function QuizzesPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Essa ação não pode ser desfeita. Isso irá deletar permanentemente o quiz "{quiz.name}".
+                      Essa ação não pode ser desfeita. Isso irá deletar permanentemente o quiz "<strong>{quiz.name}</strong>".
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteQuiz(quiz.id, quiz.name)}>Continuar</AlertDialogAction>
+                    <AlertDialogAction 
+                        onClick={() => handleDeleteQuiz(quiz.id, quiz.name)}
+                        className="bg-destructive hover:bg-destructive/90"
+                    >
+                        Sim, excluir
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
