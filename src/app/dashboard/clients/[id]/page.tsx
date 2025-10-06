@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -7,7 +8,6 @@ import {
   ChevronLeft,
   Copy,
   CreditCard,
-  File,
   ListFilter,
   MoreVertical,
   Truck,
@@ -27,6 +27,8 @@ import {
   FileText,
   Loader2,
   Check,
+  Eye,
+  MoreHorizontal
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useParams } from 'next/navigation'
@@ -80,7 +82,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
-import { doc, arrayUnion } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -99,6 +101,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -116,7 +127,7 @@ const getStatusVariant = (status: ClientStatus) => {
 }
 
 const getTimelineIcon = (activity: string) => {
-    if (activity.toLowerCase().includes('proposta')) return <File className="h-4 w-4 text-muted-foreground" />;
+    if (activity.toLowerCase().includes('proposta')) return <FileText className="h-4 w-4 text-muted-foreground" />;
     if (activity.toLowerCase().includes('documentos')) return <Upload className="h-4 w-4 text-muted-foreground" />;
     if (activity.toLowerCase().includes('quiz')) return <MessageSquare className="h-4 w-4 text-muted-foreground" />;
     if (activity.toLowerCase().includes('cadastrado')) return <User className="h-4 w-4 text-muted-foreground" />;
@@ -161,6 +172,7 @@ export default function ClientDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [quizLink, setQuizLink] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -272,6 +284,19 @@ export default function ClientDetailPage() {
     }
   };
 
+  const handleDeleteDocument = (docToDelete: ClientDocument) => {
+    if (!clientRef) return;
+    
+    updateDocumentNonBlocking(clientRef, {
+      documents: arrayRemove(docToDelete)
+    });
+    
+    toast({
+      title: "Documento excluído",
+      description: `${docToDelete.fileName} foi removido.`
+    })
+  }
+
 
   const translatedLabels: { [key: string]: string } = {
     'name': 'Nome', 'email': 'Email', 'phone': 'Telefone', 'cpf': 'CPF', 'birthdate': 'Data de Nascimento',
@@ -321,6 +346,24 @@ export default function ClientDetailPage() {
   const documents = client.documents || [];
 
   return (
+    <>
+      <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
+        <DialogContent className="max-w-4xl h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
+            <DialogDescription>Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
+          </DialogHeader>
+          <div className="h-full w-full">
+            {viewingDocument && (
+              viewingDocument.fileType.startsWith('image') ? (
+                <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
+              ) : (
+                <iframe src={viewingDocument.secureUrl} className="h-full w-full border-0" title={viewingDocument.fileName} />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
         <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
             <Card>
@@ -462,12 +505,46 @@ export default function ClientDetailPage() {
                                                 <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
                                                 <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer">
-                                                            <Download className="mr-2 h-4 w-4" />
-                                                            Baixar
-                                                        </a>
-                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button size="icon" variant="ghost">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                Ver
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => toast({ title: "Funcionalidade em desenvolvimento."})}>
+                                                                <Check className="mr-2 h-4 w-4" />
+                                                                Validar
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                             <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                                        Deletar
+                                                                    </DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido.
+                                                                    </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteDocument(doc)} className="bg-destructive hover:bg-destructive/90">
+                                                                        Sim, excluir
+                                                                    </AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -541,7 +618,10 @@ export default function ClientDetailPage() {
             </Card>
         </div>
     </div>
+    </>
   )
 }
+
+    
 
     
