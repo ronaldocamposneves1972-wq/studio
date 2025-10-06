@@ -101,7 +101,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     const renderInput = (field: any) => {
         const mask = getMaskFunction(currentQuestion.id);
-        const selectedFiles = form.watch(currentQuestion.id) as FileList | null;
+        const selectedFiles = form.watch(field.name) as FileList | null;
 
         switch (currentQuestion.type) {
             case 'file':
