@@ -198,43 +198,33 @@ export default function ClientDetailPage() {
     toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
 
     try {
-      // NOTE: This approach uses an unsigned upload preset for simplicity.
-      // For production, a signed upload from a server-side route is more secure.
       const formData = new FormData();
       formData.append('file', file);
-      // This is a common preset name, but you must create an 'unsigned' upload preset 
-      // in your Cloudinary account and name it 'consorciatech' or change this value.
-      formData.append('upload_preset', 'consorciatech'); 
-      formData.append('folder', `clients/${clientId}`);
-
-      // You need to set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in your .env.local file
-      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-      if (!cloudName) {
-        throw new Error('A variável de ambiente NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME não está definida.');
-      }
+      formData.append('clientId', clientId);
       
-      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Falha no upload para o Cloudinary.');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Falha no upload do servidor.');
       }
 
-      const cloudinaryData = await uploadResponse.json();
+      const uploadData = await uploadResponse.json();
 
       const newDocument: ClientDocument = {
-        id: cloudinaryData.public_id,
+        id: uploadData.public_id,
         clientId: clientId,
-        fileName: cloudinaryData.original_filename || file.name,
-        fileType: cloudinaryData.resource_type || 'raw',
-        cloudinaryPublicId: cloudinaryData.public_id,
-        secureUrl: cloudinaryData.secure_url,
+        fileName: uploadData.original_filename || file.name,
+        fileType: uploadData.resource_type || 'raw',
+        cloudinaryPublicId: uploadData.public_id,
+        secureUrl: uploadData.secure_url,
         uploadedAt: new Date().toISOString(),
       };
       
-      await updateDocumentNonBlocking(clientRef, {
+      updateDocumentNonBlocking(clientRef, {
         documents: arrayUnion(newDocument)
       });
 
@@ -248,7 +238,7 @@ export default function ClientDetailPage() {
       toast({
         variant: 'destructive',
         title: 'Erro no Upload',
-        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Verifique as configurações do Cloudinary.',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
       });
     } finally {
       setIsUploading(false);
@@ -512,5 +502,3 @@ export default function ClientDetailPage() {
     </div>
   )
 }
-
-    
