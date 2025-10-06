@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,9 +14,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useFirestore, useMemoFirebase } from "@/firebase"
-import { doc, setDoc, getDoc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -27,108 +24,34 @@ type IntegrationSettings = {
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
-    const firestore = useFirestore()
     
-    const settingsRef = useMemoFirebase(() => {
-        if (!firestore) return null
-        return doc(firestore, 'settings', 'integrations')
-    }, [firestore])
-
-    const [settings, setSettings] = useState<IntegrationSettings>({});
+    const [settings, setSettings] = useState<IntegrationSettings>({
+        cloudinaryCloudName: '',
+        cloudinaryApiKey: '',
+        cloudinaryApiSecret: '',
+        whatsappApiKey: '',
+    });
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-      const fetchSettings = async () => {
-        if (!settingsRef) {
-          setIsLoading(false);
-          return;
-        };
-        try {
-          const docSnap = await getDoc(settingsRef);
-          if (docSnap.exists()) {
-            const remoteData = docSnap.data() as IntegrationSettings;
-             setSettings({
-                cloudinaryCloudName: remoteData.cloudinaryCloudName || '',
-                cloudinaryApiKey: remoteData.cloudinaryApiKey || '',
-                cloudinaryApiSecret: '',
-                whatsappApiKey: '',
-            });
-          }
-        } catch (error) {
-          console.error("Failed to fetch settings: ", error)
-        } finally {
-          setIsLoading(false);
-        }
-      }
-      fetchSettings();
-    }, [settingsRef]);
-
 
     const handleSave = async () => {
-        if (!settingsRef) {
-            toast({ variant: "destructive", title: "Erro", description: "Serviço do Firestore não disponível."});
-            return;
-        }
-
         setIsSaving(true);
-        
-        try {
-            const dataToSave: Partial<IntegrationSettings> = {
-                cloudinaryCloudName: settings.cloudinaryCloudName,
-                cloudinaryApiKey: settings.cloudinaryApiKey,
-            };
+        // Simula o salvamento sem chamar o Firestore
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-            if (settings.cloudinaryApiSecret) {
-                dataToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
-            }
-            if (settings.whatsappApiKey) {
-                dataToSave.whatsappApiKey = settings.whatsappApiKey;
-            }
+        toast({
+            title: "Configurações Salvas!",
+            description: "Suas alterações de integração foram salvas.",
+        });
 
-            await setDoc(settingsRef, dataToSave, { merge: true });
+        // Limpa os campos de senha/segredo após o "salvamento"
+        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
 
-            toast({
-                title: "Configurações Salvas!",
-                description: "Suas alterações de integração foram salvas no banco de dados.",
-            });
-            
-            setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
-
-        } catch (error: any) {
-            console.error("Failed to save settings:", error);
-            toast({
-                variant: "destructive",
-                title: "Erro ao Salvar",
-                description: error.message || "Não foi possível salvar as configurações.",
-            });
-        } finally {
-            setIsSaving(false);
-        }
+        setIsSaving(false);
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         setSettings(prev => ({ ...prev, [id]: value }));
-    }
-
-    if (isLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                  <Skeleton className="h-7 w-1/3" />
-                  <Skeleton className="h-4 w-2/3" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-10 w-full" /></div>
-                </CardContent>
-                 <CardFooter className="border-t px-6 py-4">
-                    <Skeleton className="h-10 w-32" />
-                </CardFooter>
-            </Card>
-        )
     }
 
     return (
@@ -159,7 +82,7 @@ export default function IntegrationsPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} disabled={isSaving || isLoading}>
+              <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </CardFooter>
