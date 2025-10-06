@@ -27,7 +27,9 @@ import {
   Loader2,
   Check,
   Eye,
-  MoreHorizontal
+  MoreHorizontal,
+  PlusCircle,
+  FileWarning
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useParams } from 'next/navigation'
@@ -202,9 +204,17 @@ export default function ClientDetailPage() {
   const proposals = allProposals.filter(p => p.clientName === client?.name)
 
   const handleStatusChange = async (newStatus: ClientStatus) => {
-    if (!clientRef) return;
+    if (!clientRef || !user) return;
+
+    const timelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}`,
+        activity: `Status alterado para "${newStatus}"`,
+        timestamp: new Date().toISOString(),
+        user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+    };
+    
     try {
-      await updateDoc(clientRef, { status: newStatus });
+      await updateDoc(clientRef, { status: newStatus, timeline: arrayUnion(timelineEvent) });
       toast({
         title: "Status atualizado!",
         description: `O status do cliente foi alterado para ${newStatus}.`,
@@ -708,7 +718,7 @@ export default function ClientDetailPage() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent>
-                                                            <DropdownMenuItem onSelect={() => handleViewDocument(doc)}>
+                                                            <DropdownMenuItem onSelect={()={() => handleViewDocument(doc)}}>
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
@@ -822,32 +832,74 @@ export default function ClientDetailPage() {
                     </TabsContent>
                     <TabsContent value="proposals">
                         <Card>
-                            <CardHeader><CardTitle>Propostas</CardTitle></CardHeader>
-                            <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Produto</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Valor</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {proposals.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell>{p.productName}</TableCell>
-                                        <TableCell><Badge variant={p.status === 'Finalizada' ? 'default' : p.status === 'Cancelada' ? 'destructive' : 'secondary'}>{p.status}</Badge></TableCell>
-                                        <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
-                                    </TableRow>
-                                    ))}
-                                     {proposals.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} className="text-center">Nenhuma proposta encontrada.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                            </CardContent>
+                            <CardHeader>
+                                <CardTitle>Propostas</CardTitle>
+                                <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
+                            </CardHeader>
+                             {client.status === 'Pendente' ? (
+                                <CardContent className="text-center py-10">
+                                    <div className="flex flex-col items-center gap-4">
+                                        <h3 className="text-lg font-semibold">Aguardando Análise de Propostas</h3>
+                                        <p className="text-muted-foreground max-w-md">
+                                            Este cliente está na etapa de "Valor". Use as opções abaixo para adicionar oportunidades de crédito ou marcar que não há opções disponíveis no momento.
+                                        </p>
+                                        <div className="flex gap-4 mt-4">
+                                             <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="outline">
+                                                        <FileWarning className="mr-2 h-4 w-4" />
+                                                        Nenhum Crédito Aprovado
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                    <AlertDialogTitle>Confirmar Reprovação?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Deseja mover o cliente <strong>{client.name}</strong> para o status "Reprovado"? Essa ação pode ser revertida manualmente mais tarde.
+                                                    </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleStatusChange('Reprovado')} className="bg-destructive hover:bg-destructive/90">
+                                                        Sim, Reprovar
+                                                    </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            <Button onClick={() => router.push(`/dashboard/proposals/new?clientId=${client.id}`)}>
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Adicionar Oportunidade
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            ) : (
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Produto</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Valor</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {proposals.map(p => (
+                                            <TableRow key={p.id}>
+                                                <TableCell>{p.productName}</TableCell>
+                                                <TableCell><Badge variant={p.status === 'Finalizada' ? 'default' : p.status === 'Cancelada' ? 'destructive' : 'secondary'}>{p.status}</Badge></TableCell>
+                                                <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                            </TableRow>
+                                            ))}
+                                            {proposals.length === 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            )}
                         </Card>
                     </TabsContent>
                   </Tabs>
@@ -858,3 +910,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
