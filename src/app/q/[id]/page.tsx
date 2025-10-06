@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase, useUser } from '@/firebase';
 import { doc, collection, query, where, limit, getDoc, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -11,7 +11,7 @@ import { AppLogo } from '@/components/logo';
 import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Quiz, Client, ClientDocument } from '@/lib/types';
+import type { Quiz, Client, ClientDocument, TimelineEvent } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
 
@@ -21,6 +21,7 @@ export default function StandaloneQuizPage() {
   const { toast } = useToast();
   const params = useParams();
   const firestore = useFirestore();
+  const { user } = useUser();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const quizQuery = useMemoFirebase(() => {
@@ -85,15 +86,36 @@ export default function StandaloneQuizPage() {
         // Execute all file uploads in parallel
         const uploadResults = await Promise.all(fileUploadPromises);
 
-        const newDocuments: ClientDocument[] = uploadResults.map((uploadData) => ({
-            id: uploadData.public_id,
-            clientId: clientId,
-            fileName: uploadData.original_filename,
-            fileType: uploadData.resource_type || 'raw',
-            cloudinaryPublicId: uploadData.public_id,
-            secureUrl: uploadData.secure_url,
-            uploadedAt: new Date().toISOString(),
-        }));
+        const now = new Date().toISOString();
+        const timelineEvents: TimelineEvent[] = [];
+
+        const newDocuments: ClientDocument[] = uploadResults.map((uploadData) => {
+            timelineEvents.push({
+                id: `tl-${Date.now()}-${uploadData.public_id}`,
+                activity: `Documento "${uploadData.original_filename}" enviado via link`,
+                timestamp: now,
+                user: { name: "Cliente" }
+            });
+            return {
+                id: uploadData.public_id,
+                clientId: clientId,
+                fileName: uploadData.original_filename,
+                fileType: uploadData.resource_type || 'raw',
+                cloudinaryPublicId: uploadData.public_id,
+                secureUrl: uploadData.secure_url,
+                uploadedAt: now,
+            };
+        });
+        
+        if (Object.keys(nonFileAnswers).length > 0) {
+             timelineEvents.push({
+                id: `tl-${Date.now()}-answers`,
+                activity: `Respostas adicionais fornecidas via link`,
+                timestamp: now,
+                user: { name: "Cliente" }
+            });
+        }
+
 
         // Now, update Firestore with all data at once
         const clientSnap = await getDoc(clientRef);
@@ -109,6 +131,10 @@ export default function StandaloneQuizPage() {
 
         if (newDocuments.length > 0) {
             updatePayload.documents = arrayUnion(...(clientData.documents || []), ...newDocuments);
+        }
+
+        if (timelineEvents.length > 0) {
+            updatePayload.timeline = arrayUnion(...(clientData.timeline || []), ...timelineEvents);
         }
 
         updateDocumentNonBlocking(clientRef, updatePayload);
@@ -192,3 +218,5 @@ export default function StandaloneQuizPage() {
     </div>
   );
 }
+
+    

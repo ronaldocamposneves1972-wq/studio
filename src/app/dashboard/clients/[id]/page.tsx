@@ -137,9 +137,12 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
     if (!events || events.length === 0) {
         return <p className="text-sm text-muted-foreground">Nenhuma atividade registrada.</p>
     }
+
+    const sortedEvents = [...events].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
     return (
         <div className="space-y-8">
-            {events.map((event) => (
+            {sortedEvents.map((event) => (
                 <div key={event.id} className="flex items-start">
                     <div className="flex-shrink-0">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
@@ -148,9 +151,9 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
                     </div>
                     <div className="ml-4">
                         <p className="font-medium text-sm">{event.activity}</p>
-                        <p className="text-sm text-muted-foreground">{event.details}</p>
+                        {event.details && <p className="text-sm text-muted-foreground">{event.details}</p>}
                         <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(event.timestamp).toLocaleString('pt-BR')} por {event.user.name}
+                            {new Date(event.timestamp).toLocaleString('pt-BR')} por {event.user?.name || 'Sistema'}
                         </p>
                     </div>
                 </div>
@@ -241,7 +244,7 @@ export default function ClientDetailPage() {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !clientId || !clientRef) return;
+    if (!file || !clientId || !clientRef || !user) return;
 
     setIsUploading(true);
     toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
@@ -279,8 +282,17 @@ export default function ClientDetailPage() {
         validationStatus: 'pending',
       };
       
+      const timelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}`,
+        activity: `Documento "${file.name}" enviado`,
+        details: `Tipo: ${uploadData.resource_type}`,
+        timestamp: new Date().toISOString(),
+        user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+      };
+
       await updateDoc(clientRef, {
-        documents: arrayUnion(newDocument)
+        documents: arrayUnion(newDocument),
+        timeline: arrayUnion(timelineEvent)
       });
 
       toast({
@@ -344,7 +356,7 @@ export default function ClientDetailPage() {
   }
 
   const handleValidationStatusChange = async (docToUpdate: ClientDocument, newStatus: DocumentStatus) => {
-    if (!clientRef || !client?.documents) return;
+    if (!clientRef || !client?.documents || !user) return;
     try {
         const now = new Date().toISOString();
         const updatedDocuments = client.documents.map(doc =>
@@ -353,11 +365,20 @@ export default function ClientDetailPage() {
                 validationStatus: newStatus, 
                 statusUpdatedAt: now,
                 validatedAt: newStatus !== 'pending' ? now : doc.validatedAt,
-                validatedBy: newStatus !== 'pending' ? (user?.displayName || 'Sistema') : doc.validatedBy,
+                validatedBy: newStatus !== 'pending' ? (user.displayName || user.email || 'Sistema') : doc.validatedBy,
             } : doc
         );
+        
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}`,
+            activity: `Documento "${docToUpdate.fileName}" ${newStatus === 'validated' ? 'validado' : newStatus === 'rejected' ? 'rejeitado' : 'marcado como pendente'}.`,
+            timestamp: now,
+            user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+        };
+
         await updateDoc(clientRef, {
-            documents: updatedDocuments
+            documents: updatedDocuments,
+            timeline: arrayUnion(timelineEvent)
         });
         toast({
             title: `Status do documento atualizado para ${newStatus}.`,
@@ -395,9 +416,19 @@ export default function ClientDetailPage() {
        setViewingDocument(doc);
     };
 
-    const handleInitiateDocumentation = () => {
-        if (!clientRef) return;
-        updateDocumentNonBlocking(clientRef, { status: 'Em análise' });
+    const handleInitiateDocumentation = async () => {
+        if (!clientRef || !user) return;
+        
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}`,
+            activity: `Status alterado para "Em análise"`,
+            details: "Iniciada a coleta de documentos.",
+            timestamp: new Date().toISOString(),
+            user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+        };
+
+        await updateDoc(clientRef, { status: 'Em análise', timeline: arrayUnion(timelineEvent) });
+        
         toast({
             title: "Cliente movido para Documentação",
             description: `${client?.name} agora está na etapa de coleta de documentos.`
@@ -747,7 +778,7 @@ export default function ClientDetailPage() {
                         </CardContent>
                          <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
                            <div className="flex-grow flex items-center gap-2 min-w-[300px]">
-                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                                <Button onClick={handleFileSelect} disabled={isUploading}>
                                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                    {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}

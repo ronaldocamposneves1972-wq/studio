@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, query, limit, where } from 'firebase/firestore';
+import { addDoc, collection, query, limit, where, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
@@ -11,7 +11,7 @@ import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import type { Quiz } from '@/lib/types';
+import type { Quiz, TimelineEvent } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
 export default function CadastroPage() {
@@ -31,11 +31,21 @@ export default function CadastroPage() {
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
     
+    const now = new Date().toISOString();
+    
+    const timelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}`,
+        activity: "Cliente cadastrado via formulário inicial",
+        timestamp: now,
+        user: { name: "Sistema" }
+    };
+
     const newClient: Record<string, any> = {
       status: 'Novo',
       quizId: quiz?.id || null,
       answers: answers,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      timeline: arrayUnion(timelineEvent)
     };
 
     const fieldMapping: Record<string, string> = {
@@ -150,3 +160,5 @@ export default function CadastroPage() {
     </div>
   );
 }
+
+    

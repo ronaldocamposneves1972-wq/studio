@@ -58,7 +58,7 @@ export type TimelineEvent = {
   details?: string;
   user: {
     name: string;
-    avatarUrl: string;
+    avatarUrl?: string;
   }
 };
 
@@ -145,3 +145,5 @@ export type Transaction = {
   accountId: string;
   accountName?: string;
 };
+
+    
