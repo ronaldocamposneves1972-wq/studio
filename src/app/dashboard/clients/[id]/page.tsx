@@ -73,7 +73,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -82,7 +82,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, useCollection } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -216,11 +216,8 @@ export default function ClientDetailPage() {
 
   const { data: client, isLoading: isLoadingClient, error } = useDoc<Client>(clientRef);
 
-  const proposalsQuery = useMemoFirebase(() => {
-    if (!firestore || !clientId) return null
-    return query(collection(firestore, 'sales_proposals'), where('clientId', '==', clientId))
-  }, [firestore, clientId]);
-  const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
+  const proposals = client?.proposals || [];
+  const isLoadingProposals = isLoadingClient;
 
 
   const handleStatusChange = async (newStatus: ClientStatus) => {
@@ -487,37 +484,59 @@ export default function ClientDetailPage() {
     };
 
     const handleSaveProposal = async (data: any) => {
-        if (!firestore || !user || !client) return;
-
+        if (!firestore || !user || !client || !clientRef) return;
+    
+        const batch = writeBatch(firestore);
+    
         try {
+            // 1. Create the main proposal document in 'sales_proposals'
             const proposalCollection = collection(firestore, 'sales_proposals');
-            const newProposal = {
+            const newProposalRef = doc(proposalCollection); // Create a reference with a new ID
+    
+            const newProposalData: Proposal = {
+                id: newProposalRef.id,
                 ...data,
                 clientId: client.id,
                 clientName: client.name,
                 salesRepId: user.uid,
                 salesRepName: user.displayName || user.email,
-                createdAt: serverTimestamp(),
+                createdAt: new Date().toISOString(),
                 status: 'Aberta'
             };
-            await addDoc(proposalCollection, newProposal);
-            
-             const timelineEvent: TimelineEvent = {
+            batch.set(newProposalRef, newProposalData);
+    
+            // 2. Create the summary to be denormalized into the client document
+            const proposalSummary: ProposalSummary = {
+                id: newProposalRef.id,
+                productName: data.productName,
+                value: data.value,
+                status: 'Aberta'
+            };
+    
+            // 3. Create the timeline event
+            const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-proposal`,
                 activity: `Nova proposta "${data.productName}" criada.`,
                 details: `Valor: R$ ${data.value.toLocaleString('pt-br')}`,
                 timestamp: new Date().toISOString(),
                 user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
             };
-            await updateDoc(doc(firestore, 'clients', client.id), {
-                timeline: arrayUnion(timelineEvent),
+    
+            // 4. Update the client document with the proposal summary and timeline event
+            batch.update(clientRef, {
+                proposals: arrayUnion(proposalSummary),
+                timeline: arrayUnion(timelineEvent)
             });
-            
+    
+            // 5. Commit all writes at once
+            await batch.commit();
+    
             toast({
                 title: "Proposta criada!",
                 description: "A nova proposta foi adicionada ao cliente."
             });
             setIsProposalDialogOpen(false);
+    
         } catch (error) {
             console.error("Error saving proposal:", error);
             toast({
@@ -574,14 +593,12 @@ export default function ClientDetailPage() {
 
   return (
     <>
-      {client && (
-        <ProposalDialog
+      <ProposalDialog
           open={isProposalDialogOpen}
           onOpenChange={setIsProposalDialogOpen}
           onSave={handleSaveProposal}
           client={client}
-        />
-      )}
+      />
       <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
@@ -914,7 +931,7 @@ export default function ClientDetailPage() {
                                   <CardTitle>Propostas</CardTitle>
                                   <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
                               </CardHeader>
-                              {client.status === 'Pendente' ? (
+                               {client.status === 'Pendente' ? (
                                   <CardContent className="text-center py-10">
                                       <div className="flex flex-col items-center gap-4">
                                           <h3 className="text-lg font-semibold">Aguardando Análise de Propostas</h3>

@@ -26,6 +26,13 @@ export type ClientDocument = {
   validatedAt?: string;
 };
 
+export type ProposalSummary = {
+  id: string;
+  productName: string;
+  value: number;
+  status: ProposalStatus;
+}
+
 export type Client = {
   id: string;
   name: string; // Full name
@@ -40,6 +47,7 @@ export type Client = {
   quizId?: string; // Optional: ID of the quiz the client took
   answers?: Record<string, any>; // Optional: Client's answers to the quiz
   documents?: ClientDocument[];
+  proposals?: ProposalSummary[];
   cpf?: string;
   birthDate?: string;
   motherName?: string;
@@ -147,6 +155,8 @@ export type Transaction = {
   accountId: string;
   accountName?: string;
 };
+
+    
 
     
 
