@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState } from 'react';
@@ -70,7 +69,15 @@ export default function StandaloneQuizPage() {
 
         // Separate files from other answers and create upload promises
         for (const key in answers) {
-            if (answers[key] instanceof File) {
+            if (answers[key] instanceof FileList) {
+                const fileList = answers[key] as FileList;
+                for (let i = 0; i < fileList.length; i++) {
+                    const file = fileList[i];
+                     fileUploadPromises.push(
+                        uploadFileToCloudinary(file, clientId).then(uploadData => ({ key, uploadData, originalFile: file }))
+                    );
+                }
+            } else if (answers[key] instanceof File) { // Keep handling for single file inputs just in case
                 const file = answers[key] as File;
                 fileUploadPromises.push(
                     uploadFileToCloudinary(file, clientId).then(uploadData => ({ key, uploadData, originalFile: file }))
@@ -92,11 +99,21 @@ export default function StandaloneQuizPage() {
             secureUrl: uploadData.secure_url,
             uploadedAt: new Date().toISOString(),
         }));
-
+        
+        const uploadedFileUrls: Record<string, {name: string, url: string}[]> = {};
+        
         // Add file info to serializableAnswers, so it's recorded in the `answers` field
         uploadedFiles.forEach(({ key, uploadData }) => {
-            serializableAnswers[key] = { name: uploadData.original_filename, url: uploadData.secure_url };
+             if (!uploadedFileUrls[key]) {
+                uploadedFileUrls[key] = [];
+            }
+            uploadedFileUrls[key].push({ name: uploadData.original_filename, url: uploadData.secure_url });
         });
+
+        for (const key in uploadedFileUrls) {
+            serializableAnswers[key] = uploadedFileUrls[key];
+        }
+
 
         const clientSnap = await getDoc(clientRef);
         if (!clientSnap.exists()) {

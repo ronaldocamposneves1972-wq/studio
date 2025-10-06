@@ -84,6 +84,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     const renderInput = (field: any) => {
         const mask = getMaskFunction(currentQuestion.id);
+        const selectedFiles = field.value as FileList | null;
 
         switch (currentQuestion.type) {
             case 'file':
@@ -91,17 +92,25 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                     <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center">
                         <Upload className="w-12 h-12 text-muted-foreground" />
                         <FormLabel htmlFor={currentQuestion.id} className="mt-4 text-lg cursor-pointer text-primary hover:underline">
-                            Clique para enviar o arquivo
+                            Clique para selecionar os arquivos
                         </FormLabel>
                         <FormControl>
                              <Input
                                 id={currentQuestion.id}
                                 type="file"
                                 className="hidden"
-                                onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
+                                multiple // Allow multiple file selection
+                                onChange={(e) => field.onChange(e.target.files)}
                             />
                         </FormControl>
-                        {field.value && <p className="mt-2 text-sm text-muted-foreground">Arquivo selecionado: {(field.value as File).name}</p>}
+                        {selectedFiles && selectedFiles.length > 0 && (
+                            <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                                <p className="font-semibold">Arquivos selecionados:</p>
+                                {Array.from(selectedFiles).map((file, index) => (
+                                    <p key={index}>{file.name}</p>
+                                ))}
+                            </div>
+                        )}
                         <FormMessage />
                     </div>
                 );
