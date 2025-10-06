@@ -926,84 +926,82 @@ export default function ClientDetailPage() {
                         </Card>
                       </TabsContent>
                        <TabsContent value="proposals">
-                          <Card>
-                              <CardHeader>
-                                  <CardTitle>Propostas</CardTitle>
-                                  <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
-                              </CardHeader>
-                              {client.status === 'Pendente' ? (
-                                  <CardContent className="text-center py-10">
-                                      <div className="flex flex-col items-center gap-4">
-                                          <h3 className="text-lg font-semibold">Aguardando Análise de Propostas</h3>
-                                          <p className="text-muted-foreground max-w-md">
-                                              Este cliente está na etapa de "Valor". Use as opções abaixo para adicionar oportunidades de crédito ou marcar que não há opções disponíveis no momento.
-                                          </p>
-                                          <div className="flex gap-4 mt-4">
-                                               <AlertDialog>
-                                                  <AlertDialogTrigger asChild>
-                                                      <Button variant="outline">
-                                                          <FileWarning className="mr-2 h-4 w-4" />
-                                                          Nenhum Crédito Aprovado
-                                                      </Button>
-                                                  </AlertDialogTrigger>
-                                                  <AlertDialogContent>
-                                                      <AlertDialogHeader>
-                                                      <AlertDialogTitle>Confirmar Reprovação?</AlertDialogTitle>
-                                                      <AlertDialogDescription>
-                                                          Deseja mover o cliente <strong>{client.name}</strong> para o status "Reprovado"? Essa ação pode ser revertida manualmente mais tarde.
-                                                      </AlertDialogDescription>
-                                                      </AlertDialogHeader>
-                                                      <AlertDialogFooter>
-                                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                      <AlertDialogAction onClick={() => handleStatusChange('Reprovado')} className="bg-destructive hover:bg-destructive/90">
-                                                          Sim, Reprovar
-                                                      </AlertDialogAction>
-                                                      </AlertDialogFooter>
-                                                  </AlertDialogContent>
-                                              </AlertDialog>
-                                              <Button onClick={() => setIsProposalDialogOpen(true)}>
-                                                  <PlusCircle className="mr-2 h-4 w-4" />
-                                                  Adicionar Oportunidade
-                                              </Button>
-                                          </div>
-                                      </div>
-                                  </CardContent>
-                              ) : (
-                                  <CardContent>
-                                      <Table>
-                                          <TableHeader>
-                                              <TableRow>
-                                                  <TableHead>Produto</TableHead>
-                                                  <TableHead>Status</TableHead>
-                                                  <TableHead className="text-right">Valor</TableHead>
-                                              </TableRow>
-                                          </TableHeader>
-                                          <TableBody>
-                                              {isLoadingProposals ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Propostas</CardTitle>
+                                    <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Produto</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Valor</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLoadingProposals ? (
                                                 <TableRow>
                                                     <TableCell colSpan={3} className="h-24 text-center">
                                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                                     </TableCell>
                                                 </TableRow>
-                                              ) : proposals?.length > 0 ? (
+                                            ) : proposals?.length > 0 ? (
                                                 proposals.map(p => (
-                                                  <TableRow key={p.id}>
-                                                      <TableCell>{p.productName}</TableCell>
-                                                      <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
-                                                      <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
-                                                  </TableRow>
+                                                <TableRow key={p.id}>
+                                                    <TableCell>{p.productName}</TableCell>
+                                                    <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
+                                                    <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                                </TableRow>
                                                 ))
-                                              ) : (
-                                                  <TableRow>
-                                                      <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
-                                                  </TableRow>
-                                              )}
-                                          </TableBody>
-                                      </Table>
-                                  </CardContent>
-                              )}
-                          </Card>
-                      </TabsContent>
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+
+                                    {client.status === 'Pendente' && (
+                                        <div className="text-center py-6 border-t">
+                                            <h3 className="text-lg font-semibold mb-2">Gerenciar Oportunidades</h3>
+                                            <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                                                Adicione novas propostas ou marque o cliente como reprovado.
+                                            </p>
+                                            <div className="flex justify-center gap-4 mt-4">
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="outline">
+                                                            <FileWarning className="mr-2 h-4 w-4" />
+                                                            Nenhum Crédito Aprovado
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Confirmar Reprovação?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Deseja mover o cliente <strong>{client.name}</strong> para o status "Reprovado"? Essa ação pode ser revertida manualmente mais tarde.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleStatusChange('Reprovado')} className="bg-destructive hover:bg-destructive/90">
+                                                                Sim, Reprovar
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                                <Button onClick={() => setIsProposalDialogOpen(true)}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                                    Adicionar Oportunidade
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
                     </Tabs>
                   </CardContent>
               </Card>
@@ -1012,5 +1010,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
