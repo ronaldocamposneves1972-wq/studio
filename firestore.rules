@@ -1,223 +1,244 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech Application
+ * @fileoverview Firestore Security Rules for ConsorciaTech application.
  *
  * Core Philosophy:
- * This ruleset employs a strict data ownership model where users primarily have access only to their own data or data explicitly shared with them.
- * Authorization is enforced through a combination of path-based rules and denormalized fields within documents, avoiding costly `get()` operations.
+ * This ruleset prioritizes authorization independence by denormalizing data to avoid costly `get()` calls
+ * and enforces strict access control based on path-based ownership. All write operations are guarded by
+ * authentication checks, and read operations are generally public unless the data is user-specific.
  *
  * Data Structure:
- * - Users: `/users/{userId}` - Stores user profiles; access is limited to the authenticated user.
- * - Admins: `/roles_admin/{userId}` - Document existence grants admin privileges.
- * - Clients: `/clients/{clientId}` - Stores client profiles; potentially accessible to authorized personnel.
- * - Client Documents: `/clients/{clientId}/documents/{documentId}` - Documents associated with a specific client.
- * - Products: `/consortiums/{consortiumId}`, `/credit_products/{creditProductId}` - Publicly readable product catalogs.
- * - Product Combos: `/product_combos/{productComboId}` - Publicly readable product combinations.
- * - Sales Proposals: `/sales_proposals/{salesProposalId}` - Proposals linked to a specific client, with denormalized `clientId` for access control.
- * - Commissions: `/commissions/{commissionId}` - Commission records.
- * - Quizzes: `/quizzes/{quizId}` - Quiz data.
- * - Questions: `/questions/{questionId}` - Question data.
+ * - /users/{userId}: Stores user profiles; owned by the user.
+ * - /roles_admin/{userId}: Document existence determines admin role.
+ * - /clients/{clientId}: Stores client information; publicly accessible for reads, writes restricted.
+ * - /clients/{clientId}/documents/{documentId}: Stores client documents; owned by the client.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data; publicly accessible for reads, writes restricted.
+ * - /consortiums/{consortiumId}: Stores consortium product data; publicly accessible for reads, writes restricted.
+ * - /credit_products/{creditProductId}: Stores credit product data; publicly accessible for reads, writes restricted.
+ * - /product_combos/{productComboId}: Stores product combo data; publicly accessible for reads, writes restricted.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data; access controlled by denormalized clientId.
+ * - /commissions/{commissionId}: Stores commission data; publicly accessible for reads, writes restricted.
+ * - /quizzes/{quizId}: Stores quiz data; publicly accessible for reads, writes restricted.
+ * - /questions/{questionId}: Stores question data; publicly accessible for reads, writes restricted.
  *
  * Key Security Decisions:
- * - **No User Listing**: Listing all users is explicitly denied to prevent information harvesting.
- * - **Admin Role**: Admin privileges are granted based on the existence of a document in the `/roles_admin/{userId}` collection.
- * - **Product Catalogs (Consortiums, Credit Products, Product Combos)**: Publicly readable but only modifiable by authorized personnel (TODO: Define authorized personnel).
- * - **Ambiguous Relationships**: In cases where the relationship between entities is not explicitly defined, the most secure interpretation (owner-only access) is applied.
- *
- * Denormalization for Authorization:
- * - `sales_proposals` include a `clientId` field to avoid needing to perform a `get()` operation on the `/clients/{clientId}` document to verify access.
+ * - Public read access to product catalogs (consortiums, credit_products, product_combos), financial institutions, quizzes and questions.
+ * - Strict ownership for user profiles and client-related documents.
+ * - Denormalization of `clientId` in `sales_proposals` for efficient authorization.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profile data.
+     * @description Manages access to user profile data.
      * @path /users/{userId}
-     * @allow (create) Authenticated user can create their own profile.
-     * @allow (get, update, delete) Authenticated user can access and modify their own profile.
-     * @deny (create) Unauthorized user attempts to create a profile for another user.
-     * @deny (list) Listing all users is prohibited.
-     * @principle Enforces strict user-ownership: users can only manage their own data.
+     * @allow (create) - User with ID 'user123' can create their profile.
+     *   request.auth.uid == 'user123' && request.resource.data.id == 'user123'
+     * @allow (get, list, update, delete) - User with ID 'user123' can read, update and delete their profile.
+     *   request.auth.uid == 'user123'
+     * @deny (create) - User with ID 'user456' cannot create a profile for 'user123'.
+     *   request.auth.uid == 'user456' && request.resource.data.id == 'user123'
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
       function isSignedIn() {
         return request.auth != null;
       }
       function isOwner(userId) {
-        return request.auth.uid == userId;
+        return isSignedIn() && request.auth.uid == userId;
       }
       function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Grants admin role based on document existence.
+     * @description Determines admin role based on document existence.
      * @path /roles_admin/{userId}
-     * @allow (create) Any authenticated user can request admin role.
-     * @allow (get, update, delete) Only the user themselves can manage their admin role request.
-     * @deny (create) Unauthorized user attempts to create admin role for another user.
-     * @deny (list) Listing all admin roles is prohibited.
-     * @principle Existence of document grants admin access; enforces role-based access control.
+     * @allow (create, get, list, update, delete) - User document existence grants role.
+     *   request.auth.uid == 'user123'
+     * @deny (create, get, list, update, delete) - Users without document existence do not have this role.
+     *   request.auth.uid == 'user456'
      */
     match /roles_admin/{userId} {
       function isSignedIn() {
         return request.auth != null;
       }
-      function isOwner(userId) {
-        return request.auth.uid == userId;
+      function isAdmin(userId) {
+          return isSignedIn() && request.auth.uid == userId;
+      }
+      function isExistingAdmin(userId) {
+        return isAdmin(userId) && resource != null;
       }
 
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if false;
-      allow delete: if isOwner(userId) && resource != null;
+      allow get, list: if isAdmin(userId);
+      allow create: if isAdmin(userId);
+      allow update: if isExistingAdmin(userId);
+      allow delete: if isExistingAdmin(userId);
     }
 
     /**
-     * @description Controls access to client data.
+     * @description Manages access to client data.
      * @path /clients/{clientId}
-     * @allow (get, list) Allow anyone to view clients data.
-     * @deny (create, update, delete) Only allow server to manage client.
-     * @principle Limits client management to authorized sources.
+     * @allow (get, list) - Anyone can read client data.
+     * @deny (create, update, delete) - Only authorized roles can modify client data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for client data.
      */
     match /clients/{clientId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to documents uploaded by clients.
+     * @description Manages access to documents uploaded by clients.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list) Clients can access their own documents
-     * @deny (create, update, delete) Only owner client can manage their documents
-     * @principle Enforces document ownership under a client's data tree.
+     * @allow (create, get, list, update, delete) - Client with ID 'client123' can manage their documents.
+     *   request.auth.uid == 'client123'
+     * @deny (create) - User with ID 'user456' cannot create documents for 'client123'.
+     *   request.auth.uid == 'user456'
+     * @principle Enforces path-based ownership for client documents.
      */
     match /clients/{clientId}/documents/{documentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
       function isOwner(clientId) {
-        return request.auth.uid == clientId;
+        return isSignedIn() && request.auth.uid == clientId;
       }
       function isExistingOwner(clientId) {
         return isOwner(clientId) && resource != null;
       }
-      allow get, list: if request.auth.uid == clientId;
-      allow create: if request.auth.uid == clientId && request.resource.data.clientId == clientId;
+
+      allow get, list: if isOwner(clientId);
+      allow create: if isOwner(clientId) && request.resource.data.clientId == clientId;
       allow update: if isExistingOwner(clientId) && request.resource.data.clientId == resource.data.clientId;
       allow delete: if isExistingOwner(clientId);
     }
 
     /**
-     * @description Controls access to financial institution data.
+     * @description Manages access to financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list) Allow anyone to view financial institutions data.
-     * @deny (create, update, delete) Only allow server to manage financial institutions.
-     * @principle Limits financial institution management to authorized sources.
+     * @allow (get, list) - Anyone can read financial institution data.
+     * @deny (create, update, delete) - Only authorized roles can modify financial institution data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for financial institution data.
      */
     match /financial_institutions/{financialInstitutionId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to consortium product data.
+     * @description Manages access to consortium product data.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list) Allow anyone to view consortiums data.
-     * @deny (create, update, delete) Only allow server to manage consortiums.
-     * @principle Limits consortiums management to authorized sources.
+     * @allow (get, list) - Anyone can read consortium product data.
+     * @deny (create, update, delete) - Only authorized roles can modify consortium product data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for consortium product data.
      */
     match /consortiums/{consortiumId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to credit product data.
+     * @description Manages access to credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list) Allow anyone to view credit products data.
-     * @deny (create, update, delete) Only allow server to manage credit products.
-     * @principle Limits credit products management to authorized sources.
+     * @allow (get, list) - Anyone can read credit product data.
+     * @deny (create, update, delete) - Only authorized roles can modify credit product data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for credit product data.
      */
     match /credit_products/{creditProductId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to product combo data.
+     * @description Manages access to product combo data.
      * @path /product_combos/{productComboId}
-     * @allow (get, list) Allow anyone to view product combos data.
-     * @deny (create, update, delete) Only allow server to manage product combos.
-     * @principle Limits product combos management to authorized sources.
+     * @allow (get, list) - Anyone can read product combo data.
+     * @deny (create, update, delete) - Only authorized roles can modify product combo data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for product combo data.
      */
     match /product_combos/{productComboId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to sales proposal data.
+     * @description Manages access to sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get) Anyone can get sales proposals data.
-     * @allow (create, update, delete) Only owner client can manage their sales proposals.
-     * @principle Enforces ownership and allows public read access.
+     * @allow (get, list) - Anyone can read sales proposal data. // TODO: restrict listing.
+     * @allow (create, update, delete) - The authenticated user must be the `clientId`.
+     *   request.auth.uid == request.resource.data.clientId
+     * @principle Access controlled by denormalized clientId.
      */
     match /sales_proposals/{salesProposalId} {
-        function isOwner(clientId) {
-            return request.auth.uid == clientId;
-        }
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(clientId) {
+        return isSignedIn() && request.auth.uid == clientId;
+      }
+      function isExistingOwner(clientId) {
+        return isOwner(clientId) && resource != null;
+      }
 
-        function isExistingOwner(clientId) {
-            return isOwner(clientId) && resource != null;
-        }
-
-        allow get: if true;
-        allow list: if false;
-        allow create: if request.resource.data.clientId == request.auth.uid;
-        allow update: if resource.data.clientId == request.auth.uid;
-        allow delete: if resource.data.clientId == request.auth.uid;
+      allow get, list: if true; // TODO: restrict listing.
+      allow create: if isSignedIn() && request.resource.data.clientId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.clientId) && request.resource.data.clientId == resource.data.clientId;
+      allow delete: if isExistingOwner(resource.data.clientId);
     }
 
     /**
-     * @description Controls access to commission data.
+     * @description Manages access to commission data.
      * @path /commissions/{commissionId}
-     * @allow (get, list) Allow anyone to view commissions data.
-     * @deny (create, update, delete) Only allow server to manage commissions.
-     * @principle Limits commissions management to authorized sources.
+     * @allow (get, list) - Anyone can read commission data.
+     * @deny (create, update, delete) - Only authorized roles can modify commission data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for commission data.
      */
     match /commissions/{commissionId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to quiz data.
+     * @description Manages access to quiz data.
      * @path /quizzes/{quizId}
-     * @allow (get, list) Allow anyone to view quizzes data.
-     * @deny (create, update, delete) Only allow server to manage quizzes.
-     * @principle Limits quizzes management to authorized sources.
+     * @allow (get, list) - Anyone can read quiz data.
+     * @deny (create, update, delete) - Only authorized roles can modify quiz data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for quiz data.
      */
     match /quizzes/{quizId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
 
     /**
-     * @description Controls access to question data.
+     * @description Manages access to question data.
      * @path /questions/{questionId}
-     * @allow (get, list) Allow anyone to view questions data.
-     * @deny (create, update, delete) Only allow server to manage questions.
-     * @principle Limits questions management to authorized sources.
+     * @allow (get, list) - Anyone can read question data.
+     * @deny (create, update, delete) - Only authorized roles can modify question data. // TODO: Add role based permission.
+     * @principle Public read access with restricted writes for question data.
      */
     match /questions/{questionId} {
       allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create, update, delete: if false; // TODO: Add role based permission.
+    }
+
+    /**
+     * @description Manages access to product data.
+     * @path /products/{productId}
+     * @allow (get) - Anyone can read product data.
+     * @deny (get) - Only authorized roles can read product data. // TODO: Check the data model and reasoning for the right ruleset.
+     * @principle Public read access with restricted writes for product data.
+     */
+    match /products/{productId} {
+        allow get: if true;
+      allow create, update, delete: if false; // TODO: Add role based permission.
     }
   }
 }
