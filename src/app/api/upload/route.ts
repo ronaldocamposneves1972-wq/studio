@@ -1,27 +1,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import { initializeApp, getApps, App } from 'firebase-admin/app';
+import { initializeApp, getApp, App, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { credential } from 'firebase-admin';
 
 // --- Firebase Admin Initialization ---
-let adminApp: App;
-if (!getApps().length) {
-    // IMPORTANT: This service account JSON must be set as an environment variable in your hosting provider.
-    // Do NOT hardcode it in the source code.
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
-    
-    adminApp = initializeApp({
-        credential: credential.cert(serviceAccount)
-    });
-} else {
-    adminApp = getApps()[0];
-}
-
-const db = getFirestore(adminApp);
+// Helper to get or create the admin app instance.
+// Using a unique name prevents conflicts with the client-side Firebase app.
+const getAdminApp = (): App => {
+    const ADMIN_APP_NAME = 'firebase-admin-app-upload';
+    try {
+        return getApp(ADMIN_APP_NAME);
+    } catch (e) {
+        // IMPORTANT: This service account JSON must be set as an environment variable in your hosting provider.
+        // Do NOT hardcode it in the source code.
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+        return initializeApp({
+            credential: credential.cert(serviceAccount)
+        }, ADMIN_APP_NAME);
+    }
+};
 
 async function getCloudinaryConfig() {
+    const adminApp = getAdminApp();
+    const db = getFirestore(adminApp);
     try {
         const settingsDoc = await db.collection('settings').doc('integrations').get();
         if (!settingsDoc.exists) {
@@ -83,7 +86,6 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error('Server-side upload error:', error);
-        return NextResponse.json({ error: 'Falha no upload do arquivo no servidor.' }, { status
-: 500 });
+        return NextResponse.json({ error: 'Falha no upload do arquivo no servidor.' }, { status: 500 });
     }
 }
