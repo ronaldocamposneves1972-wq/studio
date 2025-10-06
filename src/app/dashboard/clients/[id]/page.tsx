@@ -276,6 +276,7 @@ export default function ClientDetailPage() {
         cloudinaryPublicId: uploadData.public_id,
         secureUrl: uploadData.secure_url,
         uploadedAt: new Date().toISOString(),
+        validated: false,
       };
       
       await updateDoc(clientRef, {
@@ -303,10 +304,9 @@ export default function ClientDetailPage() {
   };
 
   const handleDeleteDocument = async (docToDelete: ClientDocument) => {
-    if (!clientRef) return;
+    if (!clientRef || !client?.documents) return;
 
     try {
-        // Step 1: Call the API to delete the file from Cloudinary
         const response = await fetch('/api/upload', {
             method: 'DELETE',
             headers: {
@@ -320,9 +320,9 @@ export default function ClientDetailPage() {
             throw new Error(errorData.error || 'Falha ao deletar arquivo no Cloudinary.');
         }
 
-        // Step 2: If Cloudinary deletion is successful, remove the reference from Firestore
+        const updatedDocuments = client.documents.filter(doc => doc.id !== docToDelete.id);
         await updateDoc(clientRef, {
-            documents: arrayRemove(docToDelete)
+            documents: updatedDocuments
         });
 
         toast({
@@ -338,7 +338,30 @@ export default function ClientDetailPage() {
             description: error instanceof Error ? error.message : "Não foi possível excluir o documento.",
         });
     }
-}
+  }
+
+  const handleToggleValidation = async (docToValidate: ClientDocument) => {
+    if (!clientRef || !client?.documents) return;
+    try {
+        const updatedDocuments = client.documents.map(doc =>
+            doc.id === docToValidate.id ? { ...doc, validated: !doc.validated } : doc
+        );
+        await updateDoc(clientRef, {
+            documents: updatedDocuments
+        });
+        toast({
+            title: `Documento ${!docToValidate.validated ? 'validado' : 'marcado como pendente'}.`,
+            description: `${docToValidate.fileName} foi atualizado.`
+        });
+    } catch(e) {
+        console.error(e)
+        toast({
+            variant: "destructive",
+            title: "Erro ao atualizar",
+            description: "Não foi possível atualizar o status de validação."
+        })
+    }
+  }
 
 
   const translatedLabels: { [key: string]: string } = {
@@ -352,19 +375,23 @@ export default function ClientDetailPage() {
     const getDocumentViewUrl = (doc: ClientDocument | null): string => {
         if (!doc) return '';
 
-        const isPDF = doc.fileType === 'pdf' || doc.fileName.toLowerCase().endsWith('.pdf');
-
+        const isPDF = doc.fileName.toLowerCase().endsWith('.pdf');
+        
         if (isPDF) {
-            // For PDFs, we add fl_inline to suggest inline display.
-            // Cloudinary URLs are in the format: https://res.cloudinary.com/<cloud_name>/<resource_type>/<delivery_type>/<transformations>/<version>/<public_id>.<format>
-            // We need to inject `fl_inline` into the transformations part.
             const urlParts = doc.secureUrl.split('/upload/');
             if (urlParts.length === 2) {
-                return `${urlParts[0]}/upload/fl_inline/${urlParts[1]}`;
+                // Ensure `fl_inline` is added correctly, even with existing transformations
+                const pathParts = urlParts[1].split('/');
+                const transformations = pathParts.slice(0, -2); // Assumes version and public_id are last parts
+                const version = pathParts[pathParts.length - 2];
+                const publicId = pathParts[pathParts.length - 1];
+
+                const newTransformations = [...transformations, 'fl_inline'].join(',');
+
+                return `${urlParts[0]}/upload/${newTransformations}/${version}/${publicId}`;
             }
         }
         
-        // For images and other types, return the original URL
         return doc.secureUrl;
     };
 
@@ -418,7 +445,7 @@ export default function ClientDetailPage() {
           </DialogHeader>
           <div className="h-full w-full relative bg-muted">
             {viewingDocument && (
-              viewingDocument.fileType.startsWith('image') ? (
+              viewingDocument.fileType.startsWith('image') || !viewingDocument.fileName.toLowerCase().endsWith('.pdf') ? (
                 <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
               ) : (
                 <iframe src={getDocumentViewUrl(viewingDocument)} className="h-full w-full border-0" title={viewingDocument.fileName} />
@@ -554,6 +581,7 @@ export default function ClientDetailPage() {
                                         <TableRow>
                                         <TableHead>Nome do Arquivo</TableHead>
                                         <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                                        <TableHead>Validado</TableHead>
                                         <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
                                         <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
@@ -566,6 +594,17 @@ export default function ClientDetailPage() {
                                                     {doc.fileName}
                                                 </TableCell>
                                                 <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
+                                                <TableCell>
+                                                    {doc.validated ? (
+                                                        <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                                                            <CheckCircle2 className="h-4 w-4" />
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="secondary">
+                                                           <Clock className="h-4 w-4" />
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
@@ -579,9 +618,9 @@ export default function ClientDetailPage() {
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => toast({ title: "Funcionalidade em desenvolvimento."})}>
+                                                            <DropdownMenuItem onSelect={() => handleToggleValidation(doc)}>
                                                                 <Check className="mr-2 h-4 w-4" />
-                                                                Validar
+                                                                {doc.validated ? 'Marcar como Pendente' : 'Validar'}
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                              <AlertDialog>
@@ -684,5 +723,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    

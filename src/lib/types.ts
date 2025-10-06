@@ -16,6 +16,7 @@ export type ClientDocument = {
   cloudinaryPublicId: string;
   secureUrl: string;
   uploadedAt: string;
+  validated?: boolean;
 };
 
 export type Client = {
@@ -117,7 +118,6 @@ export type Transaction = {
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  category: string;
   status: 'pending' | 'paid' | 'overdue';
   dueDate: string;
   paymentDate?: string;
