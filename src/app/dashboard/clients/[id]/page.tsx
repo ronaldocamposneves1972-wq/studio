@@ -1,3 +1,4 @@
+
 'use client'
 
 import Image from "next/image"
@@ -197,13 +198,22 @@ export default function ClientDetailPage() {
     toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
 
     try {
+      // NOTE: This approach uses an unsigned upload preset for simplicity.
+      // For production, a signed upload from a server-side route is more secure.
       const formData = new FormData();
       formData.append('file', file);
-      // IMPORTANT: Replace 'consorciatech' with your actual unsigned upload preset name from Cloudinary
+      // This is a common preset name, but you must create an 'unsigned' upload preset 
+      // in your Cloudinary account and name it 'consorciatech' or change this value.
       formData.append('upload_preset', 'consorciatech'); 
       formData.append('folder', `clients/${clientId}`);
 
-      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`, {
+      // You need to set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in your .env.local file
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      if (!cloudName) {
+        throw new Error('A variável de ambiente NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME não está definida.');
+      }
+      
+      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -215,7 +225,7 @@ export default function ClientDetailPage() {
       const cloudinaryData = await uploadResponse.json();
 
       const newDocument: ClientDocument = {
-        id: cloudinaryData.public_id, // Use public_id as a unique ID
+        id: cloudinaryData.public_id,
         clientId: clientId,
         fileName: cloudinaryData.original_filename || file.name,
         fileType: cloudinaryData.resource_type || 'raw',
@@ -224,8 +234,7 @@ export default function ClientDetailPage() {
         uploadedAt: new Date().toISOString(),
       };
       
-      // Update the client document with the new document metadata
-      updateDocumentNonBlocking(clientRef, {
+      await updateDocumentNonBlocking(clientRef, {
         documents: arrayUnion(newDocument)
       });
 
@@ -239,7 +248,7 @@ export default function ClientDetailPage() {
       toast({
         variant: 'destructive',
         title: 'Erro no Upload',
-        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Verifique se o "upload preset" está configurado corretamente no Cloudinary.',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Verifique as configurações do Cloudinary.',
       });
     } finally {
       setIsUploading(false);
@@ -503,3 +512,5 @@ export default function ClientDetailPage() {
     </div>
   )
 }
+
+    
