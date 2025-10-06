@@ -1,6 +1,8 @@
-import Image from "next/image"
+'use client'
+
 import Link from "next/link"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, MoreHorizontal } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,13 +10,92 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { products } from "@/lib/placeholder-data"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import type { Product } from "@/lib/types"
+import { collection, query } from "firebase/firestore"
 
 export default function ProductsPage() {
+  const router = useRouter();
+  const firestore = useFirestore();
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, "products"));
+  }, [firestore]);
+
+  const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
+  const renderProductRows = () => {
+    if (isLoading) {
+      return Array.from({ length: 4 }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+          <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+        </TableRow>
+      ));
+    }
+
+    if (!products || products.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4} className="h-24 text-center">
+            Nenhum produto encontrado.
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    return products.map((product) => (
+      <TableRow key={product.id} onClick={() => router.push(`/dashboard/products/${product.id}`)} className="cursor-pointer">
+        <TableCell className="font-medium">{product.name}</TableCell>
+        <TableCell>
+          <Badge variant={product.type === 'Consórcio' ? 'secondary' : 'outline'}>
+            {product.type}
+          </Badge>
+        </TableCell>
+        <TableCell>
+            {`R$ ${product.minAmount.toLocaleString('pt-BR')} - R$ ${product.maxAmount.toLocaleString('pt-BR')}`}
+        </TableCell>
+        <TableCell>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button aria-haspopup="true" size="icon" variant="ghost">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={(e) => {e.stopPropagation(); router.push(`/dashboard/products/${product.id}`)}}>Ver Detalhes</DropdownMenuItem>
+              <DropdownMenuItem onSelect={(e) => e.stopPropagation()}>Editar</DropdownMenuItem>
+              <DropdownMenuItem onSelect={(e) => e.stopPropagation()} className="text-destructive">Excluir</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    ));
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -31,36 +112,31 @@ export default function ProductsPage() {
           </span>
         </Button>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3 xl:grid-cols-4">
-        {products.map((product) => (
-          <Link href={`/dashboard/products/${product.id}`} key={product.id} className="group">
-            <Card className="h-full transition-all group-hover:shadow-md group-hover:-translate-y-1">
-              <CardHeader className="p-0 relative">
-                <Image
-                  alt={product.name}
-                  className="aspect-video w-full rounded-t-lg object-cover"
-                  height="300"
-                  src={product.imageUrl}
-                  width="400"
-                  data-ai-hint={product.type === 'Consórcio' ? 'house' : 'money'}
-                />
-              </CardHeader>
-              <CardContent className="p-4">
-                <Badge variant={product.type === 'Consórcio' ? "secondary" : "outline"} className="mb-2">{product.type}</Badge>
-                <CardTitle className="text-lg group-hover:text-primary">{product.name}</CardTitle>
-                <CardDescription className="text-sm">
-                  A partir de R$ {product.minAmount.toLocaleString('pt-br')}
-                </CardDescription>
-              </CardContent>
-              <CardFooter className="p-4 pt-0">
-                 <div className="text-xs text-muted-foreground">
-                  Prazos: {product.terms.join(', ')} meses
-                </div>
-              </CardFooter>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Produtos</CardTitle>
+          <CardDescription>
+            Visualize e gerencie todos os produtos cadastrados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Faixa de Valor</TableHead>
+                <TableHead>
+                  <span className="sr-only">Ações</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {renderProductRows()}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

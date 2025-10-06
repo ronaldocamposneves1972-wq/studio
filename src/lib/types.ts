@@ -80,7 +80,6 @@ export type Product = {
   maxAmount: number;
   interestRate: number;
   terms: number[];
-  imageUrl: string;
 };
 
 export type Bank = {
