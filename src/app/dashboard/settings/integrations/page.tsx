@@ -15,8 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase"
-import { doc, setDoc } from "firebase/firestore"
+import { useFirestore, useMemoFirebase } from "@/firebase"
+import { doc, setDoc, getDoc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -34,22 +34,35 @@ export default function IntegrationsPage() {
         return doc(firestore, 'settings', 'integrations')
     }, [firestore])
 
-    const { data: remoteSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsRef)
-
     const [settings, setSettings] = useState<IntegrationSettings>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-      if (remoteSettings) {
-        setSettings({
-            cloudinaryCloudName: remoteSettings.cloudinaryCloudName || '',
-            cloudinaryApiKey: remoteSettings.cloudinaryApiKey || '',
-            // Do not pre-fill the secret for security
-            cloudinaryApiSecret: '',
-            whatsappApiKey: '',
-        });
+      const fetchSettings = async () => {
+        if (!settingsRef) {
+          setIsLoading(false);
+          return;
+        };
+        try {
+          const docSnap = await getDoc(settingsRef);
+          if (docSnap.exists()) {
+            const remoteData = docSnap.data() as IntegrationSettings;
+             setSettings({
+                cloudinaryCloudName: remoteData.cloudinaryCloudName || '',
+                cloudinaryApiKey: remoteData.cloudinaryApiKey || '',
+                cloudinaryApiSecret: '',
+                whatsappApiKey: '',
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch settings: ", error)
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }, [remoteSettings]);
+      fetchSettings();
+    }, [settingsRef]);
 
 
     const handleSave = async () => {
@@ -61,7 +74,6 @@ export default function IntegrationsPage() {
         setIsSaving(true);
         
         try {
-            // Prepare data, only include secret if it has been changed
             const dataToSave: Partial<IntegrationSettings> = {
                 cloudinaryCloudName: settings.cloudinaryCloudName,
                 cloudinaryApiKey: settings.cloudinaryApiKey,
@@ -81,7 +93,6 @@ export default function IntegrationsPage() {
                 description: "Suas alterações de integração foram salvas no banco de dados.",
             });
             
-            // Limpa os campos de segredo da UI por segurança
             setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
 
         } catch (error: any) {
@@ -101,7 +112,7 @@ export default function IntegrationsPage() {
         setSettings(prev => ({ ...prev, [id]: value }));
     }
 
-    if (isLoadingSettings) {
+    if (isLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -148,7 +159,7 @@ export default function IntegrationsPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} disabled={isSaving || isLoadingSettings}>
+              <Button onClick={handleSave} disabled={isSaving || isLoading}>
                 {isSaving ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </CardFooter>

@@ -1,8 +1,10 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
+    // Regra totalmente aberta: permite leitura e escrita para qualquer usuário autenticado em todo o storage.
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
