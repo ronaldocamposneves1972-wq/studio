@@ -347,7 +347,7 @@ export default function ClientDetailPage() {
     if (!clientRef || !client?.documents) return;
     try {
         const updatedDocuments = client.documents.map(doc =>
-            doc.id === docToUpdate.id ? { ...doc, validationStatus: newStatus } : doc
+            doc.id === docToUpdate.id ? { ...doc, validationStatus: newStatus, statusUpdatedAt: new Date().toISOString() } : doc
         );
         await updateDoc(clientRef, {
             documents: updatedDocuments
@@ -604,6 +604,10 @@ export default function ClientDetailPage() {
                                                     break;
                                            }
                                            
+                                           const isFinalStatus = doc.validationStatus === 'validated' || doc.validationStatus === 'rejected';
+                                           const oneHour = 60 * 60 * 1000;
+                                           const isLocked = isFinalStatus && doc.statusUpdatedAt && (new Date().getTime() - new Date(doc.statusUpdatedAt).getTime()) > oneHour;
+
                                            return (
                                             <TableRow key={doc.id}>
                                                 <TableCell className="font-medium flex items-center gap-2">
@@ -632,15 +636,50 @@ export default function ClientDetailPage() {
                                                                 Baixar
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
-                                                            <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'validated')}>
-                                                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                                Validar
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'rejected')}>
-                                                                <XCircle className="mr-2 h-4 w-4" />
-                                                                Rejeitar
-                                                            </DropdownMenuItem>
-                                                             <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')}>
+
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isLocked}>
+                                                                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                                        Validar
+                                                                    </DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Confirmar Validação?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            Você tem certeza de que deseja marcar o documento <strong>{doc.fileName}</strong> como validado?
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleValidationStatusChange(doc, 'validated')}>Sim, validar</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={isLocked}>
+                                                                        <XCircle className="mr-2 h-4 w-4" />
+                                                                        Rejeitar
+                                                                    </DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Confirmar Rejeição?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            Você tem certeza de que deseja rejeitar o documento <strong>{doc.fileName}</strong>?
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleValidationStatusChange(doc, 'rejected')} className="bg-destructive hover:bg-destructive/90">Sim, rejeitar</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+
+                                                             <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')} disabled={isLocked}>
                                                                 <Clock className="mr-2 h-4 w-4" />
                                                                 Marcar como Pendente
                                                             </DropdownMenuItem>

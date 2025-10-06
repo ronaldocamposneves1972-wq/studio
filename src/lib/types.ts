@@ -19,6 +19,7 @@ export type ClientDocument = {
   secureUrl: string;
   uploadedAt: string;
   validationStatus?: DocumentStatus;
+  statusUpdatedAt?: string;
 };
 
 export type Client = {
