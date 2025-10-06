@@ -83,7 +83,6 @@ export type ProductType = {
 export type FinancialInstitution = {
   id: string;
   name: string;
-  commissionRate: number;
   logoUrl?: string;
 };
 
@@ -97,6 +96,7 @@ export type Product = {
   minAmount: number;
   maxAmount: number;
   interestRate: number;
+  commissionRate: number;
   terms: number[];
 };
 
@@ -104,7 +104,6 @@ export type Bank = {
   id: string;
   name: string;
   logoUrl: string;
-  commissionRate: number;
   approvedVolume: number;
   sentVolume: number;
 };

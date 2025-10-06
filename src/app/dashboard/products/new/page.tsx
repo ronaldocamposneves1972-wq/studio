@@ -48,6 +48,10 @@ const productSchema = z.object({
     (a) => parseFloat(String(a).replace(",", ".")),
     z.number().min(0, "A taxa de juros não pode ser negativa.")
   ),
+  commissionRate: z.preprocess(
+    (a) => parseFloat(String(a).replace(",", ".")),
+    z.number().min(0, "A comissão não pode ser negativa.")
+  ),
   terms: z.string().min(1, "Informe ao menos um prazo.").transform(value => value.split(',').map(term => Number(term.trim()))),
 });
 
@@ -215,7 +219,7 @@ export default function NewProductPage() {
                     </div>
                 </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="interestRate">Taxa de Juros / Admin. (%)</Label>
                         <Input
@@ -228,6 +232,19 @@ export default function NewProductPage() {
                             disabled={isSubmitting}
                         />
                         {errors.interestRate && <p className="text-sm text-destructive mt-1">{errors.interestRate.message}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="commissionRate">Comissão (%)</Label>
+                        <Input
+                            id="commissionRate"
+                            type="number"
+                            step="0.01"
+                            {...register("commissionRate")}
+                            placeholder="2.5"
+                            className={errors.commissionRate ? "border-destructive" : ""}
+                            disabled={isSubmitting}
+                        />
+                        {errors.commissionRate && <p className="text-sm text-destructive mt-1">{errors.commissionRate.message}</p>}
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="terms">Prazos (meses, separados por vírgula)</Label>

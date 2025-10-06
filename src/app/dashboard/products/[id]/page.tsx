@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { ChevronLeft, Edit, Trash2, Landmark } from 'lucide-react'
+import { ChevronLeft, Edit, Trash2, Landmark, Percent } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase'
 import type { Product } from '@/lib/types'
@@ -151,11 +151,16 @@ export default function ProductDetailPage() {
                   <p className="text-sm font-medium text-muted-foreground">Taxa de Juros / Admin.</p>
                   <p className="text-foreground">{product.interestRate}% {product.type === 'Crédito' ? 'a.m.' : 'a.p.'}</p>
                 </div>
+                 <div className="grid gap-2">
+                  <p className="text-sm font-medium text-muted-foreground">Comissão</p>
+                  <p className="text-foreground">{product.commissionRate}%</p>
+                </div>
+              </div>
+               <Separator />
                 <div className="grid gap-2">
                   <p className="text-sm font-medium text-muted-foreground">Prazos (meses)</p>
                   <p className="text-foreground">{product.terms.join(', ')}</p>
                 </div>
-              </div>
             </div>
           </CardContent>
         </Card>

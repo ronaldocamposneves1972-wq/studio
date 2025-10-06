@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Consortium": {
@@ -33,6 +34,10 @@
         "maxValue": {
           "type": "number",
           "description": "Maximum value for the consortium."
+        },
+        "commissionRate": {
+          "type": "number",
+          "description": "Commission rate for the product."
         }
       },
       "required": [
@@ -42,7 +47,8 @@
         "interestRate",
         "termMonths",
         "minValue",
-        "maxValue"
+        "maxValue",
+        "commissionRate"
       ]
     },
     "CreditProduct": {
@@ -78,6 +84,10 @@
         "maxValue": {
           "type": "number",
           "description": "Maximum value for the credit product."
+        },
+        "commissionRate": {
+          "type": "number",
+          "description": "Commission rate for the product."
         }
       },
       "required": [
@@ -87,7 +97,8 @@
         "interestRate",
         "termMonths",
         "minValue",
-        "maxValue"
+        "maxValue",
+        "commissionRate"
       ]
     },
     "ProductCombo": {
@@ -136,16 +147,11 @@
         "name": {
           "type": "string",
           "description": "Name of the financial institution."
-        },
-        "commissionRate": {
-          "type": "number",
-          "description": "Commission rate for the financial institution."
         }
       },
       "required": [
         "id",
-        "name",
-        "commissionRate"
+        "name"
       ]
     },
     "Client": {

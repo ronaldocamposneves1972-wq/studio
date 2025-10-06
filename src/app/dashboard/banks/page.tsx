@@ -67,10 +67,6 @@ import type { FinancialInstitution as Bank } from "@/lib/types"
 
 const bankSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  commissionRate: z.preprocess(
-    (a) => parseFloat(String(a).replace(",", ".")),
-    z.number().min(0, "A comissão não pode ser negativa.")
-  ),
   logoUrl: z.string().url({ message: "Por favor, insira uma URL de imagem válida." }).optional().or(z.literal('')),
 })
 
@@ -98,7 +94,6 @@ function BankDialog({
     resolver: zodResolver(bankSchema),
     defaultValues: {
       name: bank?.name || '',
-      commissionRate: bank?.commissionRate || 0,
       logoUrl: bank?.logoUrl || '',
     },
   })
@@ -106,7 +101,6 @@ function BankDialog({
   useState(() => {
     reset({
       name: bank?.name || '',
-      commissionRate: bank?.commissionRate || 0,
       logoUrl: bank?.logoUrl || '',
     })
   })
@@ -136,20 +130,6 @@ function BankDialog({
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="commissionRate">Taxa de Comissão (%)</Label>
-              <Input
-                id="commissionRate"
-                type="number"
-                step="0.1"
-                {...register('commissionRate')}
-                placeholder="2.5"
-                className={errors.commissionRate ? 'border-destructive' : ''}
-              />
-              {errors.commissionRate && (
-                <p className="text-sm text-destructive">{errors.commissionRate.message}</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -272,7 +252,6 @@ export default function BanksPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Banco</TableHead>
-                <TableHead>Comissão</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -280,13 +259,12 @@ export default function BanksPage() {
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))}
               {!isLoading && banks?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">Nenhum parceiro encontrado.</TableCell>
+                  <TableCell colSpan={2} className="h-24 text-center">Nenhum parceiro encontrado.</TableCell>
                 </TableRow>
               )}
               {banks?.map((bank) => (
@@ -303,7 +281,6 @@ export default function BanksPage() {
                         {bank.name}
                     </div>
                   </TableCell>
-                  <TableCell>{bank.commissionRate}%</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
