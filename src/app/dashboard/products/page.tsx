@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -105,11 +106,13 @@ export default function ProductsPage() {
             Gerencie os produtos de consórcio e crédito disponíveis.
           </p>
         </div>
-        <Button size="sm" className="h-8 gap-1">
-          <PlusCircle className="h-3.5 w-3.5" />
-          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-            Adicionar Produto
-          </span>
+        <Button size="sm" className="h-8 gap-1" asChild>
+          <Link href="/dashboard/products/new">
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+              Adicionar Produto
+            </span>
+          </Link>
         </Button>
       </div>
       <Card>
