@@ -26,6 +26,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Check,
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useParams } from 'next/navigation'
@@ -97,6 +98,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -157,6 +159,23 @@ export default function ClientDetailPage() {
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [quizLink, setQuizLink] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const link = `${window.location.origin}/q/${clientId}`;
+      setQuizLink(link);
+    }
+  }, [clientId]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(quizLink).then(() => {
+      setIsCopied(true);
+      toast({ title: 'Link copiado!', description: 'O link do quiz foi copiado para a área de transferência.' });
+      setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+    });
+  };
 
   const clientRef = useMemoFirebase(() => {
     if (!firestore || !clientId) return null
@@ -208,7 +227,12 @@ export default function ClientDetailPage() {
       });
 
       if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
+        let errorData;
+        try {
+            errorData = await uploadResponse.json();
+        } catch (e) {
+             throw new Error(`O servidor respondeu com status ${uploadResponse.status}`);
+        }
         throw new Error(errorData.error || 'Falha no upload do servidor.');
       }
 
@@ -297,208 +321,227 @@ export default function ClientDetailPage() {
   const documents = client.documents || [];
 
   return (
-    <div className="grid flex-1 items-start gap-4 md:gap-8">
+    <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
         <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-[1fr_250px] lg:grid-cols-[1fr_350px]">
-            <div className="grid auto-rows-max items-start gap-4 lg:col-span-2">
-                <Card>
-                    <CardHeader className="pb-4">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-4">
-                                <Image alt="Avatar do Cliente" className="aspect-square rounded-full object-cover" height="64" src={`https://picsum.photos/seed/${client.id}/100/100`} width="64" data-ai-hint="person portrait" />
-                                <div className="grid gap-1">
-                                    <CardTitle className="text-2xl">{client.name}</CardTitle>
-                                    <CardDescription>{client.email} &middot; {client.phone}</CardDescription>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Select onValueChange={handleStatusChange} value={client.status}>
-                                    <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Novo"><Badge variant="secondary" className="mr-2"/>Novo</SelectItem>
-                                        <SelectItem value="Em análise"><Badge variant="secondary" className="mr-2"/>Em análise</SelectItem>
-                                        <SelectItem value="Pendente"><Badge variant="outline" className="mr-2"/>Pendente</SelectItem>
-                                        <SelectItem value="Aprovado"><Badge variant="default" className="mr-2"/>Aprovado</SelectItem>
-                                        <SelectItem value="Reprovado"><Badge variant="destructive" className="mr-2"/>Reprovado</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                 <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button size="icon" variant="outline"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" /> Editar Cliente</DropdownMenuItem>
-                                     <DropdownMenuSeparator />
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                          <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
-                                        </DropdownMenuItem>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                          <AlertDialogDescription>Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                          <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                            Sim, excluir
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+            <Card>
+                <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-4">
+                            <Image alt="Avatar do Cliente" className="aspect-square rounded-full object-cover" height="64" src={`https://picsum.photos/seed/${client.id}/100/100`} width="64" data-ai-hint="person portrait" />
+                            <div className="grid gap-1">
+                                <CardTitle className="text-2xl">{client.name}</CardTitle>
+                                <CardDescription>{client.email} &middot; {client.phone}</CardDescription>
                             </div>
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                       <Tabs defaultValue="documents">
-                        <TabsList className="mb-4">
-                          <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
-                          <TabsTrigger value="documents">Documentos</TabsTrigger>
-                          <TabsTrigger value="history">Histórico</TabsTrigger>
-                          <TabsTrigger value="proposals">Propostas</TabsTrigger>
-                        </TabsList>
-                         <TabsContent value="quiz">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Respostas do Cadastro Inicial</CardTitle>
-                                    <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                  {client.answers ? (
-                                    <>
-                                      {fieldOrder.map((fieldKey) => {
-                                        const answerKey = `q-${fieldKey.toLowerCase().replace(' ', '')}`;
-                                        const value = client.answers![answerKey];
-                                        if (value === undefined) return null;
-                                        const questionLabel = translatedLabels[fieldKey.toLowerCase() as keyof typeof translatedLabels] || fieldKey;
-                                        return (
-                                          <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
-                                            <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
-                                            <p className="text-foreground">{String(value) || "Não informado"}</p>
-                                          </div>
-                                        );
-                                      })}
-                                      {client.createdAt && (
-                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center border-t pt-4 mt-4">
-                                          <p className="font-medium text-sm text-muted-foreground">Data do Cadastro</p>
-                                          <p className="text-foreground">{new Date(client.createdAt).toLocaleString('pt-BR')}</p>
-                                        </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
-                                  )}
-                                </CardContent>
-                                {client.quizId && (
-                                <CardFooter className="border-t px-6 py-4">
-                                    <p className="text-sm text-muted-foreground">Quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
-                                </CardFooter>
-                                )}
-                            </Card>
-                        </TabsContent>
-                        <TabsContent value="history">
-                           <Card>
-                               <CardHeader><CardTitle>Linha do Tempo</CardTitle></CardHeader>
-                               <CardContent><Timeline events={client.timeline} /></CardContent>
-                           </Card>
-                        </TabsContent>
-                        <TabsContent value="documents">
-                          <Card>
+                        <div className="flex items-center gap-2">
+                            <Select onValueChange={handleStatusChange} value={client.status}>
+                                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Novo"><Badge variant="secondary" className="mr-2"/>Novo</SelectItem>
+                                    <SelectItem value="Em análise"><Badge variant="secondary" className="mr-2"/>Em análise</SelectItem>
+                                    <SelectItem value="Pendente"><Badge variant="outline" className="mr-2"/>Pendente</SelectItem>
+                                    <SelectItem value="Aprovado"><Badge variant="default" className="mr-2"/>Aprovado</SelectItem>
+                                    <SelectItem value="Reprovado"><Badge variant="destructive" className="mr-2"/>Reprovado</SelectItem>
+                                </SelectContent>
+                            </Select>
+                             <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button size="icon" variant="outline"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" /> Editar Cliente</DropdownMenuItem>
+                                 <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                      <AlertDialogDescription>Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                        Sim, excluir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                   <Tabs defaultValue="documents">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
+                      <TabsTrigger value="documents">Documentos</TabsTrigger>
+                      <TabsTrigger value="history">Histórico</TabsTrigger>
+                      <TabsTrigger value="proposals">Propostas</TabsTrigger>
+                    </TabsList>
+                     <TabsContent value="quiz">
+                        <Card>
                             <CardHeader>
-                              <CardTitle>Documentos</CardTitle>
-                              <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
+                                <CardTitle>Respostas do Cadastro Inicial</CardTitle>
+                                <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {documents.length === 0 && (
-                                    <div className={cn(
-                                        "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6"
-                                    )}>
-                                        <Upload className="h-12 w-12 text-muted-foreground" />
-                                        <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
-                                        <p className="text-muted-foreground">Clique no botão abaixo para adicionar documentos.</p>
+                              {client.answers ? (
+                                <>
+                                  {fieldOrder.map((fieldKey) => {
+                                    const answerKey = `q-${fieldKey.toLowerCase().replace(' ', '')}`;
+                                    const value = client.answers![answerKey];
+                                    if (value === undefined) return null;
+                                    const questionLabel = translatedLabels[fieldKey.toLowerCase() as keyof typeof translatedLabels] || fieldKey;
+                                    return (
+                                      <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
+                                        <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
+                                        <p className="text-foreground">{String(value) || "Não informado"}</p>
+                                      </div>
+                                    );
+                                  })}
+                                  {client.createdAt && (
+                                    <div className="grid grid-cols-[150px_1fr] gap-2 items-center border-t pt-4 mt-4">
+                                      <p className="font-medium text-sm text-muted-foreground">Data do Cadastro</p>
+                                      <p className="text-foreground">{new Date(client.createdAt).toLocaleString('pt-BR')}</p>
                                     </div>
-                                )}
-                                {documents.length > 0 && (
-                                     <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                            <TableHead>Nome do Arquivo</TableHead>
-                                            <TableHead className="hidden sm:table-cell">Tipo</TableHead>
-                                            <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
-                                            <TableHead className="text-right">Ações</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {documents.map((doc) => (
-                                                <TableRow key={doc.id}>
-                                                    <TableCell className="font-medium flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-muted-foreground" />
-                                                        {doc.fileName}
-                                                    </TableCell>
-                                                    <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
-                                                    <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer">
-                                                                <Download className="mr-2 h-4 w-4" />
-                                                                Baixar
-                                                            </a>
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
+                                  )}
+                                </>
+                              ) : (
+                                <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
+                              )}
                             </CardContent>
-                             <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
-                               <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                               <Button onClick={handleFileSelect} disabled={isUploading}>
-                                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                                   {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
-                               </Button>
-                                <Button disabled={!documents || documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
-                             </CardFooter>
-                          </Card>
-                        </TabsContent>
-                        <TabsContent value="proposals">
-                            <Card>
-                                <CardHeader><CardTitle>Propostas</CardTitle></CardHeader>
-                                <CardContent>
-                                <Table>
+                            {client.quizId && (
+                            <CardFooter className="border-t px-6 py-4">
+                                <p className="text-sm text-muted-foreground">Quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
+                            </CardFooter>
+                            )}
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="history">
+                       <Card>
+                           <CardHeader><CardTitle>Linha do Tempo</CardTitle></CardHeader>
+                           <CardContent><Timeline events={client.timeline} /></CardContent>
+                       </Card>
+                    </TabsContent>
+                    <TabsContent value="documents">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Documentos</CardTitle>
+                          <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {documents.length === 0 && (
+                                <div className={cn(
+                                    "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6"
+                                )}>
+                                    <Upload className="h-12 w-12 text-muted-foreground" />
+                                    <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
+                                    <p className="text-muted-foreground">Clique no botão abaixo ou envie um link para o cliente.</p>
+                                </div>
+                            )}
+                            {documents.length > 0 && (
+                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Produto</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Valor</TableHead>
+                                        <TableHead>Nome do Arquivo</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                                        <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
+                                        <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {proposals.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell>{p.productName}</TableCell>
-                                            <TableCell><Badge variant={p.status === 'Finalizada' ? 'default' : p.status === 'Cancelada' ? 'destructive' : 'secondary'}>{p.status}</Badge></TableCell>
-                                            <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
-                                        </TableRow>
-                                        ))}
-                                         {proposals.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={3} className="text-center">Nenhuma proposta encontrada.</TableCell>
+                                        {documents.map((doc) => (
+                                            <TableRow key={doc.id}>
+                                                <TableCell className="font-medium flex items-center gap-2">
+                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                    {doc.fileName}
+                                                </TableCell>
+                                                <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer">
+                                                            <Download className="mr-2 h-4 w-4" />
+                                                            Baixar
+                                                        </a>
+                                                    </Button>
+                                                </TableCell>
                                             </TableRow>
-                                        )}
+                                        ))}
                                     </TableBody>
                                 </Table>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                      </Tabs>
-                    </CardContent>
-                </Card>
-            </div>
-          </div>
+                            )}
+                        </CardContent>
+                         <CardFooter className="border-t px-6 py-4 flex justify-between items-center">
+                           <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                           <Button onClick={handleFileSelect} disabled={isUploading}>
+                               {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                               {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
+                           </Button>
+                            <Button disabled={!documents || documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                         </CardFooter>
+                      </Card>
+                    </TabsContent>
+                    <TabsContent value="proposals">
+                        <Card>
+                            <CardHeader><CardTitle>Propostas</CardTitle></CardHeader>
+                            <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Produto</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Valor</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {proposals.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell>{p.productName}</TableCell>
+                                        <TableCell><Badge variant={p.status === 'Finalizada' ? 'default' : p.status === 'Cancelada' ? 'destructive' : 'secondary'}>{p.status}</Badge></TableCell>
+                                        <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                    </TableRow>
+                                    ))}
+                                     {proposals.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="text-center">Nenhuma proposta encontrada.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+            </Card>
+        </div>
+         <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ações Rápidas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-4">
+                        <div className="space-y-2">
+                             <Label htmlFor="quiz-link">Link de Documentação para Cliente</Label>
+                             <div className="flex gap-2">
+                                <Input id="quiz-link" value={quizLink} readOnly />
+                                <Button variant="outline" size="icon" onClick={handleCopyLink}>
+                                    {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                             </div>
+                             <p className="text-xs text-muted-foreground">Envie este link para o cliente solicitar a documentação.</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     </div>
   )
 }
+
+    
