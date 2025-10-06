@@ -374,21 +374,11 @@ export default function ClientDetailPage() {
 
     const getDocumentViewUrl = (doc: ClientDocument | null): string => {
         if (!doc) return '';
-        if (doc.fileName.toLowerCase().endsWith('.pdf')) {
-            // For PDFs, just return the secure URL and let the browser handle it.
-            return doc.secureUrl;
-        }
-        // For other types (images), we can try to optimize.
         return doc.secureUrl;
     };
     
     const handleViewDocument = (doc: ClientDocument) => {
-        const isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
-        if (isPdf) {
-            window.open(getDocumentViewUrl(doc), '_blank');
-        } else {
-            setViewingDocument(doc);
-        }
+       setViewingDocument(doc);
     };
 
 
@@ -438,10 +428,18 @@ export default function ClientDetailPage() {
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
-            <DialogDescription>Visualizando imagem. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
+            <DialogDescription>Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {viewingDocument && <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />}
+            {viewingDocument && viewingDocument.fileType.startsWith('image') ? (
+              <Image src={getDocumentViewUrl(viewingDocument)} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
+            ) : (
+                 <div className="text-center p-8">
+                    <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
+                    <p className="mt-4 text-lg font-semibold">Não é possível pré-visualizar este arquivo.</p>
+                    <p className="text-muted-foreground">Use a opção "Abrir / Baixar" para visualizar o arquivo.</p>
+                </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
