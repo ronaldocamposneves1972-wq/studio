@@ -66,11 +66,13 @@ export type ProposalStatus = 'Aberta' | 'Em negociação' | 'Finalizada' | 'Canc
 
 export type Proposal = {
   id: string;
+  clientId: string;
   clientName: string;
   productName: string;
   value: number;
   status: ProposalStatus;
   createdAt: string;
+  salesRepId: string;
   salesRepName: string;
 };
 
@@ -145,5 +147,7 @@ export type Transaction = {
   accountId: string;
   accountName?: string;
 };
+
+    
 
     

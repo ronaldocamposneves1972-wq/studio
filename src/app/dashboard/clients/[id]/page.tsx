@@ -73,8 +73,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { proposals as allProposals } from "@/lib/placeholder-data"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -82,8 +81,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, useCollection } from "@/firebase"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -125,6 +124,20 @@ const getStatusVariant = (status: ClientStatus) => {
       return 'outline';
     default:
       return 'secondary';
+  }
+}
+
+const getProposalStatusVariant = (status: ProposalStatus) => {
+  switch (status) {
+    case 'Finalizada':
+      return 'default';
+    case 'Cancelada':
+      return 'destructive';
+    case 'Em negociação':
+      return 'secondary';
+    case 'Aberta':
+    default:
+      return 'outline';
   }
 }
 
@@ -203,7 +216,12 @@ export default function ClientDetailPage() {
 
   const { data: client, isLoading: isLoadingClient, error } = useDoc<Client>(clientRef);
 
-  const proposals = allProposals.filter(p => p.clientName === client?.name)
+  const proposalsQuery = useMemoFirebase(() => {
+    if (!firestore || !clientId) return null
+    return query(collection(firestore, 'sales_proposals'), where('clientId', '==', clientId))
+  }, [firestore, clientId]);
+  const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
+
 
   const handleStatusChange = async (newStatus: ClientStatus) => {
     if (!clientRef || !user) return;
@@ -945,14 +963,21 @@ export default function ClientDetailPage() {
                                               </TableRow>
                                           </TableHeader>
                                           <TableBody>
-                                              {proposals.map(p => (
+                                              {isLoadingProposals && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="h-24 text-center">
+                                                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                                    </TableCell>
+                                                </TableRow>
+                                              )}
+                                              {!isLoadingProposals && proposals?.map(p => (
                                               <TableRow key={p.id}>
                                                   <TableCell>{p.productName}</TableCell>
-                                                  <TableCell><Badge variant={p.status === 'Finalizada' ? 'default' : p.status === 'Cancelada' ? 'destructive' : 'secondary'}>{p.status}</Badge></TableCell>
+                                                  <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
                                                   <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
                                               </TableRow>
                                               ))}
-                                              {proposals.length === 0 && (
+                                              {!isLoadingProposals && proposals?.length === 0 && (
                                                   <TableRow>
                                                       <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
                                                   </TableRow>
@@ -971,3 +996,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
