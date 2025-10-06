@@ -510,7 +510,6 @@ export default function ClientDetailPage() {
                 salesRepId: user.uid,
                 salesRepName: user.displayName || user.email,
                 createdAt: now,
-                approvedAt: '', // Initially empty
                 status: 'Aberta'
             };
             batch.set(newProposalRef, newProposalData);
@@ -522,8 +521,7 @@ export default function ClientDetailPage() {
                 bankName: data.bankName,
                 value: data.value,
                 status: 'Aberta',
-                createdAt: now,
-                approvedAt: ''
+                createdAt: now
             };
     
             // 3. Create the timeline event
@@ -726,14 +724,18 @@ export default function ClientDetailPage() {
                         <div><p className="text-muted-foreground">Produto</p><p>{viewingProposal.productName}</p></div>
                         <div><p className="text-muted-foreground">Status</p><p><Badge variant={getProposalStatusVariant(viewingProposal.status)}>{viewingProposal.status}</Badge></p></div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><p className="text-muted-foreground">Valor</p><p>R$ {viewingProposal.value.toLocaleString('pt-br')}</p></div>
-                        <div><p className="text-muted-foreground">Data de Criação</p><p>{new Date(viewingProposal.createdAt).toLocaleString('pt-br')}</p></div>
-                    </div>
-                     <Separator />
                      <div className="grid grid-cols-2 gap-4">
-                        <div><p className="text-muted-foreground">Cliente</p><p>{viewingProposal.clientName}</p></div>
+                        <div><p className="text-muted-foreground">Banco</p><p>{viewingProposal.bankName || 'N/A'}</p></div>
                         <div><p className="text-muted-foreground">Atendente</p><p>{viewingProposal.salesRepName}</p></div>
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Valor Solicitado</p><p>R$ {viewingProposal.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p></div>
+                         {viewingProposal.installments && <div><p className="text-muted-foreground">Parcelas</p><p>{viewingProposal.installments}x de R$ {viewingProposal.installmentValue?.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p></div>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Data de Criação</p><p>{new Date(viewingProposal.createdAt).toLocaleString('pt-br')}</p></div>
+                        <div><p className="text-muted-foreground">Data de Aprovação</p><p>{viewingProposal.approvedAt ? new Date(viewingProposal.approvedAt).toLocaleString('pt-br') : '—'}</p></div>
                     </div>
                 </div>
             )}

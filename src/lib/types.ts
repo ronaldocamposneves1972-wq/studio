@@ -80,7 +80,10 @@ export type Proposal = {
   clientId: string;
   clientName: string;
   productName: string;
+  bankName?: string;
   value: number;
+  installments?: number;
+  installmentValue?: number;
   status: ProposalStatus;
   createdAt: string;
   approvedAt?: string;
