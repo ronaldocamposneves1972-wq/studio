@@ -30,7 +30,8 @@ import {
   Eye,
   MoreHorizontal,
   PlusCircle,
-  FileWarning
+  FileWarning,
+  Receipt
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useParams } from 'next/navigation'
@@ -644,10 +645,11 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         await batch.commit();
         toast({
             title: "Proposta Aceita!",
-            description: `O cliente ${client.name} foi marcado como Aprovado.`
+            description: `O cliente ${client.name} foi marcado como Aprovado e movido para a esteira de Clearance.`
         });
         setProposalToAccept(null);
         setFormalizationLink('');
+        router.push('/dashboard/pipeline/clearance');
     } catch (error) {
         console.error("Error accepting proposal: ", error);
         toast({
@@ -895,6 +897,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                         <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
                         <TabsTrigger value="documents">Documentos</TabsTrigger>
+                        {hasAcceptedProposal && <TabsTrigger value="payment_guides">Guias de Pagamento</TabsTrigger>}
                         <TabsTrigger value="history">Histórico</TabsTrigger>
                       </TabsList>
                        <TabsContent value="quiz">
@@ -1265,6 +1268,29 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                             </div>
                                         </div>
                                     )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                         <TabsContent value="payment_guides">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Guias de Pagamento</CardTitle>
+                                    <CardDescription>
+                                        Gerencie os boletos de seguro, comissão e outras taxas.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
+                                        <Receipt className="h-12 w-12 text-muted-foreground" />
+                                        <h3 className="text-xl font-semibold">Nenhuma guia de pagamento</h3>
+                                        <p className="text-muted-foreground max-w-sm">
+                                            Anexe aqui os boletos de seguro prestamista, taxas de comissão e outros documentos de pagamento relevantes para este contrato.
+                                        </p>
+                                        <Button>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Anexar Guia
+                                        </Button>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
