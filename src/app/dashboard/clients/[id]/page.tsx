@@ -365,6 +365,15 @@ export default function ClientDetailPage() {
         })
     }
   }
+  
+  const handleDownload = (doc: ClientDocument) => {
+    const link = document.createElement('a');
+    link.href = doc.secureUrl;
+    link.download = doc.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
 
   const translatedLabels: { [key: string]: string } = {
@@ -419,7 +428,7 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
-  const isViewingImage = viewingDocument && viewingDocument.fileType === 'image';
+  const isViewingImage = viewingDocument && viewingDocument.fileType.startsWith('image');
 
 
   return (
@@ -429,7 +438,7 @@ export default function ClientDetailPage() {
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
             <DialogDescription>
-                Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.
+                 Visualizando documento. <a onClick={() => handleDownload(viewingDocument!)} className="text-primary hover:underline cursor-pointer">Fazer download</a>.
             </DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
@@ -439,7 +448,7 @@ export default function ClientDetailPage() {
                  <div className="text-center p-8">
                     <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
                     <p className="mt-4 text-lg font-semibold">Pré-visualização não disponível.</p>
-                    <p className="text-muted-foreground">Este tipo de arquivo não pode ser exibido aqui. Use a opção "Baixar" para acessar o arquivo.</p>
+                    <p className="text-muted-foreground">Este tipo de arquivo não pode ser exibido. Use a opção de download.</p>
                 </div>
             )}
           </div>
@@ -609,7 +618,7 @@ export default function ClientDetailPage() {
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
-                                                             <DropdownMenuItem onSelect={() => window.open(doc.secureUrl, '_blank')}>
+                                                             <DropdownMenuItem onSelect={() => handleDownload(doc)}>
                                                                 <Download className="mr-2 h-4 w-4" />
                                                                 Baixar
                                                             </DropdownMenuItem>
