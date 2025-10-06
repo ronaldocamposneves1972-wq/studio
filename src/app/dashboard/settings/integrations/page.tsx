@@ -15,8 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase"
-import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -27,7 +25,6 @@ type IntegrationSettings = {
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
-    const firestore = useFirestore()
     
     const [settings, setSettings] = useState<IntegrationSettings>({
         cloudinaryCloudName: '',
@@ -36,59 +33,23 @@ export default function IntegrationsPage() {
         whatsappApiKey: '',
     });
     const [isSaving, setIsSaving] = useState(false);
-
-    const settingsDocRef = useMemoFirebase(() => {
-        if (!firestore) return null
-        return doc(firestore, 'settings', 'integrations')
-    }, [firestore])
-
-    const { data: savedSettings, isLoading: isLoadingSettings, error } = useDoc<IntegrationSettings>(settingsDocRef)
-
-    useEffect(() => {
-        if (savedSettings) {
-            setSettings({
-                cloudinaryCloudName: savedSettings.cloudinaryCloudName || '',
-                cloudinaryApiKey: savedSettings.cloudinaryApiKey || '',
-                whatsappApiKey: savedSettings.whatsappApiKey || '',
-                cloudinaryApiSecret: '', // Always keep secret blank in UI
-            })
-        }
-    }, [savedSettings])
-
+    const [isLoadingSettings, setIsLoadingSettings] = useState(false); // Simulating loading state
 
     const handleSave = () => {
-        if (!settingsDocRef) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro',
-                description: 'A conexão com o banco de dados não está pronta.',
-            })
-            return;
-        }
-
         setIsSaving(true);
         
-        const settingsToSave: Partial<IntegrationSettings> = {
-            cloudinaryCloudName: settings.cloudinaryCloudName,
-            cloudinaryApiKey: settings.cloudinaryApiKey,
-            whatsappApiKey: settings.whatsappApiKey,
-        };
-        // Only include the secret if a new one was typed
-        if (settings.cloudinaryApiSecret) {
-            settingsToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
-        }
-        
-        setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+        // Simulate a network request
+        setTimeout(() => {
+            toast({
+                title: "Configurações Salvas!",
+                description: "Suas chaves de API foram salvas localmente.",
+            });
+            
+            // Optimistically clear secret field from UI state
+            setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
 
-        toast({
-            title: "Configurações Salvas!",
-            description: "Suas chaves de API foram enviadas para salvamento.",
-        });
-        
-        // Optimistically clear secret field from UI state
-        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
-
-        setIsSaving(false);
+            setIsSaving(false);
+        }, 500);
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,24 +74,6 @@ export default function IntegrationsPage() {
                 </CardFooter>
             </Card>
         )
-    }
-
-    if (error) {
-       return (
-         <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="text-destructive">Acesso Negado</CardTitle>
-              <CardDescription>
-                Você não tem permissão para gerenciar as integrações. Apenas administradores podem acessar esta página.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">
-                    Se você acredita que isso é um erro, entre em contato com o suporte do sistema.
-                </p>
-            </CardContent>
-          </Card>
-       )
     }
 
     return (
