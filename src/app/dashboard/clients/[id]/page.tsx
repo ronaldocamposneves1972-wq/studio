@@ -421,7 +421,8 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
-  const isViewingPdf = viewingDocument?.fileName.toLowerCase().endsWith('.pdf');
+  const isImage = viewingDocument && viewingDocument.fileType.startsWith('image');
+
 
   return (
     <>
@@ -434,14 +435,13 @@ export default function ClientDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {viewingDocument && !isViewingPdf ? (
+            {isImage ? (
               <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
             ) : (
                  <div className="text-center p-8">
                     <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold">Não é possível pré-visualizar este PDF.</p>
+                    <p className="mt-4 text-lg font-semibold">Pré-visualização não disponível.</p>
                     <p className="text-muted-foreground">Use a opção "Abrir em nova aba" para visualizar o arquivo.</p>
-                    <p className="text-xs text-destructive mt-2">Falha ao carregar documento PDF.</p>
                 </div>
             )}
           </div>
