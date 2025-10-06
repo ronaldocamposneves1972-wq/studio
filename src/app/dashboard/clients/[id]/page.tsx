@@ -82,7 +82,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -349,6 +349,25 @@ export default function ClientDetailPage() {
 
   const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'number', 'complement', 'neighborhood', 'city', 'state'];
 
+    const getDocumentViewUrl = (doc: ClientDocument | null): string => {
+        if (!doc) return '';
+
+        const isPDF = doc.fileType === 'pdf' || doc.fileName.toLowerCase().endsWith('.pdf');
+
+        if (isPDF) {
+            // For PDFs, we add fl_inline to suggest inline display.
+            // Cloudinary URLs are in the format: https://res.cloudinary.com/<cloud_name>/<resource_type>/<delivery_type>/<transformations>/<version>/<public_id>.<format>
+            // We need to inject `fl_inline` into the transformations part.
+            const urlParts = doc.secureUrl.split('/upload/');
+            if (urlParts.length === 2) {
+                return `${urlParts[0]}/upload/fl_inline/${urlParts[1]}`;
+            }
+        }
+        
+        // For images and other types, return the original URL
+        return doc.secureUrl;
+    };
+
   if (isLoadingClient) {
      return (
        <div className="grid flex-1 items-start gap-4 md:gap-8">
@@ -395,14 +414,14 @@ export default function ClientDetailPage() {
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
-            <DialogDescription>Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
+            <DialogDescription>Visualizando documento. <a href={getDocumentViewUrl(viewingDocument)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
           </DialogHeader>
-          <div className="h-full w-full relative">
+          <div className="h-full w-full relative bg-muted">
             {viewingDocument && (
               viewingDocument.fileType.startsWith('image') ? (
                 <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
               ) : (
-                <iframe src={viewingDocument.secureUrl} className="h-full w-full border-0" title={viewingDocument.fileName} />
+                <iframe src={getDocumentViewUrl(viewingDocument)} className="h-full w-full border-0" title={viewingDocument.fileName} />
               )
             )}
           </div>
