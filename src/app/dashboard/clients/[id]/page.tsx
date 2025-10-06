@@ -73,7 +73,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { proposals as allProposals } from "@/lib/placeholder-data"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -276,7 +276,7 @@ export default function ClientDetailPage() {
         cloudinaryPublicId: uploadData.public_id,
         secureUrl: uploadData.secure_url,
         uploadedAt: new Date().toISOString(),
-        validated: false,
+        validationStatus: 'pending',
       };
       
       await updateDoc(clientRef, {
@@ -343,18 +343,18 @@ export default function ClientDetailPage() {
     }
   }
 
-  const handleToggleValidation = async (docToValidate: ClientDocument) => {
+  const handleValidationStatusChange = async (docToUpdate: ClientDocument, newStatus: DocumentStatus) => {
     if (!clientRef || !client?.documents) return;
     try {
         const updatedDocuments = client.documents.map(doc =>
-            doc.id === docToValidate.id ? { ...doc, validated: !doc.validated } : doc
+            doc.id === docToUpdate.id ? { ...doc, validationStatus: newStatus } : doc
         );
         await updateDoc(clientRef, {
             documents: updatedDocuments
         });
         toast({
-            title: `Documento ${!docToValidate.validated ? 'validado' : 'marcado como pendente'}.`,
-            description: `${docToValidate.fileName} foi atualizado.`
+            title: `Status do documento atualizado para ${newStatus}.`,
+            description: `${docToUpdate.fileName} foi atualizado.`
         });
     } catch(e) {
         console.error(e)
@@ -582,13 +582,29 @@ export default function ClientDetailPage() {
                                         <TableRow>
                                         <TableHead>Nome do Arquivo</TableHead>
                                         <TableHead className="hidden sm:table-cell">Tipo</TableHead>
-                                        <TableHead>Validado</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
                                         <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {documents.map((doc) => (
+                                        {documents.map((doc) => {
+                                           const status = doc.validationStatus || 'pending';
+                                           let statusBadge;
+                                           switch (status) {
+                                                case 'validated':
+                                                    statusBadge = <Badge variant="default" className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-4 w-4 mr-1" /> Validado</Badge>;
+                                                    break;
+                                                case 'rejected':
+                                                    statusBadge = <Badge variant="destructive"><XCircle className="h-4 w-4 mr-1" /> Rejeitado</Badge>;
+                                                    break;
+                                                case 'pending':
+                                                default:
+                                                    statusBadge = <Badge variant="secondary"><Clock className="h-4 w-4 mr-1" /> Pendente</Badge>;
+                                                    break;
+                                           }
+                                           
+                                           return (
                                             <TableRow key={doc.id}>
                                                 <TableCell className="font-medium flex items-center gap-2">
                                                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -596,15 +612,7 @@ export default function ClientDetailPage() {
                                                 </TableCell>
                                                 <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
                                                 <TableCell>
-                                                    {doc.validated ? (
-                                                        <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-                                                            <CheckCircle2 className="h-4 w-4" />
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="secondary">
-                                                           <Clock className="h-4 w-4" />
-                                                        </Badge>
-                                                    )}
+                                                    {statusBadge}
                                                 </TableCell>
                                                 <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
                                                 <TableCell className="text-right">
@@ -623,9 +631,18 @@ export default function ClientDetailPage() {
                                                                 <Download className="mr-2 h-4 w-4" />
                                                                 Baixar
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onSelect={() => handleToggleValidation(doc)}>
-                                                                <Check className="mr-2 h-4 w-4" />
-                                                                {doc.validated ? 'Marcar como Pendente' : 'Validar'}
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'validated')}>
+                                                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                                Validar
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'rejected')}>
+                                                                <XCircle className="mr-2 h-4 w-4" />
+                                                                Rejeitar
+                                                            </DropdownMenuItem>
+                                                             <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')}>
+                                                                <Clock className="mr-2 h-4 w-4" />
+                                                                Marcar como Pendente
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                              <AlertDialog>
@@ -654,7 +671,7 @@ export default function ClientDetailPage() {
                                                     </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
+                                        )})}
                                     </TableBody>
                                 </Table>
                             )}

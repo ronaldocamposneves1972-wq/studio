@@ -8,6 +8,8 @@ export type User = {
 
 export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado';
 
+export type DocumentStatus = 'pending' | 'validated' | 'rejected';
+
 export type ClientDocument = {
   id: string;
   clientId: string;
@@ -16,7 +18,7 @@ export type ClientDocument = {
   cloudinaryPublicId: string;
   secureUrl: string;
   uploadedAt: string;
-  validated?: boolean;
+  validationStatus?: DocumentStatus;
 };
 
 export type Client = {
