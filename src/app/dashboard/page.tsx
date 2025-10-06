@@ -9,7 +9,6 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { proposals as allProposals, clients as allClients, users as allUsers } from "@/lib/placeholder-data"
 import type { Proposal, Client, User } from "@/lib/types"
 
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +38,8 @@ import {
 } from "recharts"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useMemo } from "react"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, query, limit, orderBy } from "firebase/firestore"
 
 
 function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: string, icon: React.ElementType, value: string, subtext: string, isLoading: boolean }) {
@@ -67,14 +68,17 @@ function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: stri
 
 
 export default function Dashboard() {
-    const proposals = allProposals;
-    const recentProposals = allProposals.slice(0, 5);
-    const clients = allClients;
-    const users = allUsers;
-    const isLoadingProposals = false;
-    const isLoadingClients = false;
-    const isLoadingRecentProposals = false;
-    const isLoadingUsers = false;
+    const firestore = useFirestore();
+
+    const proposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals')) : null, [firestore]);
+    const recentProposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals'), orderBy('createdAt', 'desc'), limit(5)) : null, [firestore]);
+    const clientsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'clients')) : null, [firestore]);
+    const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+
+    const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
+    const { data: recentProposals, isLoading: isLoadingRecentProposals } = useCollection<Proposal>(recentProposalsQuery);
+    const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+    const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
 
 
     const { totalApproved, pendingProposalsCount, inNegotiationCount, commissionValue } = useMemo(() => {
