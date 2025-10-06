@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -59,8 +60,8 @@ export default function RegisterPage() {
       );
       const user = userCredential.user;
 
-      // Define o papel do usuário. E-mail específico se torna Admin.
-      const userRole = email.toLowerCase() === 'kaiqueguilhermepereiramiranda@gmail.com' ? 'Admin' : 'Atendente';
+      // Define o papel padrão como 'Atendente' para todos os novos usuários.
+      const userRole = 'Atendente';
 
       // Cria um documento para o usuário no Firestore.
       await setDoc(doc(firestore, 'users', user.uid), {

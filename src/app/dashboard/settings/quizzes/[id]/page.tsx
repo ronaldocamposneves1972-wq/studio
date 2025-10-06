@@ -176,18 +176,6 @@ export default function EditQuizPage() {
       </div>
     )
   }
-  
-  // Security check on client-side as a safeguard
-  if (quiz.ownerId !== user.uid) {
-     return (
-      <div className="text-center py-10">
-        <p>Você não tem permissão para editar este quiz.</p>
-         <Button asChild className="mt-4">
-          <Link href="/dashboard/settings/quizzes">Voltar</Link>
-        </Button>
-      </div>
-    )
-  }
 
 
   return (

@@ -39,9 +39,6 @@ export default function QuizzesPage() {
 
   const quizzesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // For admins/owners, we might show all. For now, let's assume rules handle filtering.
-    // If we wanted to explicitly filter by owner:
-    // return query(collection(firestore, 'quizzes'), where('ownerId', '==', user.uid));
     return query(collection(firestore, 'quizzes'));
   }, [firestore]);
 
@@ -51,7 +48,6 @@ export default function QuizzesPage() {
     if (!firestore) return;
     const quizDocRef = doc(firestore, 'quizzes', quizId);
     
-    // This function handles its own errors and is non-blocking
     deleteDocumentNonBlocking(quizDocRef);
 
     toast({
@@ -83,8 +79,7 @@ export default function QuizzesPage() {
               <Button variant="secondary" asChild>
                 <Link href={`/dashboard/settings/quizzes/${quiz.id}`}>Editar</Link>
               </Button>
-              {/* Only show delete button if the logged-in user is the owner */}
-              {user && quiz.ownerId === user.uid && (
+              {user && (
                  <AlertDialog>
                   <AlertDialogTrigger asChild>
                      <Button variant="destructive" size="sm">
