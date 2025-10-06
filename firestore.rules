@@ -1,233 +1,205 @@
-/**
- * @fileoverview Firestore Security Rules for ConsorciaTech application.
- *
- * Core Philosophy:
- * This ruleset enforces a combination of ownership-based and role-based access control.
- * - Users can only manage their own data under /users/{userId}.
- * - Clients can create and access documents related to them in /clients/{clientId}/documents.
- * - Certain data, like financial institutions, consortiums, credit products, product combos, quizzes and questions, are publicly readable.
- * - Sales proposals are accessible based on client ID.
- * - Admin roles are determined by the existence of a document in /roles_admin/{userId}.
- *
- * Data Structure:
- * - /users/{userId}: User profiles, accessible only by the user.
- * - /roles_admin/{userId}: Admin role indicators, checked by existence.
- * - /clients/{clientId}: Client data.
- * - /clients/{clientId}/documents/{documentId}: Client-uploaded documents, owned by the client.
- * - /financial_institutions/{financialInstitutionId}: Financial institution data, publicly readable.
- * - /consortiums/{consortiumId}: Consortium product data, publicly readable.
- * - /credit_products/{creditProductId}: Credit product data, publicly readable.
- * - /product_combos/{productComboId}: Product combo data, publicly readable.
- * - /sales_proposals/{salesProposalId}: Sales proposal data, accessible based on clientId.
- * - /commissions/{commissionId}: Commission data.
- * - /quizzes/{quizId}: Quiz data, publicly readable.
- * - /questions/{questionId}: Question data, publicly readable.
- *
- * Key Security Decisions:
- * - User listing is disallowed.
- * - Public read access is granted to financial institutions, consortiums, credit products, product combos, quizzes and questions.
- * - Sales proposals are accessible based on client ID, denormalized within the document.
- * - Strict ownership is enforced for user-specific data.
- *
- * Denormalization for Authorization:
- * - `sales_proposals` include a `clientId` field to allow direct authorization without additional reads.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is an existing owner.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user has admin role.
-     */
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    /**
-     * @description Grants owner read and write access to their user document.
+     * @description Controls access to user profile data. Only the authenticated user can read/write their own profile.
      * @path /users/{userId}
-     * @allow (get, update, delete) if isOwner(userId) - Allows a user to read, update and delete their own user document.
-     * @allow (create) if isOwner(userId) - Allows a user to create their own user document.
-     * @allow (list) if false - Prevents listing of user documents.
-     * @deny (get) if !isOwner(userId) - Denies other users from accessing this user document.
-     * @principle Enforces user-ownership for user data.
+     * @allow (create, update, delete) - User 'abc' can create/update/delete their own profile at /users/abc with correct auth.
+     * @deny (create, update, delete) - User 'abc' cannot create/update/delete profile 'xyz' at /users/xyz.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId) && isExistingOwner(userId);
     }
 
     /**
-     * @description Grants admin role based on document existence.
+     * @description Determines admin role based on document existence.
      * @path /roles_admin/{userId}
+     * @allow create - User 'abc' can create a document at /roles_admin/abc if they are authenticated. This grants them admin role.
+     * @deny create - An unauthenticated user cannot create a document at /roles_admin/abc.
+     * @allow get - Any authenticated user can check if a user is an admin.
      */
     match /roles_admin/{userId} {
-      allow get: if isAdmin();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isAdmin(userId) {
+        return exists(/databases/$(database)/documents/roles_admin/$(userId));
+      }
+
+      allow get: if isSignedIn();
       allow list: if false;
-      allow create: if isAdmin();
+      allow create: if isSignedIn();
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if false;
     }
 
     /**
-     * @description Grants read and write access to client documents.
+     * @description Controls access to client data. All clients are publicly readable.
      * @path /clients/{clientId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access with owner-only writes (not implemented here).
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants a client read/write access to their uploaded documents.
+     * @description Controls access to client documents. Only the client can read/write their own documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) if isSignedIn() - Allows a signed-in user to create a document if the clientId matches their own id.
-     * @allow (get, list, update, delete) if isOwner(clientId) - Allows a user to read, list, update, and delete their own documents.
-     * @deny (create) if !isOwner(clientId) - Denies a user from creating a document under someone else's client ID.
-     * @principle Enforces path-based ownership for client documents.
+     * @allow (create, update, delete) - Client 'abc' can create/update/delete their own document at /clients/abc/documents/doc1 with correct auth.
+     * @deny (create, update, delete) - Client 'abc' cannot create/update/delete document 'doc2' for client 'xyz' at /clients/xyz/documents/doc2.
+     * @principle Enforces document ownership for client documents.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if isOwner(clientId);
-      allow list: if isOwner(clientId);
-      allow create: if isOwner(clientId) && request.resource.data.clientId == clientId;
-      allow update: if isExistingOwner(clientId) && request.resource.data.clientId == clientId;
-      allow delete: if isExistingOwner(clientId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(clientId) {
+        return request.auth.uid == clientId;
+      }
+
+      function isExistingOwner(clientId) {
+        return isOwner(clientId) && resource.data != null;
+      }
+
+      allow get: if isSignedIn() && isOwner(clientId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(clientId);
+      allow update: if isSignedIn() && isOwner(clientId) && isExistingOwner(clientId);
+      allow delete: if isSignedIn() && isOwner(clientId) && isExistingOwner(clientId);
     }
 
     /**
-     * @description Grants public read access to financial institution documents.
+     * @description Controls access to financial institution data. All financial institutions are publicly readable.
      * @path /financial_institutions/{financialInstitutionId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants public read access to consortium product documents.
+     * @description Controls access to consortium product data. All consortium products are publicly readable.
      * @path /consortiums/{consortiumId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /consortiums/{consortiumId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants public read access to credit product documents.
+     * @description Controls access to credit product data. All credit products are publicly readable.
      * @path /credit_products/{creditProductId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /credit_products/{creditProductId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants public read access to product combo documents.
+     * @description Controls access to product combo data. All product combos are publicly readable.
      * @path /product_combos/{productComboId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /product_combos/{productComboId} {
-      allow get: if true;
-      allow list: if true;
-            allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants access to sales proposals based on client ID.
+     * @description Controls access to sales proposal data. All sales proposals are publicly readable.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get, list) if resource.data.clientId == request.auth.uid - Allows a user to read sales proposals associated with their client ID.
-     * @principle Enforces authorization independence by using the 'clientId' in the document.
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if resource.data.clientId == request.auth.uid;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants access to commission documents.
+     * @description Controls access to commission data. All commissions are publicly readable.
      * @path /commissions/{commissionId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /commissions/{commissionId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants public read access to quiz documents.
+     * @description Controls access to quiz data. All quizzes are publicly readable.
      * @path /quizzes/{quizId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /quizzes/{quizId} {
-      allow get: if true;
-      allow list: if true;
-            allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Grants public read access to question documents.
+     * @description Controls access to question data. All questions are publicly readable.
      * @path /questions/{questionId}
+     * @allow get, list: Public read access.
+     * @deny create, update, delete: No direct writes allowed.
+     * @principle Public read access.
      */
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
-            allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-        /**
-     * @description Grants read access to settings documents.
-     * @path /settings/integrations
-     * @allow (get) if true - Allows any user to read the settings/integrations document.
-     * @principle Allows public read access to settings/integrations.
-     */
-    match /settings/integrations {
-      allow get: if true;
-      allow list: if false;
+      allow get, list: if true;
       allow create: if false;
       allow update: if false;
       allow delete: if false;

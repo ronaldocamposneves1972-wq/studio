@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase"
+import { doc, setDoc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -25,31 +27,73 @@ type IntegrationSettings = {
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
+    const firestore = useFirestore()
     
-    // Usar estado local em vez de hooks do Firestore
-    const [settings, setSettings] = useState<IntegrationSettings>({
-        cloudinaryCloudName: '',
-        cloudinaryApiKey: '',
-        cloudinaryApiSecret: '',
-        whatsappApiKey: '',
-    });
+    const settingsRef = useMemoFirebase(() => {
+        if (!firestore) return null
+        return doc(firestore, 'settings', 'integrations')
+    }, [firestore])
+
+    const { data: remoteSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsRef)
+
+    const [settings, setSettings] = useState<IntegrationSettings>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+
+    useEffect(() => {
+      if (remoteSettings) {
+        setSettings({
+            cloudinaryCloudName: remoteSettings.cloudinaryCloudName || '',
+            cloudinaryApiKey: remoteSettings.cloudinaryApiKey || '',
+            // Do not pre-fill the secret for security
+            cloudinaryApiSecret: '',
+            whatsappApiKey: '',
+        });
+      }
+    }, [remoteSettings]);
 
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        if (!settingsRef) {
+            toast({ variant: "destructive", title: "Erro", description: "Serviço do Firestore não disponível."});
+            return;
+        }
+
         setIsSaving(true);
         
-        // Apenas simula o salvamento com um toast
-        toast({
-            title: "Configurações Salvas!",
-            description: "Suas alterações foram salvas localmente (simulado).",
-        });
-        
-        // Limpa o campo de segredo da UI por segurança
-        setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
+        try {
+            // Prepare data, only include secret if it has been changed
+            const dataToSave: Partial<IntegrationSettings> = {
+                cloudinaryCloudName: settings.cloudinaryCloudName,
+                cloudinaryApiKey: settings.cloudinaryApiKey,
+            };
 
-        setIsSaving(false);
+            if (settings.cloudinaryApiSecret) {
+                dataToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
+            }
+            if (settings.whatsappApiKey) {
+                dataToSave.whatsappApiKey = settings.whatsappApiKey;
+            }
+
+            await setDoc(settingsRef, dataToSave, { merge: true });
+
+            toast({
+                title: "Configurações Salvas!",
+                description: "Suas alterações de integração foram salvas no banco de dados.",
+            });
+            
+            // Limpa os campos de segredo da UI por segurança
+            setSettings(prev => ({ ...prev, cloudinaryApiSecret: '', whatsappApiKey: '' }));
+
+        } catch (error: any) {
+            console.error("Failed to save settings:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro ao Salvar",
+                description: error.message || "Não foi possível salvar as configurações.",
+            });
+        } finally {
+            setIsSaving(false);
+        }
     }
     
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
