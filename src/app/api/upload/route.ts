@@ -27,10 +27,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(arrayBuffer);
 
+    // Determine resource_type based on file's MIME type
+    const resource_type = file.type.startsWith('image/') ? 'image' : 'raw';
+
     const uploadResult = await new Promise<any>((resolve, reject) => {
       cloudinary.uploader.upload_stream({
         folder: `clients/${clientId}`,
-        resource_type: 'auto'
+        resource_type: resource_type, // Use determined resource_type
       }, (error, result) => {
         if (error) {
           reject(error);
@@ -57,13 +60,15 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { public_id } = await request.json();
+    const { public_id, resource_type } = await request.json();
 
     if (!public_id) {
       return NextResponse.json({ error: 'ID público do arquivo ausente.' }, { status: 400 });
     }
 
-    const result = await cloudinary.uploader.destroy(public_id);
+    const result = await cloudinary.uploader.destroy(public_id, {
+        resource_type: resource_type || 'raw'
+    });
 
     if (result.result !== 'ok' && result.result !== 'not found') {
        throw new Error(result.result || 'Falha ao deletar o arquivo no Cloudinary.');

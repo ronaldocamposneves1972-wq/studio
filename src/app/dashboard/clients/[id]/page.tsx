@@ -312,7 +312,10 @@ export default function ClientDetailPage() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ public_id: docToDelete.cloudinaryPublicId }),
+            body: JSON.stringify({ 
+              public_id: docToDelete.cloudinaryPublicId,
+              resource_type: docToDelete.fileType
+            }),
         });
 
         if (!response.ok) {
@@ -421,7 +424,7 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
-  const isImage = viewingDocument && viewingDocument.fileType.startsWith('image');
+  const isViewingImage = viewingDocument && viewingDocument.fileType === 'image';
 
 
   return (
@@ -435,7 +438,7 @@ export default function ClientDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {isImage ? (
+            {isViewingImage ? (
               <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
             ) : (
                  <div className="text-center p-8">
