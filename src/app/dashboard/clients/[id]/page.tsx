@@ -428,7 +428,7 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
-  const isViewingImage = viewingDocument && viewingDocument.fileType.startsWith('image');
+  const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image') && !viewingDocument.fileName.toLowerCase().endsWith('.pdf'));
 
 
   return (
@@ -455,7 +455,7 @@ export default function ClientDetailPage() {
         </DialogContent>
       </Dialog>
     <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
-        <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
+        <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3">
             <Card>
                 <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
@@ -507,12 +507,13 @@ export default function ClientDetailPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                   <Tabs defaultValue="documents">
+                   <Tabs defaultValue="quiz">
                     <TabsList className="mb-4">
                       <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
                       <TabsTrigger value="documents">Documentos</TabsTrigger>
                       <TabsTrigger value="history">Histórico</TabsTrigger>
                       <TabsTrigger value="proposals">Propostas</TabsTrigger>
+                      <TabsTrigger value="actions">Ações</TabsTrigger>
                     </TabsList>
                      <TabsContent value="quiz">
                         <Card>
@@ -698,28 +699,29 @@ export default function ClientDetailPage() {
                             </CardContent>
                         </Card>
                     </TabsContent>
+                     <TabsContent value="actions">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Ações Rápidas</CardTitle>
+                                <CardDescription>Execute ações rápidas relacionadas a este cliente.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="quiz-link">Link de Documentação para Cliente</Label>
+                                        <div className="flex gap-2">
+                                            <Input id="quiz-link" value={quizLink} readOnly />
+                                            <Button variant="outline" size="icon" onClick={handleCopyLink}>
+                                                {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">Envie este link para o cliente solicitar a documentação.</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
                   </Tabs>
-                </CardContent>
-            </Card>
-        </div>
-         <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ações Rápidas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-4">
-                        <div className="space-y-2">
-                             <Label htmlFor="quiz-link">Link de Documentação para Cliente</Label>
-                             <div className="flex gap-2">
-                                <Input id="quiz-link" value={quizLink} readOnly />
-                                <Button variant="outline" size="icon" onClick={handleCopyLink}>
-                                    {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                </Button>
-                             </div>
-                             <p className="text-xs text-muted-foreground">Envie este link para o cliente solicitar a documentação.</p>
-                        </div>
-                    </div>
                 </CardContent>
             </Card>
         </div>
