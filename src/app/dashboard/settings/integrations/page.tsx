@@ -15,8 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase"
-import { doc } from "firebase/firestore"
 
 type IntegrationSettings = {
   cloudinaryCloudName?: string;
@@ -27,54 +25,28 @@ type IntegrationSettings = {
 
 export default function IntegrationsPage() {
     const { toast } = useToast()
-    const firestore = useFirestore()
     
-    const [settings, setSettings] = useState<IntegrationSettings>({});
+    // Usar estado local em vez de hooks do Firestore
+    const [settings, setSettings] = useState<IntegrationSettings>({
+        cloudinaryCloudName: '',
+        cloudinaryApiKey: '',
+        cloudinaryApiSecret: '',
+        whatsappApiKey: '',
+    });
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
-    const settingsDocRef = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return doc(firestore, 'settings', 'integrations');
-    }, [firestore]);
-
-    const { data: loadedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef);
-
-    useEffect(() => {
-        if (loadedSettings) {
-            setSettings({
-                cloudinaryCloudName: loadedSettings.cloudinaryCloudName || '',
-                cloudinaryApiKey: loadedSettings.cloudinaryApiKey || '',
-                whatsappApiKey: loadedSettings.whatsappApiKey || '',
-                cloudinaryApiSecret: '', // Always keep secret blank in UI
-            });
-        }
-    }, [loadedSettings]);
 
     const handleSave = () => {
-        if (!settingsDocRef) {
-            toast({
-                variant: "destructive",
-                title: "Erro",
-                description: "A referência do banco de dados não está pronta.",
-            });
-            return;
-        }
         setIsSaving(true);
         
-        const settingsToSave: Partial<IntegrationSettings> = { ...settings };
-        // Only include the secret if it has been changed
-        if (!settings.cloudinaryApiSecret) {
-            delete settingsToSave.cloudinaryApiSecret;
-        }
-
-        setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
-
+        // Apenas simula o salvamento com um toast
         toast({
             title: "Configurações Salvas!",
-            description: "Suas chaves de API foram enviadas para o banco de dados.",
+            description: "Suas alterações foram salvas localmente (simulado).",
         });
         
-        // Optimistically clear secret field from UI state after saving
+        // Limpa o campo de segredo da UI por segurança
         setSettings(prev => ({ ...prev, cloudinaryApiSecret: '' }));
 
         setIsSaving(false);
@@ -124,7 +96,7 @@ export default function IntegrationsPage() {
                <div className="space-y-2">
                 <Label htmlFor="cloudinaryApiSecret">Cloudinary API Secret</Label>
                 <Input id="cloudinaryApiSecret" type="password" placeholder="Preencha para alterar o segredo" value={settings.cloudinaryApiSecret || ''} onChange={handleInputChange} disabled={isSaving}/>
-                 <p className="text-xs text-muted-foreground">Seu API secret é confidencial e não será exibido. Deixe em branco para não alterar.</p>
+                 <p className="text-xs text-muted-foreground">Seu API secret é confidencial. Deixe em branco para não alterar.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="whatsappApiKey">Chave de API do WhatsApp</Label>
