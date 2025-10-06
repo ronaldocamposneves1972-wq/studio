@@ -421,6 +421,7 @@ export default function ClientDetailPage() {
   }
 
   const documents = client.documents || [];
+  const isViewingPdf = viewingDocument?.fileName.toLowerCase().endsWith('.pdf');
 
   return (
     <>
@@ -428,16 +429,19 @@ export default function ClientDetailPage() {
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
-            <DialogDescription>Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
+            <DialogDescription>
+                Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.
+            </DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {viewingDocument && viewingDocument.fileType.startsWith('image') ? (
-              <Image src={getDocumentViewUrl(viewingDocument)} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
+            {viewingDocument && !isViewingPdf ? (
+              <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
             ) : (
                  <div className="text-center p-8">
                     <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold">Não é possível pré-visualizar este arquivo.</p>
-                    <p className="text-muted-foreground">Use a opção "Abrir / Baixar" para visualizar o arquivo.</p>
+                    <p className="mt-4 text-lg font-semibold">Não é possível pré-visualizar este PDF.</p>
+                    <p className="text-muted-foreground">Use a opção "Abrir em nova aba" para visualizar o arquivo.</p>
+                    <p className="text-xs text-destructive mt-2">Falha ao carregar documento PDF.</p>
                 </div>
             )}
           </div>
