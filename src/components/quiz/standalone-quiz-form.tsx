@@ -121,6 +121,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 type="file"
                                 className="hidden"
                                 multiple // Allow multiple file selection
+                                accept="image/*,application/pdf"
                                 onChange={(e) => field.onChange(e.target.files)}
                             />
                         </FormControl>
