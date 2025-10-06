@@ -375,8 +375,16 @@ export default function ClientDetailPage() {
 
   const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'number', 'complement', 'neighborhood', 'city', 'state'];
 
-    const getDocumentViewUrl = (doc: ClientDocument | null): string => {
-        if (!doc) return '';
+    const getInlineViewUrl = (doc: ClientDocument | null): string => {
+        if (!doc || !doc.secureUrl) return '';
+
+        const isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
+        
+        if (isPdf && doc.fileType === 'raw') {
+            // Insert fl_inline transformation for raw PDFs
+            return doc.secureUrl.replace('/upload/', '/upload/fl_inline/');
+        }
+
         return doc.secureUrl;
     };
     
@@ -434,7 +442,7 @@ export default function ClientDetailPage() {
           <DialogHeader>
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
             <DialogDescription>
-                Visualizando documento. <a href={viewingDocument?.secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.
+                Visualizando documento. <a href={getInlineViewUrl(viewingDocument)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.
             </DialogDescription>
           </DialogHeader>
           <div className="h-full w-full relative bg-muted flex items-center justify-center">
@@ -444,7 +452,7 @@ export default function ClientDetailPage() {
                  <div className="text-center p-8">
                     <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
                     <p className="mt-4 text-lg font-semibold">Pré-visualização não disponível.</p>
-                    <p className="text-muted-foreground">Use a opção "Abrir em nova aba" para visualizar o arquivo.</p>
+                    <p className="text-muted-foreground">Este tipo de arquivo não pode ser exibido aqui. Use a opção "Abrir em nova aba" para visualizá-lo.</p>
                 </div>
             )}
           </div>
@@ -614,7 +622,7 @@ export default function ClientDetailPage() {
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
                                                             </DropdownMenuItem>
-                                                             <DropdownMenuItem onSelect={() => window.open(getDocumentViewUrl(doc), '_blank')}>
+                                                             <DropdownMenuItem onSelect={() => window.open(getInlineViewUrl(doc), '_blank')}>
                                                                 <Download className="mr-2 h-4 w-4" />
                                                                 Abrir / Baixar
                                                             </DropdownMenuItem>
