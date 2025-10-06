@@ -53,6 +53,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalToPay, setTotalToPay] = useState(0);
   const [monthlyInterestRate, setMonthlyInterestRate] = useState(0);
+  const [annualInterestRate, setAnnualInterestRate] = useState(0);
   const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: string} | null>(null);
   const firestore = useFirestore();
 
@@ -82,12 +83,18 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         const total = parsedInstallments * parsedInstallmentValue;
         setTotalToPay(total);
         if (!isNaN(parsedPrincipal) && parsedPrincipal > 0) {
-          const rate = calculateMonthlyRate(parsedPrincipal, parsedInstallments, parsedInstallmentValue);
-          setMonthlyInterestRate(rate);
+          const monthlyRate = calculateMonthlyRate(parsedPrincipal, parsedInstallments, parsedInstallmentValue);
+          setMonthlyInterestRate(monthlyRate);
+          
+          // Calculate effective annual rate
+          const annualRate = (Math.pow(1 + monthlyRate, 12) - 1);
+          setAnnualInterestRate(annualRate);
+
         }
     } else {
         setTotalToPay(0);
         setMonthlyInterestRate(0);
+        setAnnualInterestRate(0);
     }
   }, [principal, installments, installmentValue]);
   
@@ -231,12 +238,20 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
                 R$ {totalToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
-           <div>
-            <p className="text-sm text-muted-foreground">Total de Juros (Mensal)</p>
-             <p className="text-2xl font-bold text-primary">
-                {(monthlyInterestRate * 100).toFixed(2)}%
-            </p>
-          </div>
+           <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <p className="text-sm text-muted-foreground">Juros (Mensal)</p>
+                    <p className="text-lg font-bold text-primary">
+                        {(monthlyInterestRate * 100).toFixed(2)}%
+                    </p>
+                </div>
+                <div>
+                    <p className="text-sm text-muted-foreground">Juros (Anual)</p>
+                    <p className="text-lg font-bold text-primary">
+                        {(annualInterestRate * 100).toFixed(2)}%
+                    </p>
+                </div>
+            </div>
         </div>
         <p className="text-xs text-muted-foreground">Valores calculados com base nas informações fornecidas.</p>
       </div>
