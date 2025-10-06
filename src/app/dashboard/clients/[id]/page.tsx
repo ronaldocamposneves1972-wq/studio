@@ -725,7 +725,7 @@ export default function ClientDetailPage() {
                                                                <DropdownMenuItem onClick={() => handleDownload(doc)}>
                                                                   <Download className="mr-2 h-4 w-4" />
                                                                   Baixar
-                                                              </DropdownMenuItem>
+                                                               </DropdownMenuItem>
                                                               <DropdownMenuSeparator />
 
                                                               <AlertDialog>
@@ -773,7 +773,7 @@ export default function ClientDetailPage() {
                                                                <DropdownMenuItem onSelect={() => handleValidationStatusChange(doc, 'pending')} disabled={!canMarkPending}>
                                                                   <Clock className="mr-2 h-4 w-4" />
                                                                   Marcar como Pendente
-                                                              </DropdownMenuItem>
+                                                               </DropdownMenuItem>
                                                               <DropdownMenuSeparator />
                                                                <AlertDialog>
                                                                   <AlertDialogTrigger asChild>
@@ -910,5 +910,3 @@ export default function ClientDetailPage() {
     </>
   )
 }
-
-    
