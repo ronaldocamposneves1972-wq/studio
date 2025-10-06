@@ -50,6 +50,7 @@ interface ProposalFormProps {
 export function ProposalForm({ onSave }: ProposalFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalToPay, setTotalToPay] = useState(0);
+  const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: string} | null>(null);
   const firestore = useFirestore();
 
   const productsQuery = useMemoFirebase(() => {
@@ -66,6 +67,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
 
   const installments = watch('installments');
   const installmentValue = watch('installmentValue');
+  const selectedProductId = watch('productId');
 
   useEffect(() => {
     const parsedInstallments = parseInt(String(installments), 10);
@@ -77,6 +79,17 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         setTotalToPay(0);
     }
   }, [installments, installmentValue]);
+  
+  useEffect(() => {
+    if (selectedProductId && products) {
+        const product = products.find(p => p.id === selectedProductId);
+        if (product) {
+            setSelectedProductInfo({ rate: product.interestRate, type: product.type });
+        } else {
+            setSelectedProductInfo(null);
+        }
+    }
+  }, [selectedProductId, products]);
 
 
   const handleFormSubmit = async (data: ProposalFormData) => {
@@ -123,30 +136,39 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
-      <div className="grid gap-2">
-        <Label htmlFor="productId">Produto</Label>
-        {isLoadingProducts ? (
-          <Skeleton className="h-10 w-full" />
-        ) : (
-          <Select onValueChange={(value) => setValue('productId', value)} disabled={isSubmitting}>
-            <SelectTrigger id="productId" className={errors.productId ? 'border-destructive' : ''}>
-              <SelectValue placeholder="Selecione um produto de crédito" />
-            </SelectTrigger>
-            <SelectContent>
-              {products?.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.name} ({product.bankName})
-                </SelectItem>
-              ))}
-              {!products?.length && (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  Nenhum produto cadastrado. <Link href="/dashboard/products/new" className="text-primary underline">Adicionar produto</Link>.
-                </div>
-              )}
-            </SelectContent>
-          </Select>
-        )}
-        {errors.productId && <p className="text-sm text-destructive">{errors.productId.message}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid gap-2">
+            <Label htmlFor="productId">Produto</Label>
+            {isLoadingProducts ? (
+            <Skeleton className="h-10 w-full" />
+            ) : (
+            <Select onValueChange={(value) => setValue('productId', value)} disabled={isSubmitting}>
+                <SelectTrigger id="productId" className={errors.productId ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Selecione um produto de crédito" />
+                </SelectTrigger>
+                <SelectContent>
+                {products?.map((product) => (
+                    <SelectItem key={product.id} value={product.id}>
+                    {product.name} ({product.bankName})
+                    </SelectItem>
+                ))}
+                {!products?.length && (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                    Nenhum produto cadastrado. <Link href="/dashboard/products/new" className="text-primary underline">Adicionar produto</Link>.
+                    </div>
+                )}
+                </SelectContent>
+            </Select>
+            )}
+            {errors.productId && <p className="text-sm text-destructive">{errors.productId.message}</p>}
+        </div>
+
+        <div className="grid gap-2">
+            <Label>Taxa de Juros / Admin.</Label>
+            <div className={cn("flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm", selectedProductInfo ? 'text-foreground' : 'text-muted-foreground')}>
+                {selectedProductInfo ? `${selectedProductInfo.rate}% ${selectedProductInfo.type === 'Crédito' ? 'a.m.' : 'a.p.'}` : 'Selecione um produto'}
+            </div>
+        </div>
       </div>
 
        <div className="grid gap-2">
