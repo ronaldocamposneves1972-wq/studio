@@ -893,7 +893,7 @@ export default function ClientDetailPage() {
                                   </Table>
                               )}
                           </CardContent>
-                          {client.status === 'Em análise' ? (
+                           {client.status === 'Em análise' ? (
                             <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
                                 <div className="flex-grow flex items-center gap-2 min-w-[300px]">
                                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
@@ -916,7 +916,7 @@ export default function ClientDetailPage() {
                                     Enviar para Análise de Crédito
                                 </Button>
                             </CardFooter>
-                          ) : (
+                           ) : (
                              <CardFooter className="border-t px-6 py-4">
                                <p className="text-sm text-muted-foreground">
                                 O cliente já avançou no processo. Não é mais possível adicionar documentos ou enviar para análise.
@@ -925,13 +925,13 @@ export default function ClientDetailPage() {
                           )}
                         </Card>
                       </TabsContent>
-                      <TabsContent value="proposals">
+                       <TabsContent value="proposals">
                           <Card>
                               <CardHeader>
                                   <CardTitle>Propostas</CardTitle>
                                   <CardDescription>Oportunidades de crédito e consórcio para o cliente.</CardDescription>
                               </CardHeader>
-                               {client.status === 'Pendente' ? (
+                              {client.status === 'Pendente' ? (
                                   <CardContent className="text-center py-10">
                                       <div className="flex flex-col items-center gap-4">
                                           <h3 className="text-lg font-semibold">Aguardando Análise de Propostas</h3>
@@ -979,21 +979,21 @@ export default function ClientDetailPage() {
                                               </TableRow>
                                           </TableHeader>
                                           <TableBody>
-                                              {isLoadingProposals && (
+                                              {isLoadingProposals ? (
                                                 <TableRow>
                                                     <TableCell colSpan={3} className="h-24 text-center">
                                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                                     </TableCell>
                                                 </TableRow>
-                                              )}
-                                              {!isLoadingProposals && proposals?.map(p => (
-                                              <TableRow key={p.id}>
-                                                  <TableCell>{p.productName}</TableCell>
-                                                  <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
-                                                  <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
-                                              </TableRow>
-                                              ))}
-                                              {!isLoadingProposals && proposals?.length === 0 && (
+                                              ) : proposals?.length > 0 ? (
+                                                proposals.map(p => (
+                                                  <TableRow key={p.id}>
+                                                      <TableCell>{p.productName}</TableCell>
+                                                      <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
+                                                      <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                                  </TableRow>
+                                                ))
+                                              ) : (
                                                   <TableRow>
                                                       <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
                                                   </TableRow>
