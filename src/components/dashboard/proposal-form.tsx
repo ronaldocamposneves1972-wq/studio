@@ -29,7 +29,7 @@ const proposalFormSchema = z.object({
   productId: z.string({ required_error: 'Selecione um produto.' }),
   value: z.preprocess(
     (a) => parseFloat(String(a).replace(/\./g, '').replace(',', '.')),
-    z.number().positive('O valor deve ser positivo.')
+    z.number().positive('O valor do empréstimo deve ser positivo.')
   ),
    installments: z.preprocess(
     (a) => parseInt(String(a), 10),
@@ -47,27 +47,9 @@ interface ProposalFormProps {
   onSave: (data: any) => Promise<void> | void;
 }
 
-const formatCurrency = (value: number | string) => {
-    if (!value) return '';
-    let stringValue = String(value);
-    
-    // Remove non-digit characters except comma
-    stringValue = stringValue.replace(/[^\d,]/g, '');
-    // Replace comma with a dot for float conversion
-    stringValue = stringValue.replace(',', '.');
-
-    const numberValue = parseFloat(stringValue);
-    if (isNaN(numberValue)) return '';
-
-    return numberValue.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-};
-
 export function ProposalForm({ onSave }: ProposalFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [calculatedTotal, setCalculatedTotal] = useState(0);
+  const [totalToPay, setTotalToPay] = useState(0);
   const firestore = useFirestore();
 
   const productsQuery = useMemoFirebase(() => {
@@ -90,9 +72,9 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
     const parsedInstallmentValue = parseFloat(String(installmentValue).replace(/\./g, '').replace(',', '.'));
     
     if (!isNaN(parsedInstallments) && !isNaN(parsedInstallmentValue) && parsedInstallments > 0 && parsedInstallmentValue > 0) {
-        setCalculatedTotal(parsedInstallments * parsedInstallmentValue);
+        setTotalToPay(parsedInstallments * parsedInstallmentValue);
     } else {
-        setCalculatedTotal(0);
+        setTotalToPay(0);
     }
   }, [installments, installmentValue]);
 
@@ -108,7 +90,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
     
     const fullData = {
         ...data,
-        value: calculatedTotal > 0 ? calculatedTotal : data.value,
+        totalValue: totalToPay, // Renamed to represent the total amount to be paid
         productName: selectedProduct.name,
         bankName: selectedProduct.bankName,
     }
@@ -126,7 +108,8 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
     }
     const numberValue = parseInt(digitsOnly, 10);
     
-    if (fieldName === 'installmentValue') {
+    // For currency fields
+    if (fieldName === 'installmentValue' || fieldName === 'value') {
       const formatted = (numberValue / 100).toLocaleString('pt-BR', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
@@ -166,6 +149,20 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         {errors.productId && <p className="text-sm text-destructive">{errors.productId.message}</p>}
       </div>
 
+       <div className="grid gap-2">
+        <Label htmlFor="value">Valor do Empréstimo (Principal) R$</Label>
+        <Input
+          id="value"
+          {...register('value')}
+          placeholder="Ex: 80.000,00"
+          className={cn(errors.value ? 'border-destructive' : '')}
+          disabled={isSubmitting}
+          onChange={(e) => handleNumericInputChange(e, 'value')}
+        />
+        {errors.value && <p className="text-sm text-destructive">{errors.value.message}</p>}
+      </div>
+
+
        <div className="grid grid-cols-2 gap-4">
          <div className="grid gap-2">
             <Label htmlFor="installments">Número de Parcelas</Label>
@@ -194,24 +191,11 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
       </div>
       
        <div className="space-y-2 rounded-lg bg-muted/50 p-4">
-        <p className="text-sm text-muted-foreground">Valor Total Calculado</p>
+        <p className="text-sm text-muted-foreground">Valor Total a Pagar</p>
         <p className="text-2xl font-bold">
-            R$ {calculatedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            R$ {totalToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="value">Ou informe o Valor Total Desejado (R$)</Label>
-        <Input
-          id="value"
-          {...register('value')}
-          placeholder="Ex: 90.030,00"
-          className={cn(errors.value ? 'border-destructive' : '', calculatedTotal > 0 ? 'bg-muted/70' : '')}
-          disabled={isSubmitting || calculatedTotal > 0}
-          onChange={(e) => handleNumericInputChange(e, 'value')}
-        />
-        {errors.value && <p className="text-sm text-destructive">{errors.value.message}</p>}
-         {calculatedTotal > 0 && <p className="text-xs text-muted-foreground">O valor total é calculado automaticamente a partir das parcelas.</p>}
+         <p className="text-xs text-muted-foreground">Calculado a partir do número e valor das parcelas.</p>
       </div>
 
       <DialogFooter>

@@ -910,14 +910,14 @@ export default function ClientDetailPage() {
                                              let statusBadge;
                                              switch (status) {
                                                   case 'validated':
-                                                      statusBadge = <Badge variant="default" className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-4 w-4 mr-1" /> Validado</Badge>;
+                                                      statusBadge = <Badge variant="default" className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="mr-2 h-4 w-4" /> Validado</Badge>;
                                                       break;
                                                   case 'rejected':
-                                                      statusBadge = <Badge variant="destructive"><XCircle className="h-4 w-4 mr-1" /> Rejeitado</Badge>;
+                                                      statusBadge = <Badge variant="destructive"><XCircle className="mr-2 h-4 w-4" /> Rejeitado</Badge>;
                                                       break;
                                                   case 'pending':
                                                   default:
-                                                      statusBadge = <Badge variant="secondary"><Clock className="h-4 w-4 mr-1" /> Pendente</Badge>;
+                                                      statusBadge = <Badge variant="secondary"><Clock className="mr-2 h-4 w-4" /> Pendente</Badge>;
                                                       break;
                                              }
                                              
