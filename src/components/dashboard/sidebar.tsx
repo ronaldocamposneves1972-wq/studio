@@ -16,7 +16,7 @@ export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   {
     label: 'Esteira', icon: CircuitBoard, children: [
-      { href: '/dashboard/clients', label: 'Discovery', icon: Users },
+      { href: '/dashboard/pipeline/discovery', label: 'Discovery', icon: Users },
       { href: '/dashboard/pipeline/valor', label: 'Valor', icon: DollarSign },
       { href: '/dashboard/pipeline/clearance', label: 'Clearance', icon: Check },
       { href: '/dashboard/pipeline/proposal', label: 'Proposal', icon: FileText },
@@ -25,13 +25,13 @@ export const navItems = [
   },
   {
     label: 'Cadastro', icon: FilePlus, children: [
-      { href: '/dashboard/clients', label: 'Clientes', icon: Users },
       { href: '/dashboard/proposals/new', label: 'Nova Proposta', icon: FilePlus },
       { href: '/dashboard/restrictions', label: 'Restrição', icon: FileX },
     ],
   },
   {
     label: 'Consulta', icon: BookUser, children: [
+      { href: '/dashboard/clients', label: 'Clientes', icon: Users },
       { href: '/dashboard/analytics/production', label: 'Analítico de Produção', icon: LineChart },
       { href: '/dashboard/contracts/by-client', label: 'Contratos por Cliente', icon: Users },
       { href: '/dashboard/promoter/debt', label: 'Dívida do Promotor', icon: DollarSign },
