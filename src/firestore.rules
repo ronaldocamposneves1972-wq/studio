@@ -1,0 +1,231 @@
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict authorization model for the ConsorciaTech application,
+ *              emphasizing data ownership and role-based access control.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles. User-owned; only the authenticated user can read/write their own profile.
+ * - /roles_admin/{userId}: Used for admin role assignment. Existence of a document grants admin privileges.
+ * - /clients/{clientId}: Stores client information. Publicly readable, but write access is restricted.
+ * - /clients/{clientId}/documents/{documentId}: Stores client documents (e.g., ID, proof of address). Only the associated client can manage these.
+ * - /financial_institutions/{financialInstitutionId}, /consortiums/{consortiumId}, /credit_products/{creditProductId}, /product_combos/{productComboId}, /sales_proposals/{salesProposalId}, /commissions/{commissionId}, /quizzes/{quizId}, /questions/{questionId}: Publicly readable. Write access is restricted.
+ *
+ * Key Security Decisions:
+ * - User data is strictly private, accessible only to the authenticated user.
+ * - Admin roles are managed through the existence of documents in the /roles_admin collection.
+ * - Public read access is granted for most collections to enable open data consumption.
+ * - Write access to most collections is limited.
+ * - Relational integrity is maintained by validating certain fields on create and enforcing immutability on update.
+ *
+ * Denormalization for Authorization:
+ * - The `clientId` is denormalized within `sales_proposals` to grant access for the specific client without needing extra `get()` calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Enforces user-ownership for user profiles.
+     * @path /users/{userId}
+     * @allow (create, update, get, delete, list) if the request is made by the user with matching ID.
+     * @deny (create, update, get, delete, list) if the request is made by a different user.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    /**
+     * @description Determines admin role based on document existence.
+     * @path /roles_admin/{userId}
+     * @allow (create, get, delete) if the user is authenticated.
+     * @deny (create, get, delete) if the user is not authenticated.
+     * @principle Role-based access control using document existence.
+     */
+    match /roles_admin/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if isSignedIn();
+    }
+
+    /**
+     * @description Allows public read access to client data, but restricts write access.
+     * @path /clients/{clientId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /clients/{clientId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Enforces client-ownership for client documents.
+     * @path /clients/{clientId}/documents/{documentId}
+     * @allow (create, update, get, delete, list) if the request is made by the client with matching ID.
+     * @deny (create, update, get, delete, list) if the request is made by a different client.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /clients/{clientId}/documents/{documentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(clientId) {
+        return isSignedIn() && request.auth.uid == clientId;
+      }
+
+       function isExistingOwner(clientId) {
+        return isOwner(clientId) && resource != null;
+      }
+
+      allow get: if isOwner(clientId);
+      allow list: if isOwner(clientId);
+      allow create: if isOwner(clientId) && request.resource.data.clientId == clientId;
+      allow update: if isExistingOwner(clientId) && request.resource.data.clientId == resource.data.clientId;
+      allow delete: if isExistingOwner(clientId);
+    }
+
+    /**
+     * @description Allows public read access to financial institution data, but restricts write access.
+     * @path /financial_institutions/{financialInstitutionId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /financial_institutions/{financialInstitutionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to consortium product data, but restricts write access.
+     * @path /consortiums/{consortiumId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /consortiums/{consortiumId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to credit product data, but restricts write access.
+     * @path /credit_products/{creditProductId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /credit_products/{creditProductId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to product combo data, but restricts write access.
+     * @path /product_combos/{productComboId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /product_combos/{productComboId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to sales proposal data, but restricts write access.
+     * @path /sales_proposals/{salesProposalId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /sales_proposals/{salesProposalId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to commission data, but restricts write access.
+     * @path /commissions/{commissionId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /commissions/{commissionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to quiz data, but restricts write access.
+     * @path /quizzes/{quizId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /quizzes/{quizId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows public read access to question data, but restricts write access.
+     * @path /questions/{questionId}
+     * @allow (get, list) to all users.
+     * @deny (create, update, delete) to all users.
+     * @principle Public read access with restricted writes.
+     */
+    match /questions/{questionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

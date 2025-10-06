@@ -1,14 +1,14 @@
 
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft } from "lucide-react"
-import { collection, addDoc } from "firebase/firestore"
+import { collection, addDoc, query } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -28,23 +28,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useFirestore, useUser } from "@/firebase"
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { ProductType } from "@/lib/types"
 
 const productSchema = z.object({
   name: z.string().min(3, "O nome do produto é obrigatório."),
-  type: z.enum(["Consórcio", "Crédito"], {
-    required_error: "O tipo do produto é obrigatório.",
-  }),
+  productTypeId: z.string({ required_error: "O tipo do produto é obrigatório." }),
   minAmount: z.preprocess(
-    (a) => parseFloat(z.string().parse(a)),
+    (a) => parseFloat(String(a).replace(",", ".")),
     z.number().positive("O valor mínimo deve ser positivo.")
   ),
   maxAmount: z.preprocess(
-    (a) => parseFloat(z.string().parse(a)),
+    (a) => parseFloat(String(a).replace(",", ".")),
     z.number().positive("O valor máximo deve ser positivo.")
   ),
   interestRate: z.preprocess(
-    (a) => parseFloat(z.string().parse(a)),
+    (a) => parseFloat(String(a).replace(",", ".")),
     z.number().min(0, "A taxa de juros não pode ser negativa.")
   ),
   terms: z.string().min(1, "Informe ao menos um prazo.").transform(value => value.split(',').map(term => Number(term.trim()))),
@@ -59,11 +59,20 @@ export default function NewProductPage() {
   const { user } = useUser()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const productTypesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, "product_types"));
+  }, [firestore]);
+
+  const { data: productTypes, isLoading: isLoadingTypes } = useCollection<ProductType>(productTypesQuery);
+
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue
+    setValue,
+    control
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
   })
@@ -83,8 +92,14 @@ export default function NewProductPage() {
     try {
       if (!firestore) throw new Error("Firestore not available");
       const productsCollection = collection(firestore, 'products');
+
+      const selectedType = productTypes?.find(t => t.id === data.productTypeId);
+      const productData = {
+        ...data,
+        type: selectedType?.name || 'N/A' // Legacy field
+      }
       
-      await addDoc(productsCollection, data);
+      await addDoc(productsCollection, productData);
       
       toast({
         title: "Produto criado com sucesso!",
@@ -140,16 +155,26 @@ export default function NewProductPage() {
                 </div>
                  <div className="grid gap-2">
                     <Label>Tipo</Label>
-                     <Select onValueChange={(value) => setValue("type", value as "Consórcio" | "Crédito")} disabled={isSubmitting}>
-                        <SelectTrigger className={errors.type ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Consórcio">Consórcio</SelectItem>
-                            <SelectItem value="Crédito">Crédito</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     {errors.type && <p className="text-sm text-destructive mt-1">{errors.type.message}</p>}
+                     {isLoadingTypes ? (
+                      <Skeleton className="h-10 w-full" />
+                     ) : (
+                       <Select onValueChange={(value) => setValue("productTypeId", value)} disabled={isSubmitting || isLoadingTypes}>
+                          <SelectTrigger className={errors.productTypeId ? "border-destructive" : ""}>
+                              <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {productTypes?.map(type => (
+                                <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                              ))}
+                              {productTypes?.length === 0 && (
+                                <div className="p-4 text-sm text-center text-muted-foreground">
+                                  Nenhum tipo encontrado. <Link href="/dashboard/settings/product-types" className="text-primary underline">Cadastre um tipo.</Link>
+                                </div>
+                              )}
+                          </SelectContent>
+                      </Select>
+                     )}
+                     {errors.productTypeId && <p className="text-sm text-destructive mt-1">{errors.productTypeId.message}</p>}
                 </div>
               </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -160,7 +185,7 @@ export default function NewProductPage() {
                             type="number"
                             step="0.01"
                             {...register("minAmount")}
-                            placeholder="1000.00"
+                            placeholder="1000,00"
                             className={errors.minAmount ? "border-destructive" : ""}
                             disabled={isSubmitting}
                         />
@@ -173,7 +198,7 @@ export default function NewProductPage() {
                             type="number"
                             step="0.01"
                             {...register("maxAmount")}
-                            placeholder="500000.00"
+                            placeholder="500000,00"
                             className={errors.maxAmount ? "border-destructive" : ""}
                             disabled={isSubmitting}
                         />
@@ -189,7 +214,7 @@ export default function NewProductPage() {
                             type="number"
                             step="0.01"
                             {...register("interestRate")}
-                            placeholder="1.8"
+                            placeholder="1,8"
                             className={errors.interestRate ? "border-destructive" : ""}
                             disabled={isSubmitting}
                         />
