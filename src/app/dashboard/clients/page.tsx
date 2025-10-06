@@ -64,6 +64,7 @@ import {
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, doc, query } from "firebase/firestore"
 import { useState } from "react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -86,6 +87,7 @@ export default function ClientsPage() {
   const { toast } = useToast()
   const firestore = useFirestore()
   const [activeTab, setActiveTab] = useState('all')
+  const [selectedRows, setSelectedRows] = useState<string[]>([])
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -110,10 +112,28 @@ export default function ClientsPage() {
   
   const clientList = filteredClients(activeTab as any)
 
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedRows(clientList.map(client => client.id));
+    } else {
+      setSelectedRows([]);
+    }
+  }
+  
+  const handleSelectRow = (clientId: string, checked: boolean) => {
+    if (checked) {
+        setSelectedRows(prev => [...prev, clientId]);
+    } else {
+        setSelectedRows(prev => prev.filter(id => id !== clientId));
+    }
+  }
+
+
   const renderTableContent = (clientList: Client[]) => {
     if (isLoading) {
        return Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
+          <TableCell><Skeleton className="h-5 w-5"/></TableCell>
           <TableCell><Skeleton className="h-5 w-32"/></TableCell>
           <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-40"/></TableCell>
           <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-28"/></TableCell>
@@ -127,7 +147,7 @@ export default function ClientsPage() {
     if (clientList.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-24 text-center">
+          <TableCell colSpan={7} className="h-24 text-center">
             Nenhum cliente encontrado.
           </TableCell>
         </TableRow>
@@ -135,22 +155,32 @@ export default function ClientsPage() {
     }
     
     return clientList.map(client => (
-      <TableRow key={client.id} onClick={() => router.push(`/dashboard/clients/${client.id}`)} className="cursor-pointer">
-        <TableCell className="font-medium">
+      <TableRow 
+        key={client.id} 
+        data-state={selectedRows.includes(client.id) && "selected"}
+      >
+        <TableCell className="p-2">
+            <Checkbox
+                checked={selectedRows.includes(client.id)}
+                onCheckedChange={(checked) => handleSelectRow(client.id, !!checked)}
+                aria-label={`Selecionar cliente ${client.name}`}
+            />
+        </TableCell>
+        <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           <div className="flex items-center gap-3">
              {client.avatarUrl ? <Image src={client.avatarUrl} alt={client.name} width={24} height={24} className="rounded-full" data-ai-hint="person portrait" /> : <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">{client.name.charAt(0)}</div>}
              {client.name}
           </div>
         </TableCell>
-        <TableCell className="hidden sm:table-cell">{client.email}</TableCell>
-        <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
-        <TableCell>
+        <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.email}</TableCell>
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.phone}</TableCell>
+        <TableCell className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
         </TableCell>
-        <TableCell className="hidden md:table-cell">
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
         </TableCell>
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -205,6 +235,10 @@ export default function ClientsPage() {
       </TableRow>
     ))
   }
+  
+    const numSelected = selectedRows.length;
+    const allSelected = numSelected > 0 && numSelected === clientList.length;
+    const someSelected = numSelected > 0 && numSelected < clientList.length;
 
   return (
     <Tabs defaultValue="all" onValueChange={setActiveTab}>
@@ -218,6 +252,17 @@ export default function ClientsPage() {
           </TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
+           {numSelected > 0 && (
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                        {numSelected} selecionado(s)
+                    </span>
+                    <Button variant="outline" size="sm" className="h-8 gap-1">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir
+                    </Button>
+                </div>
+            )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1">
@@ -263,6 +308,13 @@ export default function ClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                     <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Selecionar todos"
+                      />
+                  </TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Email</TableHead>
                   <TableHead className="hidden md:table-cell">Telefone</TableHead>
@@ -290,3 +342,5 @@ export default function ClientsPage() {
     </Tabs>
   )
 }
+
+    
