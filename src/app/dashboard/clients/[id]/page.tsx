@@ -83,7 +83,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -110,6 +110,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -178,6 +179,7 @@ export default function ClientDetailPage() {
   const [quizLink, setQuizLink] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
+  const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -466,6 +468,49 @@ export default function ClientDetailPage() {
         router.push('/dashboard/pipeline/valor');
     };
 
+    const handleSaveProposal = async (data: any) => {
+        if (!firestore || !user || !client) return;
+
+        try {
+            const proposalCollection = collection(firestore, 'sales_proposals');
+            const newProposal = {
+                ...data,
+                clientId: client.id,
+                clientName: client.name,
+                salesRepId: user.uid,
+                salesRepName: user.displayName || user.email,
+                createdAt: serverTimestamp(),
+                status: 'Aberta'
+            };
+            await addDoc(proposalCollection, newProposal);
+            
+             const timelineEvent: TimelineEvent = {
+                id: `tl-${Date.now()}-proposal`,
+                activity: `Nova proposta "${data.productName}" criada.`,
+                details: `Valor: R$ ${data.value.toLocaleString('pt-br')}`,
+                timestamp: new Date().toISOString(),
+                user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+            };
+            await updateDoc(doc(firestore, 'clients', client.id), {
+                timeline: arrayUnion(timelineEvent),
+            });
+            
+            toast({
+                title: "Proposta criada!",
+                description: "A nova proposta foi adicionada ao cliente."
+            });
+            setIsProposalDialogOpen(false);
+            // Optional: refresh proposals data
+        } catch (error) {
+            console.error("Error saving proposal:", error);
+            toast({
+                variant: "destructive",
+                title: "Erro ao salvar proposta",
+                description: "Ocorreu um erro ao tentar salvar a nova proposta."
+            });
+        }
+    };
+
 
   if (isLoadingClient) {
      return (
@@ -512,6 +557,14 @@ export default function ClientDetailPage() {
 
   return (
     <>
+      {client && (
+        <ProposalDialog
+          open={isProposalDialogOpen}
+          onOpenChange={setIsProposalDialogOpen}
+          onSave={handleSaveProposal}
+          client={client}
+        />
+      )}
       <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
@@ -874,7 +927,7 @@ export default function ClientDetailPage() {
                                                       </AlertDialogFooter>
                                                   </AlertDialogContent>
                                               </AlertDialog>
-                                              <Button onClick={() => router.push(`/dashboard/proposals/new?clientId=${client.id}`)}>
+                                              <Button onClick={() => setIsProposalDialogOpen(true)}>
                                                   <PlusCircle className="mr-2 h-4 w-4" />
                                                   Adicionar Oportunidade
                                               </Button>
