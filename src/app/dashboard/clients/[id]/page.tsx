@@ -374,24 +374,8 @@ export default function ClientDetailPage() {
 
     const getDocumentViewUrl = (doc: ClientDocument | null): string => {
         if (!doc) return '';
-
-        const isPDF = doc.fileName.toLowerCase().endsWith('.pdf');
         
-        if (isPDF) {
-            const urlParts = doc.secureUrl.split('/upload/');
-            if (urlParts.length === 2) {
-                // Ensure `fl_inline` is added correctly, even with existing transformations
-                const pathParts = urlParts[1].split('/');
-                const transformations = pathParts.slice(0, pathParts.length - 2); 
-                const version = pathParts[pathParts.length - 2];
-                const publicId = pathParts[pathParts.length - 1];
-
-                const newTransformations = [...transformations, 'fl_inline'].join(',');
-
-                return `${urlParts[0]}/upload/${newTransformations}/${version}/${publicId}`;
-            }
-        }
-        
+        // Always return the direct secureUrl for simplicity now
         return doc.secureUrl;
     };
 
@@ -443,13 +427,9 @@ export default function ClientDetailPage() {
             <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
             <DialogDescription>Visualizando documento. <a href={getDocumentViewUrl(viewingDocument)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Abrir em nova aba</a>.</DialogDescription>
           </DialogHeader>
-          <div className="h-full w-full relative bg-muted">
+          <div className="h-full w-full relative bg-muted flex items-center justify-center">
             {viewingDocument && (
-              viewingDocument.fileName.toLowerCase().endsWith('.pdf') ? (
-                <iframe src={getDocumentViewUrl(viewingDocument)} className="h-full w-full border-0" title={viewingDocument.fileName} />
-              ) : (
                 <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
-              )
             )}
           </div>
         </DialogContent>
@@ -617,6 +597,10 @@ export default function ClientDetailPage() {
                                                             <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 Ver
+                                                            </DropdownMenuItem>
+                                                             <DropdownMenuItem onSelect={() => window.open(doc.secureUrl, '_blank')}>
+                                                                <Download className="mr-2 h-4 w-4" />
+                                                                Baixar
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem onSelect={() => handleToggleValidation(doc)}>
                                                                 <Check className="mr-2 h-4 w-4" />
