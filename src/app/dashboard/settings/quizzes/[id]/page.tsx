@@ -169,7 +169,7 @@ export default function EditQuizPage() {
     if (!quiz) {
      return (
       <div className="text-center py-10">
-        <p>Quiz não encontrado ou você não tem permissão para editá-lo.</p>
+        <p>Quiz não encontrado.</p>
          <Button asChild className="mt-4">
           <Link href="/dashboard/settings/quizzes">Voltar</Link>
         </Button>

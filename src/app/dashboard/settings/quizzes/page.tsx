@@ -79,28 +79,26 @@ export default function QuizzesPage() {
               <Button variant="secondary" asChild>
                 <Link href={`/dashboard/settings/quizzes/${quiz.id}`}>Editar</Link>
               </Button>
-              {user && (
-                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                     <Button variant="destructive" size="sm">
-                        <Trash2 className="w-4 h-4 mr-2"/>
-                        Excluir
-                      </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Essa ação não pode ser desfeita. Isso irá deletar permanentemente o quiz "{quiz.name}".
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDeleteQuiz(quiz.id, quiz.name)}>Continuar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={!user}>
+                      <Trash2 className="w-4 h-4 mr-2"/>
+                      Excluir
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação não pode ser desfeita. Isso irá deletar permanentemente o quiz "{quiz.name}".
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteQuiz(quiz.id, quiz.name)}>Continuar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardFooter>
           </Card>
         ))}
