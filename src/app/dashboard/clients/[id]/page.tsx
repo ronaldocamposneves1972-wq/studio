@@ -193,6 +193,14 @@ export default function ClientDetailPage() {
   const [isCopied, setIsCopied] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
   const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
+  const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
+
+  const proposalRef = useMemoFirebase(() => {
+    if (!firestore || !viewingProposalId) return null;
+    return doc(firestore, 'sales_proposals', viewingProposalId);
+  }, [firestore, viewingProposalId]);
+
+  const { data: viewingProposal, isLoading: isLoadingProposal } = useDoc<Proposal>(proposalRef);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -546,6 +554,99 @@ export default function ClientDetailPage() {
             });
         }
     };
+    
+    const handleAcceptProposal = async (acceptedProposal: ProposalSummary) => {
+        if (!firestore || !client || !clientRef || !user) return;
+        
+        toast({ title: 'Processando aceitação...' });
+        
+        const batch = writeBatch(firestore);
+        const now = new Date().toISOString();
+
+        // 1. Update the client status to "Aprovado"
+        batch.update(clientRef, { status: 'Aprovado' });
+
+        // 2. Update all proposal summaries in the client document
+        const updatedProposals = client.proposals?.map(p => {
+            if (p.id === acceptedProposal.id) {
+                return { ...p, status: 'Finalizada' as ProposalStatus };
+            }
+            if (p.status === 'Aberta' || p.status === 'Em negociação') {
+                return { ...p, status: 'Cancelada' as ProposalStatus };
+            }
+            return p;
+        });
+        batch.update(clientRef, { proposals: updatedProposals });
+
+        // 3. Update the full proposal documents in 'sales_proposals'
+        client.proposals?.forEach(p => {
+            const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
+            if (p.id === acceptedProposal.id) {
+                batch.update(proposalDocRef, { status: 'Finalizada' });
+            } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
+                batch.update(proposalDocRef, { status: 'Cancelada' });
+            }
+        });
+
+        // 4. Add a timeline event
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}-accepted`,
+            activity: `Proposta "${acceptedProposal.productName}" aceita.`,
+            details: `Cliente movido para "Aprovado".`,
+            timestamp: now,
+            user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+        };
+        batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
+
+        try {
+            await batch.commit();
+            toast({
+                title: "Proposta Aceita!",
+                description: `O cliente ${client.name} foi marcado como Aprovado.`
+            });
+        } catch (error) {
+            console.error("Error accepting proposal: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao aceitar proposta',
+                description: 'Não foi possível completar a operação.'
+            });
+        }
+    };
+
+
+    const handleDeleteProposal = async (proposalToDelete: ProposalSummary) => {
+        if (!firestore || !client || !clientRef) return;
+
+        toast({ title: 'Excluindo proposta...' });
+
+        const batch = writeBatch(firestore);
+
+        // 1. Remove from client's proposals array
+        batch.update(clientRef, {
+            proposals: arrayRemove(proposalToDelete)
+        });
+
+        // 2. Delete from sales_proposals collection
+        const proposalDocRef = doc(firestore, 'sales_proposals', proposalToDelete.id);
+        batch.delete(proposalDocRef);
+
+        try {
+            await batch.commit();
+            toast({
+                title: "Proposta Excluída!",
+                description: `A proposta "${proposalToDelete.productName}" foi removida.`
+            });
+        } catch (error) {
+            console.error("Error deleting proposal:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao excluir',
+                description: 'Não foi possível remover a proposta.'
+            });
+        }
+    };
+
 
 
   if (isLoadingClient) {
@@ -589,6 +690,7 @@ export default function ClientDetailPage() {
   const documents = client.documents || [];
   const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image'));
   const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
+  const hasAcceptedProposal = proposals.some(p => p.status === 'Finalizada');
 
 
   return (
@@ -599,6 +701,40 @@ export default function ClientDetailPage() {
           onSave={handleSaveProposal}
           client={client}
       />
+      <Dialog open={!!viewingProposalId} onOpenChange={(open) => !open && setViewingProposalId(null)}>
+        <DialogContent className="sm:max-w-[625px]">
+            <DialogHeader>
+                <DialogTitle>Detalhes da Proposta</DialogTitle>
+                <DialogDescription>
+                    Informações completas da oportunidade de crédito.
+                </DialogDescription>
+            </DialogHeader>
+            {isLoadingProposal && <div className="space-y-4 py-4">
+                <Skeleton className="h-4 w-1/2"/>
+                <Skeleton className="h-4 w-3/4"/>
+                <Skeleton className="h-4 w-1/2"/>
+                <Skeleton className="h-4 w-2/3"/>
+            </div>}
+            {viewingProposal && (
+                <div className="grid gap-4 py-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Produto</p><p>{viewingProposal.productName}</p></div>
+                        <div><p className="text-muted-foreground">Status</p><p><Badge variant={getProposalStatusVariant(viewingProposal.status)}>{viewingProposal.status}</Badge></p></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Valor</p><p>R$ {viewingProposal.value.toLocaleString('pt-br')}</p></div>
+                        <div><p className="text-muted-foreground">Data de Criação</p><p>{new Date(viewingProposal.createdAt).toLocaleString('pt-br')}</p></div>
+                    </div>
+                     <Separator />
+                     <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Cliente</p><p>{viewingProposal.clientName}</p></div>
+                        <div><p className="text-muted-foreground">Atendente</p><p>{viewingProposal.salesRepName}</p></div>
+                    </div>
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
         <DialogContent className="max-w-4xl h-[90vh]">
           <DialogHeader>
@@ -938,12 +1074,13 @@ export default function ClientDetailPage() {
                                                 <TableHead>Produto</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Valor</TableHead>
+                                                <TableHead className="text-right">Ações</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {isLoadingProposals ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={3} className="h-24 text-center">
+                                                    <TableCell colSpan={4} className="h-24 text-center">
                                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                                                     </TableCell>
                                                 </TableRow>
@@ -953,11 +1090,52 @@ export default function ClientDetailPage() {
                                                     <TableCell>{p.productName}</TableCell>
                                                     <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
                                                     <TableCell className="text-right">R$ {p.value.toLocaleString('pt-BR')}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onSelect={() => setViewingProposalId(p.id)}>
+                                                                    <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
+                                                                </DropdownMenuItem>
+                                                                <AlertDialog>
+                                                                    <AlertDialogTrigger asChild>
+                                                                         <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
+                                                                            <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
+                                                                        </DropdownMenuItem>
+                                                                    </AlertDialogTrigger>
+                                                                    <AlertDialogContent>
+                                                                        <AlertDialogHeader><AlertDialogTitle>Aceitar esta proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> no valor de R$ {p.value.toLocaleString('pt-br')} será marcada como "Finalizada" e as outras serão "Canceladas". O cliente será movido para "Aprovado".</AlertDialogDescription></AlertDialogHeader>
+                                                                        <AlertDialogFooter>
+                                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                            <AlertDialogAction onClick={() => handleAcceptProposal(p)}>Sim, aceitar</AlertDialogAction>
+                                                                        </AlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                                <DropdownMenuSeparator />
+                                                                 <AlertDialog>
+                                                                    <AlertDialogTrigger asChild>
+                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                                                        </DropdownMenuItem>
+                                                                    </AlertDialogTrigger>
+                                                                    <AlertDialogContent>
+                                                                        <AlertDialogHeader><AlertDialogTitle>Excluir Proposta?</AlertDialogTitle><AlertDialogDescription>A proposta para <strong>{p.productName}</strong> será permanentemente removida.</AlertDialogDescription></AlertDialogHeader>
+                                                                        <AlertDialogFooter>
+                                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                            <AlertDialogAction onClick={() => handleDeleteProposal(p)} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
+                                                                        </AlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
                                                 </TableRow>
                                                 ))
                                             ) : (
                                                 <TableRow>
-                                                    <TableCell colSpan={3} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
+                                                    <TableCell colSpan={4} className="text-center h-24">Nenhuma proposta encontrada.</TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>
@@ -1010,3 +1188,5 @@ export default function ClientDetailPage() {
     </>
   )
 }
+
+    
