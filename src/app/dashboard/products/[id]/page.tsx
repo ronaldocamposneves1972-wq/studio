@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { ChevronLeft, Edit, Trash2 } from 'lucide-react'
+import { ChevronLeft, Edit, Trash2, Landmark } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase'
 import type { Product } from '@/lib/types'
@@ -126,6 +127,13 @@ export default function ProductDetailPage() {
                   </p>
                 </div>
               </div>
+               <Separator />
+               <div className="grid grid-cols-1 gap-4">
+                <div className="grid gap-2">
+                    <p className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4"/> Banco / Instituição</p>
+                    <p className="text-foreground">{product.bankName || "Não especificado"}</p>
+                </div>
+               </div>
                <Separator />
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">

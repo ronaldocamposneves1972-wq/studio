@@ -30,11 +30,12 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { ProductType } from "@/lib/types"
+import type { ProductType, FinancialInstitution as Bank } from "@/lib/types"
 
 const productSchema = z.object({
   name: z.string().min(3, "O nome do produto é obrigatório."),
   productTypeId: z.string({ required_error: "O tipo do produto é obrigatório." }),
+  bankId: z.string({ required_error: "O banco é obrigatório." }),
   minAmount: z.preprocess(
     (a) => parseFloat(String(a).replace(",", ".")),
     z.number().positive("O valor mínimo deve ser positivo.")
@@ -63,8 +64,13 @@ export default function NewProductPage() {
     if (!firestore) return null;
     return query(collection(firestore, "product_types"));
   }, [firestore]);
-
   const { data: productTypes, isLoading: isLoadingTypes } = useCollection<ProductType>(productTypesQuery);
+
+  const banksQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, "financial_institutions"));
+  }, [firestore]);
+  const { data: banks, isLoading: isLoadingBanks } = useCollection<Bank>(banksQuery);
 
 
   const {
@@ -94,9 +100,12 @@ export default function NewProductPage() {
       const productsCollection = collection(firestore, 'products');
 
       const selectedType = productTypes?.find(t => t.id === data.productTypeId);
+      const selectedBank = banks?.find(b => b.id === data.bankId);
+      
       const productData = {
         ...data,
-        type: selectedType?.name || 'N/A' // Legacy field
+        type: selectedType?.name || 'N/A', // Legacy field
+        bankName: selectedBank?.name || 'N/A',
       }
       
       await addDoc(productsCollection, productData);
@@ -231,6 +240,30 @@ export default function NewProductPage() {
                         />
                         {errors.terms && <p className="text-sm text-destructive mt-1">{errors.terms.message}</p>}
                     </div>
+                </div>
+
+                 <div className="grid gap-2">
+                    <Label>Banco / Instituição Financeira</Label>
+                     {isLoadingBanks ? (
+                      <Skeleton className="h-10 w-full" />
+                     ) : (
+                       <Select onValueChange={(value) => setValue("bankId", value)} disabled={isSubmitting || isLoadingBanks}>
+                          <SelectTrigger className={errors.bankId ? "border-destructive" : ""}>
+                              <SelectValue placeholder="Selecione o banco parceiro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {banks?.map(bank => (
+                                <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                              ))}
+                              {banks?.length === 0 && (
+                                <div className="p-4 text-sm text-center text-muted-foreground">
+                                  Nenhum banco encontrado. <Link href="/dashboard/banks" className="text-primary underline">Cadastre um banco.</Link>
+                                </div>
+                              )}
+                          </SelectContent>
+                      </Select>
+                     )}
+                     {errors.bankId && <p className="text-sm text-destructive mt-1">{errors.bankId.message}</p>}
                 </div>
 
               <div className="mt-6 flex justify-end gap-2">

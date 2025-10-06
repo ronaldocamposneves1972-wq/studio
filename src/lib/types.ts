@@ -1,4 +1,5 @@
 
+
 export type User = {
   id: string;
   name: string;
@@ -79,11 +80,20 @@ export type ProductType = {
   description?: string;
 };
 
+export type FinancialInstitution = {
+  id: string;
+  name: string;
+  commissionRate: number;
+  logoUrl?: string;
+};
+
 export type Product = {
   id: string;
   name: string;
   type: 'Consórcio' | 'Crédito' | string;
   productTypeId: string; // Reference to ProductType
+  bankId: string; // Reference to FinancialInstitution
+  bankName?: string;
   minAmount: number;
   maxAmount: number;
   interestRate: number;

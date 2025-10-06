@@ -37,9 +37,8 @@ import { collection, query } from "firebase/firestore"
 export default function ProductsPage() {
   const router = useRouter();
   const firestore = useFirestore();
-  const { user } = useUser(); // Hook para verificar o usuário autenticado
+  const { user } = useUser();
 
-  // A query só é criada se o firestore e o usuário existirem.
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, "products"));
@@ -54,6 +53,7 @@ export default function ProductsPage() {
           <TableCell><Skeleton className="h-5 w-48" /></TableCell>
           <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+          <TableCell><Skeleton className="h-5 w-24" /></TableCell>
           <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
         </TableRow>
       ));
@@ -62,7 +62,7 @@ export default function ProductsPage() {
     if (!products || products.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={4} className="h-24 text-center">
+          <TableCell colSpan={5} className="h-24 text-center">
             Nenhum produto encontrado.
           </TableCell>
         </TableRow>
@@ -78,19 +78,22 @@ export default function ProductsPage() {
           </Badge>
         </TableCell>
         <TableCell>
+            {product.bankName || 'N/A'}
+        </TableCell>
+        <TableCell>
             {`R$ ${product.minAmount.toLocaleString('pt-BR')} - R$ ${product.maxAmount.toLocaleString('pt-BR')}`}
         </TableCell>
         <TableCell>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button aria-haspopup="true" size="icon" variant="ghost">
+              <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
                 <MoreHorizontal className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={(e) => {e.stopPropagation(); router.push(`/dashboard/products/${product.id}`)}}>Ver Detalhes</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push(`/dashboard/products/${product.id}`)}>Ver Detalhes</DropdownMenuItem>
               <DropdownMenuItem onSelect={(e) => e.stopPropagation()}>Editar</DropdownMenuItem>
               <DropdownMenuItem onSelect={(e) => e.stopPropagation()} className="text-destructive">Excluir</DropdownMenuItem>
             </DropdownMenuContent>
@@ -131,6 +134,7 @@ export default function ProductsPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Banco</TableHead>
                 <TableHead>Faixa de Valor</TableHead>
                 <TableHead>
                   <span className="sr-only">Ações</span>
