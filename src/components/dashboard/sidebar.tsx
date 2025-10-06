@@ -6,13 +6,23 @@ import { useState } from 'react';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings, ChevronRight,
   FilePlus, FileX, LineChart, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
+import { CircuitBoard } from 'lucide-react';
 
 export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
+  {
+    label: 'Esteira', icon: CircuitBoard, children: [
+      { href: '/dashboard/clients', label: 'Discovery', icon: Users },
+      { href: '/dashboard/pipeline/valor', label: 'Valor', icon: DollarSign },
+      { href: '/dashboard/pipeline/clearance', label: 'Clearance', icon: Check },
+      { href: '/dashboard/pipeline/proposal', label: 'Proposal', icon: FileText },
+      { href: '/dashboard/pipeline/ledger', label: 'Ledger', icon: Receipt },
+    ],
+  },
   {
     label: 'Cadastro', icon: FilePlus, children: [
       { href: '/dashboard/clients', label: 'Clientes', icon: Users },
