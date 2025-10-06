@@ -56,6 +56,49 @@ export default function StandaloneQuizPage() {
     return response.json();
   };
 
+  const handleStepFileUpload = async (questionId: string, files: FileList): Promise<boolean> => {
+    if (!firestore || !clientId) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'ID do cliente ou conexão não disponível.' });
+      return false;
+    }
+    
+    const clientRef = doc(firestore, 'clients', clientId);
+    const fileUploadPromises = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        fileUploadPromises.push(uploadFileToCloudinary(file, clientId));
+    }
+
+    try {
+        const uploadResults = await Promise.all(fileUploadPromises);
+
+        const newDocuments: ClientDocument[] = uploadResults.map((uploadData, index) => ({
+            id: uploadData.public_id,
+            clientId: clientId,
+            fileName: uploadData.original_filename || files[index].name,
+            fileType: uploadData.resource_type || 'raw',
+            cloudinaryPublicId: uploadData.public_id,
+            secureUrl: uploadData.secure_url,
+            uploadedAt: new Date().toISOString(),
+        }));
+
+        if (newDocuments.length > 0) {
+            updateDocumentNonBlocking(clientRef, {
+                documents: arrayUnion(...newDocuments)
+            });
+        }
+        
+        toast({ title: "Arquivo(s) enviado(s)!", description: `${files.length} arquivo(s) foram adicionados com sucesso.`});
+        return true;
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : 'Falha no upload de um ou mais arquivos.';
+        toast({ variant: 'destructive', title: 'Erro no Upload', description: errorMessage });
+        return false;
+    }
+  }
+
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
     try {
@@ -64,57 +107,15 @@ export default function StandaloneQuizPage() {
         }
 
         const clientRef = doc(firestore, 'clients', clientId);
-        const fileUploadPromises: Promise<{ key: string, uploadData: any, originalFile: File }>[] = [];
         const serializableAnswers: Record<string, any> = {};
 
-        // Separate files from other answers and create upload promises
+        // Filter out any file objects, as they are handled by handleStepFileUpload
         for (const key in answers) {
-            if (answers[key] instanceof FileList) {
-                const fileList = answers[key] as FileList;
-                for (let i = 0; i < fileList.length; i++) {
-                    const file = fileList[i];
-                     fileUploadPromises.push(
-                        uploadFileToCloudinary(file, clientId).then(uploadData => ({ key, uploadData, originalFile: file }))
-                    );
-                }
-            } else if (answers[key] instanceof File) { // Keep handling for single file inputs just in case
-                const file = answers[key] as File;
-                fileUploadPromises.push(
-                    uploadFileToCloudinary(file, clientId).then(uploadData => ({ key, uploadData, originalFile: file }))
-                );
-            } else {
+            if (!(answers[key] instanceof File) && !(answers[key] instanceof FileList)) {
                 serializableAnswers[key] = answers[key];
             }
         }
-
-        // Wait for all file uploads to complete
-        const uploadedFiles = await Promise.all(fileUploadPromises);
         
-        const newDocuments: ClientDocument[] = uploadedFiles.map(({ uploadData, originalFile }) => ({
-            id: uploadData.public_id,
-            clientId: clientId,
-            fileName: uploadData.original_filename || originalFile.name,
-            fileType: uploadData.resource_type || 'raw',
-            cloudinaryPublicId: uploadData.public_id,
-            secureUrl: uploadData.secure_url,
-            uploadedAt: new Date().toISOString(),
-        }));
-        
-        const uploadedFileUrls: Record<string, {name: string, url: string}[]> = {};
-        
-        // Add file info to serializableAnswers, so it's recorded in the `answers` field
-        uploadedFiles.forEach(({ key, uploadData }) => {
-             if (!uploadedFileUrls[key]) {
-                uploadedFileUrls[key] = [];
-            }
-            uploadedFileUrls[key].push({ name: uploadData.original_filename, url: uploadData.secure_url });
-        });
-
-        for (const key in uploadedFileUrls) {
-            serializableAnswers[key] = uploadedFileUrls[key];
-        }
-
-
         const clientSnap = await getDoc(clientRef);
         if (!clientSnap.exists()) {
             throw new Error("Documento do cliente não encontrado.");
@@ -125,10 +126,6 @@ export default function StandaloneQuizPage() {
             answers: { ...clientData.answers, ...serializableAnswers },
             status: 'Em análise',
         };
-
-        if (newDocuments.length > 0) {
-            updatePayload.documents = arrayUnion(...newDocuments)
-        }
 
         updateDocumentNonBlocking(clientRef, updatePayload);
 
@@ -181,7 +178,7 @@ export default function StandaloneQuizPage() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
+      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} onFileUpload={handleStepFileUpload} />;
     }
 
     return (
@@ -211,4 +208,3 @@ export default function StandaloneQuizPage() {
     </div>
   );
 }
- 

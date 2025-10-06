@@ -45,10 +45,12 @@ interface StandaloneQuizFormProps {
     isSubmitting: boolean;
     initialAnswers?: Record<string, any>;
     onCEPChange?: (cep: string) => Promise<void>;
+    onFileUpload?: (questionId: string, files: FileList) => Promise<boolean>;
 }
 
-export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange }: StandaloneQuizFormProps) {
+export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange, onFileUpload }: StandaloneQuizFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
+    const [isUploadingStep, setIsUploadingStep] = useState(false);
     const totalSteps = quiz.questions.length;
     
     const form = useForm<FormData>({
@@ -64,8 +66,22 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         const isValid = await form.trigger(currentQuestion.id as any);
         if (!isValid) return;
 
+        // Handle CEP change if function is provided
         if (currentQuestion.id === 'q-cep' && onCEPChange) {
             await onCEPChange(form.getValues(currentQuestion.id));
+        }
+
+        // Handle file upload for the current step
+        if (currentQuestion.type === 'file' && onFileUpload) {
+            const files = form.getValues(currentQuestion.id) as FileList;
+            if (files && files.length > 0) {
+                setIsUploadingStep(true);
+                const uploadSuccess = await onFileUpload(currentQuestion.id, files);
+                setIsUploadingStep(false);
+                if (!uploadSuccess) {
+                    return; // Stop if upload fails
+                }
+            }
         }
 
         if (currentStep < totalSteps - 1) {
@@ -84,7 +100,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     const renderInput = (field: any) => {
         const mask = getMaskFunction(currentQuestion.id);
-        const selectedFiles = field.value as FileList | null;
+        const selectedFiles = form.watch(currentQuestion.id) as FileList | null;
 
         switch (currentQuestion.type) {
             case 'file':
@@ -160,6 +176,15 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         }
     };
 
+    const isFinalStep = currentStep === totalSteps - 1;
+    const buttonDisabled = isSubmitting || isUploadingStep;
+    const getButtonText = () => {
+        if (isUploadingStep) return 'Enviando Arquivo...';
+        if (isSubmitting) return 'Finalizando...';
+        return isFinalStep ? 'Finalizar' : 'Continuar';
+    }
+
+
     return (
         <Form {...form}>
             <div className="space-y-4">
@@ -186,15 +211,15 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
 
                 <div className="flex justify-between items-center pt-4">
                     {currentStep > 0 ? (
-                        <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
+                        <Button variant="outline" onClick={handleBack} disabled={buttonDisabled}>
                             <ChevronLeft className="mr-2 h-4 w-4" />
                             Voltar
                         </Button>
                     ) : <div></div>}
-                    <Button onClick={handleNext} disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isSubmitting ? 'Enviando...' : (currentStep === totalSteps - 1 ? 'Finalizar' : 'Continuar')}
-                        {!isSubmitting && currentStep < totalSteps - 1 && <ChevronRight className="ml-2 h-4 w-4" />}
+                    <Button onClick={handleNext} disabled={buttonDisabled}>
+                        {buttonDisabled ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {getButtonText()}
+                        {!buttonDisabled && !isFinalStep && <ChevronRight className="ml-2 h-4 w-4" />}
                     </Button>
                 </div>
             </div>
