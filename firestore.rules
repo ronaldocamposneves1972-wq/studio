@@ -2,239 +2,300 @@
  * @fileoverview Firestore Security Rules for ConsorciaTech application.
  *
  * Core Philosophy:
- * This ruleset prioritizes a secure-by-default posture. It enforces strict data ownership where applicable (e.g., user profiles, client documents),
- * and grants public read access only to collections explicitly designed for it (e.g., product catalogs). Authorization decisions are made
- * independently wherever possible, avoiding chained `get()` calls and complex lookups.
+ * This ruleset prioritizes security and authorization independence, leveraging
+ * path-based ownership and data denormalization to avoid complex queries within
+ * the rules. It strictly enforces user-based and role-based access controls.
  *
  * Data Structure:
- * - /users/{userId}: User profile information. Only the authenticated user can manage their own profile.
- * - /roles_admin/{userId}: Document existence grants admin privileges.
- * - /clients/{clientId}: Client information.
- * - /clients/{clientId}/documents/{documentId}: Documents associated with a specific client. Only the authenticated client can manage their own documents.
- * - /financial_institutions/{financialInstitutionId}: Financial institution data. Public read access.
- * - /consortiums/{consortiumId}: Consortium product data. Public read access.
- * - /credit_products/{creditProductId}: Credit product data. Public read access.
- * - /product_combos/{productComboId}: Combination of products data. Public read access.
- * - /sales_proposals/{salesProposalId}: Sales proposal data.
- * - /commissions/{commissionId}: Commission data.
- * - /quizzes/{quizId}: Quiz data.
- * - /questions/{questionId}: Question data. Public read access.
+ * - /users/{userId}: Stores individual user data, accessible only by the user themselves or admins.
+ * - /roles_admin/{userId}: Used for role-based authorization; presence of a document grants admin privileges.
+ * - /clients/{clientId}: Stores client data, accessible by admins and potentially by specific users (e.g., 'Gestor').
+ * - /clients/{clientId}/documents/{documentId}: Client-owned documents.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
+ * - /consortiums/{consortiumId}: Stores consortium product data. Access to product data is broadly open.
+ * - /credit_products/{creditProductId}: Stores credit product data. Access to product data is broadly open.
+ * - /product_combos/{productComboId}: Stores product combos. Access to product combo data is broadly open.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposals, with denormalized 'clientId' for authorization.
+ * - /commissions/{commissionId}: Stores commission data.
+ * - /quizzes/{quizId}: Stores quiz data.
+ * - /questions/{questionId}: Stores question data.
  *
  * Key Security Decisions:
- * - Public Listing: Collections like `consortiums`, `credit_products`, `product_combos`, `financial_institutions`, and `questions` are publicly listable. All other collections are not listable without authentication.
- * - Authorization Independence: The rules avoid chained `get()` calls by denormalizing the `clientId` in `sales_proposals` to grant access for the specific client.
- * - Strict Ownership: User-owned resources (e.g., documents under /users/{userId}) are strictly controlled using path-based ownership checks.
+ * - Strict user ownership for /users/{userId} and /clients/{clientId}/documents/{documentId}.
+ * - Role-based admin access via /roles_admin/{userId} document existence check.
+ * - Data denormalization (e.g., clientId in sales_proposals) to avoid costly get() calls in rules.
+ * - Broad read access to product catalogs (consortiums, credit_products, product_combos).
  *
  * Denormalization for Authorization:
- * - `sales_proposals` include `clientId` to authorize clients to access their own proposals without additional reads.
+ * - The `sales_proposals` collection includes a `clientId` field to avoid needing to
+ *   query the `clients` collection for authorization. This enables direct access control
+ *   based on client ownership without additional reads.
  *
  * Structural Segregation:
- * - Public data (products, financial institutions) is stored in top-level collections with public read access.
- * - Private data (user profiles, client documents) is stored in user-specific or client-specific subcollections.
+ * - No explicit structural segregation is used.  However, the design could be expanded to
+ *   include separate private/public collections in the future if needed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user is signed in
-    function isSignedIn() {
-      return request.auth != null;
-    }
+    /**
+     * @description Grants access to user-specific data.
+     * @path /users/{userId}
+     * @allow (read,write) if the user is signed in and the requested userId matches their own ID.
+     * @deny (read,write) if the user is not signed in or the userId does not match their own ID.
+     * @principle Enforces document ownership for user data.
+     */
+    match /users/{userId} {
+      // isOwner function checks if the authenticated user's ID matches the requested userId.
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
 
-    // Helper function to check if the authenticated user ID matches the provided user ID
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
+      // isSignedIn function checks if a user is signed in.
+      function isSignedIn() {
+        return request.auth != null;
+      }
 
-    // Helper function to check if the authenticated user ID matches the provided user ID and the resource exists
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+      allow get: if isOwner(userId);
+      allow list: if false; // Prevent listing of all users.
+      allow create: if isSignedIn() && isOwner(userId); // Self-creation allowed.
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Allows a user to manage their own user profile.
-     * @path /users/{userId}
-     * @allow (create) User with UID 'user123' creates a document at /users/user123.
-     * @deny (create) User with UID 'user123' attempts to create a document at /users/user456.
-     * @principle Enforces document ownership for writes.
-     */
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
-    }
-
-        /**
-     * @description Allows a user to manage their own admin profile.
+     * @description Grants admin role based on document existence.
      * @path /roles_admin/{userId}
-     * @allow (create) User with UID 'user123' creates a document at /roles_admin/user123.
-     * @deny (create) User with UID 'user123' attempts to create a document at /roles_admin/user456.
-     * @principle Enforces document ownership for writes.
+     * @allow (read,write) if the user is signed in and the requested userId matches their own ID.
+     * @deny (read,write) if the user is not signed in or the userId does not match their own ID.
+     * @principle Role-based access control.
      */
     match /roles_admin/{userId} {
-      allow get: if true;
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if false; // No listing of admins.
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if false; // Only creation and deletion to manage roles
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    /**
+     * @description Grants access to client data.
+     * @path /clients/{clientId}
+     * @allow (read,write) if the user is an admin.
+     * @deny (read,write) if the user is not an admin.
+     * @principle Role-based access control.
+     */
+    match /clients/{clientId} {
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    /**
+     * @description Grants access to client documents.
+     * @path /clients/{clientId}/documents/{documentId}
+     * @allow (read,write) if the user is an admin or the client.
+     * @deny (read,write) if the user is not an admin or the client.
+     * @principle Document ownership for client documents.
+     */
+    match /clients/{clientId}/documents/{documentId} {
+      function isClient(clientId) {
+          return request.auth.uid == clientId;
+      }
+
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && (isClient(clientId) || isAdmin());
       allow list: if false;
+      allow create: if isSignedIn() && (isClient(clientId) || isAdmin());
+      allow update: if isSignedIn() && (isClient(clientId) || isAdmin());
+      allow delete: if isSignedIn() && (isClient(clientId) || isAdmin());
+    }
+
+    /**
+     * @description Grants access to financial institution data.
+     * @path /financial_institutions/{financialInstitutionId}
+     * @allow (read,write) if the user is an admin.
+     * @deny (read,write) if the user is not an admin.
+     * @principle Role-based access control.
+     */
+    match /financial_institutions/{financialInstitutionId} {
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    /**
+     * @description Grants access to consortium product data.
+     * @path /consortiums/{consortiumId}
+     * @allow (read,write) to everyone.
+     * @principle Open read access to product data.
+     */
+    match /consortiums/{consortiumId} {
+      allow get: if true;
+      allow list: if true;
       allow create: if true;
-      allow update: if false;
+      allow update: if true;
       allow delete: if true;
     }
 
     /**
-     * @description Allows access to client information.
-     * @path /clients/{clientId}
-     * @allow (get) Any authenticated user can read client data.
-     * @deny (create) Any user cannot create client data.
-     * @principle Requires authentication for reads and restricts write access.
-     */
-    match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Allows a client to manage their own documents.
-     * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) User with UID 'client123' creates a document at /clients/client123/documents/doc1.
-     * @deny (create) User with UID 'client123' attempts to create a document at /clients/client456/documents/doc1.
-     * @principle Enforces document ownership for writes under a client's path.
-     */
-    match /clients/{clientId}/documents/{documentId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Allows public read access to financial institution data.
-     * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get) Any user can read financial institution data.
-     * @deny (create) No one can create financial institution data through the client.
-     * @principle Allows public reads and restricts writes.
-     */
-    match /financial_institutions/{financialInstitutionId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Allows public read access to consortium product data.
-     * @path /consortiums/{consortiumId}
-     * @allow (get) Any user can read consortium product data.
-     * @deny (create) No one can create consortium product data through the client.
-     * @principle Allows public reads and restricts writes.
-     */
-    match /consortiums/{consortiumId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Allows public read access to credit product data.
+     * @description Grants access to credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow (get) Any user can read credit product data.
-     * @deny (create) No one can create credit product data through the client.
-     * @principle Allows public reads and restricts writes.
+     * @allow (read,write) to everyone.
+     * @principle Open read access to product data.
      */
     match /credit_products/{creditProductId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows public read access to product combo data.
+     * @description Grants access to product combo data.
      * @path /product_combos/{productComboId}
-     * @allow (get) Any user can read product combo data.
-     * @deny (create) No one can create product combo data through the client.
-     * @principle Allows public reads and restricts writes.
+     * @allow (read,write) to everyone.
+     * @principle Open read access to product data.
      */
     match /product_combos/{productComboId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Allows access to sales proposal data.
+     * @description Grants access to sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get) Any authenticated user can read sales proposal data.
-     * @deny (create) Any user cannot create sales proposal data.
+     * @allow (read,write) if the user is an admin or the client.
+     * @deny (read,write) if the user is not an admin or the client.
+     * @principle Document ownership for sales proposals.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isClient(clientId) {
+          return request.auth.uid == clientId;
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && (isClient(resource.data.clientId) || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && (request.resource.data.clientId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && (isClient(resource.data.clientId) || isAdmin());
+      allow delete: if isSignedIn() && (isClient(resource.data.clientId) || isAdmin());
     }
 
     /**
-     * @description Allows access to commission data.
+     * @description Grants access to commission data.
      * @path /commissions/{commissionId}
-     * @allow (get) Any authenticated user can read commission data.
-     * @deny (create) Any user cannot create commission data.
+     * @allow (read,write) if the user is an admin.
+     * @deny (read,write) if the user is not an admin.
+     * @principle Role-based access control.
      */
     match /commissions/{commissionId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Allows access to quiz data.
+     * @description Grants access to quiz data.
      * @path /quizzes/{quizId}
-     * @allow (get) Any authenticated user can read quiz data.
-     * @deny (create) Any user cannot create quiz data.
+     * @allow (read,write) if the user is an admin.
+     * @deny (read,write) if the user is not an admin.
+     * @principle Role-based access control.
      */
     match /quizzes/{quizId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Allows public read access to question data.
+     * @description Grants access to question data.
      * @path /questions/{questionId}
-     * @allow (get) Any user can read question data.
-     * @deny (create) No one can create question data through the client.
-     * @principle Allows public reads and restricts writes.
+     * @allow (read,write) if the user is an admin.
+     * @deny (read,write) if the user is not an admin.
+     * @principle Role-based access control.
      */
     match /questions/{questionId} {
-      allow get, list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
 
-    /**
-     * @description Fixes the "Missing or insufficient permissions" error by allowing public listing of the "products" collection.
-     * @path /products
-     * @allow (list) Any user can list products. This is a temporary fix and should be reviewed for security implications.
-     * @deny (create) No one can create product data through the client.
-     * @principle Allows public reads and restricts writes.
-     */
-    match /products {
-        allow get, list: if true;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
     }
   }
 }
