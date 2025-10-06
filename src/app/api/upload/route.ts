@@ -5,9 +5,9 @@ import { v2 as cloudinary } from 'cloudinary';
 // Configure Cloudinary with your credentials
 // These are securely stored on the server and not exposed to the client.
 cloudinary.config({
-  cloud_name: 'duuaxalsw', // Preenchido com a informação fornecida
-  api_key: process.env.CLOUDINARY_API_KEY, // Substitua pelo seu API Key ou use uma variável de ambiente
-  api_secret: process.env.CLOUDINARY_API_SECRET, // Substitua pelo seu API Secret ou use uma variável de ambiente
+  cloud_name: 'duuaxalsw',
+  api_key: '581358637918314',
+  api_secret: 'NTNgWHeJJAQVxWQ8GvMZtx3Uam0',
 });
 
 
@@ -18,10 +18,6 @@ export async function POST(request: NextRequest) {
 
   if (!file || !clientId) {
     return NextResponse.json({ error: 'Arquivo ou ID do cliente ausente.' }, { status: 400 });
-  }
-  
-  if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-      return NextResponse.json({ error: 'As credenciais do Cloudinary não estão configuradas no servidor.' }, { status: 500 });
   }
 
   try {
