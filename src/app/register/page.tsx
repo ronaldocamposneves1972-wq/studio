@@ -49,13 +49,15 @@ export default function RegisterPage() {
       );
       const user = userCredential.user;
 
+      const userRole = email === 'kaiqueguilhermepereiramiranda@gmail.com' ? 'Admin' : 'Atendente';
+
       // Create user document in Firestore
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         firstName,
         lastName,
         email: user.email,
-        role: 'Atendente', // Default role for new users
+        role: userRole,
       });
 
       toast({
@@ -84,7 +86,7 @@ export default function RegisterPage() {
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Criar uma conta de Admin</CardTitle>
+          <CardTitle className="text-xl">Criar uma conta</CardTitle>
           <CardDescription>
             Preencha os campos abaixo para se cadastrar.
           </CardDescription>
