@@ -77,8 +77,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
-import { doc, collection, query, where } from "firebase/firestore"
+import { useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
+import { doc, arrayUnion } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -162,14 +162,7 @@ export default function ClientDetailPage() {
     return doc(firestore, 'clients', clientId)
   }, [firestore, clientId])
 
-  const documentsQuery = useMemoFirebase(() => {
-    if (!firestore || !clientId) return null;
-    return query(collection(firestore, 'clients', clientId, 'documents'));
-  }, [firestore, clientId]);
-
-
   const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
-  const { data: documents, isLoading: isLoadingDocuments } = useCollection<ClientDocument>(documentsQuery);
 
   const proposals = allProposals.filter(p => p.clientName === client?.name)
 
@@ -198,60 +191,43 @@ export default function ClientDetailPage() {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !clientId || !firestore) return;
+    if (!file || !clientId || !clientRef) return;
 
     setIsUploading(true);
     toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
 
     try {
-      // 1. Get signature from our API
-      const timestamp = Math.round(new Date().getTime() / 1000);
-      const paramsToSign = {
-        timestamp: timestamp,
-        folder: `clients/${clientId}`,
-        public_id: `${Date.now()}-${file.name}`,
-      };
-
-      const signResponse = await fetch('/api/sign-cloudinary-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paramsToSign }),
-      });
-
-      if (!signResponse.ok) throw new Error('Falha ao obter assinatura do servidor.');
-      
-      const { signature } = await signResponse.json();
-
-      // 2. Upload file to Cloudinary
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('api_key', process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY!);
-      formData.append('timestamp', String(timestamp));
-      formData.append('signature', signature);
+      // IMPORTANT: Replace 'consorciatech' with your actual unsigned upload preset name from Cloudinary
+      formData.append('upload_preset', 'consorciatech'); 
       formData.append('folder', `clients/${clientId}`);
-      formData.append('public_id', paramsToSign.public_id);
-      
+
       const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`, {
         method: 'POST',
         body: formData,
       });
 
-      if (!uploadResponse.ok) throw new Error('Falha no upload para o Cloudinary.');
+      if (!uploadResponse.ok) {
+        throw new Error('Falha no upload para o Cloudinary.');
+      }
 
       const cloudinaryData = await uploadResponse.json();
 
-      // 3. Save file metadata to Firestore
-      const newDocument: Omit<ClientDocument, 'id'> = {
+      const newDocument: ClientDocument = {
+        id: cloudinaryData.public_id, // Use public_id as a unique ID
         clientId: clientId,
-        fileName: file.name,
+        fileName: cloudinaryData.original_filename || file.name,
         fileType: cloudinaryData.resource_type || 'raw',
         cloudinaryPublicId: cloudinaryData.public_id,
         secureUrl: cloudinaryData.secure_url,
         uploadedAt: new Date().toISOString(),
       };
       
-      const documentsCollection = collection(firestore, 'clients', clientId, 'documents');
-      await addDocumentNonBlocking(documentsCollection, newDocument);
+      // Update the client document with the new document metadata
+      updateDocumentNonBlocking(clientRef, {
+        documents: arrayUnion(newDocument)
+      });
 
       toast({
         title: 'Arquivo enviado!',
@@ -263,11 +239,10 @@ export default function ClientDetailPage() {
       toast({
         variant: 'destructive',
         title: 'Erro no Upload',
-        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
+        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo. Verifique se o "upload preset" está configurado corretamente no Cloudinary.',
       });
     } finally {
       setIsUploading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -320,6 +295,7 @@ export default function ClientDetailPage() {
     )
   }
 
+  const documents = client.documents || [];
 
   return (
     <div className="grid flex-1 items-start gap-4 md:gap-8">
@@ -436,25 +412,16 @@ export default function ClientDetailPage() {
                               <CardDescription>Gerencie os documentos enviados pelo cliente para análise.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {(isLoadingDocuments || (!documents || documents.length === 0)) && (
+                                {documents.length === 0 && (
                                     <div className={cn(
                                         "flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6"
                                     )}>
-                                        {isLoadingDocuments ? (
-                                            <>
-                                                <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
-                                                <h3 className="text-xl font-semibold">Carregando documentos...</h3>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-12 w-12 text-muted-foreground" />
-                                                <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
-                                                <p className="text-muted-foreground">Clique no botão abaixo para adicionar documentos.</p>
-                                            </>
-                                        )}
+                                        <Upload className="h-12 w-12 text-muted-foreground" />
+                                        <h3 className="text-xl font-semibold">Nenhum documento enviado</h3>
+                                        <p className="text-muted-foreground">Clique no botão abaixo para adicionar documentos.</p>
                                     </div>
                                 )}
-                                {documents && documents.length > 0 && (
+                                {documents.length > 0 && (
                                      <Table>
                                         <TableHeader>
                                             <TableRow>
