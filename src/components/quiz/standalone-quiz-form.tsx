@@ -49,6 +49,7 @@ interface StandaloneQuizFormProps {
 
 export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange }: StandaloneQuizFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
+    const [isStepProcessing, setIsStepProcessing] = useState(false);
     const totalSteps = quiz.questions.length;
     
     const form = useForm<FormData>({
@@ -67,6 +68,21 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         // Handle CEP change if function is provided
         if (currentQuestion.id === 'q-cep' && onCEPChange) {
             await onCEPChange(form.getValues(currentQuestion.id));
+        }
+
+        const isFileStep = currentQuestion.type === 'file' && form.getValues(currentQuestion.id);
+
+        if (isFileStep) {
+            setIsStepProcessing(true);
+            setTimeout(() => {
+                setIsStepProcessing(false);
+                if (currentStep < totalSteps - 1) {
+                    setCurrentStep(currentStep + 1);
+                } else {
+                    onComplete(form.getValues());
+                }
+            }, 1000); // 1-second animation/delay
+            return;
         }
 
         if (currentStep < totalSteps - 1) {
@@ -91,9 +107,13 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
             case 'file':
                 return (
                     <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center">
-                        <Upload className="w-12 h-12 text-muted-foreground" />
+                        {isStepProcessing ? (
+                             <CheckCircle className="w-12 h-12 text-green-500 animate-pulse" />
+                        ) : (
+                            <Upload className="w-12 h-12 text-muted-foreground" />
+                        )}
                         <FormLabel htmlFor={currentQuestion.id} className="mt-4 text-lg cursor-pointer text-primary hover:underline">
-                            Clique para selecionar os arquivos
+                            {isStepProcessing ? "Arquivo(s) pronto(s)!" : "Clique para selecionar os arquivos"}
                         </FormLabel>
                         <FormControl>
                              <Input
@@ -162,9 +182,11 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     };
 
     const isFinalStep = currentStep === totalSteps - 1;
-    const buttonDisabled = isSubmitting;
+    const buttonDisabled = isSubmitting || isStepProcessing;
+    
     const getButtonText = () => {
         if (isSubmitting) return 'Finalizando...';
+        if (isStepProcessing) return 'Aguarde...';
         return isFinalStep ? 'Finalizar' : 'Continuar';
     }
 
