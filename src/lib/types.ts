@@ -20,6 +20,8 @@ export type ClientDocument = {
   uploadedAt: string;
   validationStatus?: DocumentStatus;
   statusUpdatedAt?: string;
+  validatedBy?: string;
+  validatedAt?: string;
 };
 
 export type Client = {

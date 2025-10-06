@@ -81,7 +81,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase"
+import { useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase"
 import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
@@ -165,6 +165,7 @@ export default function ClientDetailPage() {
   const params = useParams();
   const clientId = params.id as string;
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -346,8 +347,15 @@ export default function ClientDetailPage() {
   const handleValidationStatusChange = async (docToUpdate: ClientDocument, newStatus: DocumentStatus) => {
     if (!clientRef || !client?.documents) return;
     try {
+        const now = new Date().toISOString();
         const updatedDocuments = client.documents.map(doc =>
-            doc.id === docToUpdate.id ? { ...doc, validationStatus: newStatus, statusUpdatedAt: new Date().toISOString() } : doc
+            doc.id === docToUpdate.id ? { 
+                ...doc, 
+                validationStatus: newStatus, 
+                statusUpdatedAt: now,
+                validatedAt: now,
+                validatedBy: user?.displayName || 'Sistema'
+            } : doc
         );
         await updateDoc(clientRef, {
             documents: updatedDocuments
@@ -581,9 +589,10 @@ export default function ClientDetailPage() {
                                     <TableHeader>
                                         <TableRow>
                                         <TableHead>Nome do Arquivo</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Tipo</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead className="hidden md:table-cell">Data de Envio</TableHead>
+                                        <TableHead>Data de Envio</TableHead>
+                                        <TableHead>Data de Validação</TableHead>
+                                        <TableHead>Validado Por</TableHead>
                                         <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -610,7 +619,7 @@ export default function ClientDetailPage() {
                                            
                                            const canValidate = !isLocked && status !== 'validated';
                                            const canReject = !isLocked && status !== 'rejected';
-                                           const canMarkPending = !isLocked && status !== 'pending';
+                                           const canMarkPending = isFinalStatus && !isLocked;
 
                                            return (
                                             <TableRow key={doc.id}>
@@ -618,11 +627,11 @@ export default function ClientDetailPage() {
                                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                                     {doc.fileName}
                                                 </TableCell>
-                                                <TableCell className="hidden sm:table-cell capitalize">{doc.fileType}</TableCell>
-                                                <TableCell>
-                                                    {statusBadge}
-                                                </TableCell>
-                                                <TableCell className="hidden md:table-cell">{new Date(doc.uploadedAt).toLocaleDateString('pt-BR')}</TableCell>
+                                                <TableCell>{statusBadge}</TableCell>
+                                                <TableCell>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</TableCell>
+                                                <TableCell>{doc.validatedAt ? new Date(doc.validatedAt).toLocaleString('pt-BR') : '—'}</TableCell>
+                                                <TableCell>{doc.validatedBy || '—'}</TableCell>
+
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -664,7 +673,7 @@ export default function ClientDetailPage() {
 
                                                             <AlertDialog>
                                                                 <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!canReject}>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!canReject} className="text-destructive focus:text-destructive">
                                                                         <XCircle className="mr-2 h-4 w-4" />
                                                                         Rejeitar
                                                                     </DropdownMenuItem>
