@@ -1,5 +1,6 @@
 import Image from "next/image"
-import { PlusCircle, MoreVertical } from "lucide-react"
+import Link from "next/link"
+import { PlusCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,12 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { products } from "@/lib/placeholder-data"
 
 export default function ProductsPage() {
@@ -38,44 +33,32 @@ export default function ProductsPage() {
       </div>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3 xl:grid-cols-4">
         {products.map((product) => (
-          <Card key={product.id}>
-            <CardHeader className="p-0 relative">
-              <Image
-                alt={product.name}
-                className="aspect-video w-full rounded-t-lg object-cover"
-                height="300"
-                src={product.imageUrl}
-                width="400"
-                data-ai-hint={product.type === 'Consórcio' ? 'house' : 'money'}
-              />
-              <div className="absolute top-2 right-2">
-                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
-                      <MoreVertical className="h-4 w-4" />
-                      <span className="sr-only">Mais</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem>Desativar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              <Badge variant={product.type === 'Consórcio' ? "secondary" : "outline"} className="mb-2">{product.type}</Badge>
-              <CardTitle className="text-lg">{product.name}</CardTitle>
-              <CardDescription className="text-sm">
-                A partir de R$ {product.minAmount.toLocaleString('pt-br')}
-              </CardDescription>
-            </CardContent>
-            <CardFooter className="p-4 pt-0">
-               <div className="text-xs text-muted-foreground">
-                Prazos: {product.terms.join(', ')} meses
-              </div>
-            </CardFooter>
-          </Card>
+          <Link href={`/dashboard/products/${product.id}`} key={product.id} className="group">
+            <Card className="h-full transition-all group-hover:shadow-md group-hover:-translate-y-1">
+              <CardHeader className="p-0 relative">
+                <Image
+                  alt={product.name}
+                  className="aspect-video w-full rounded-t-lg object-cover"
+                  height="300"
+                  src={product.imageUrl}
+                  width="400"
+                  data-ai-hint={product.type === 'Consórcio' ? 'house' : 'money'}
+                />
+              </CardHeader>
+              <CardContent className="p-4">
+                <Badge variant={product.type === 'Consórcio' ? "secondary" : "outline"} className="mb-2">{product.type}</Badge>
+                <CardTitle className="text-lg group-hover:text-primary">{product.name}</CardTitle>
+                <CardDescription className="text-sm">
+                  A partir de R$ {product.minAmount.toLocaleString('pt-br')}
+                </CardDescription>
+              </CardContent>
+              <CardFooter className="p-4 pt-0">
+                 <div className="text-xs text-muted-foreground">
+                  Prazos: {product.terms.join(', ')} meses
+                </div>
+              </CardFooter>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>
