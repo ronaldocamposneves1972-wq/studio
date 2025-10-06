@@ -24,6 +24,8 @@ import type { Product } from '@/lib/types';
 import Link from 'next/link';
 import { DialogFooter } from '../ui/dialog';
 import { cn } from '@/lib/utils';
+import { calculateMonthlyRate } from '@/lib/utils';
+
 
 const proposalFormSchema = z.object({
   productId: z.string({ required_error: 'Selecione um produto.' }),
@@ -50,6 +52,7 @@ interface ProposalFormProps {
 export function ProposalForm({ onSave }: ProposalFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalToPay, setTotalToPay] = useState(0);
+  const [monthlyInterestRate, setMonthlyInterestRate] = useState(0);
   const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: string} | null>(null);
   const firestore = useFirestore();
 
@@ -65,20 +68,28 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
 
+  const principal = watch('value');
   const installments = watch('installments');
   const installmentValue = watch('installmentValue');
   const selectedProductId = watch('productId');
 
   useEffect(() => {
+    const parsedPrincipal = parseFloat(String(principal).replace(/\./g, '').replace(',', '.'));
     const parsedInstallments = parseInt(String(installments), 10);
     const parsedInstallmentValue = parseFloat(String(installmentValue).replace(/\./g, '').replace(',', '.'));
     
     if (!isNaN(parsedInstallments) && !isNaN(parsedInstallmentValue) && parsedInstallments > 0 && parsedInstallmentValue > 0) {
-        setTotalToPay(parsedInstallments * parsedInstallmentValue);
+        const total = parsedInstallments * parsedInstallmentValue;
+        setTotalToPay(total);
+        if (!isNaN(parsedPrincipal) && parsedPrincipal > 0) {
+          const rate = calculateMonthlyRate(parsedPrincipal, parsedInstallments, parsedInstallmentValue);
+          setMonthlyInterestRate(rate);
+        }
     } else {
         setTotalToPay(0);
+        setMonthlyInterestRate(0);
     }
-  }, [installments, installmentValue]);
+  }, [principal, installments, installmentValue]);
   
   useEffect(() => {
     if (selectedProductId && products) {
@@ -103,7 +114,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
     
     const fullData = {
         ...data,
-        totalValue: totalToPay, // Renamed to represent the total amount to be paid
+        totalValue: totalToPay,
         productName: selectedProduct.name,
         bankName: selectedProduct.bankName,
     }
@@ -164,7 +175,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         </div>
 
         <div className="grid gap-2">
-            <Label>Taxa de Juros / Admin.</Label>
+            <Label>Taxa de Juros / Admin. do Produto</Label>
             <div className={cn("flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm", selectedProductInfo ? 'text-foreground' : 'text-muted-foreground')}>
                 {selectedProductInfo ? `${selectedProductInfo.rate}% ${selectedProductInfo.type === 'Crédito' ? 'a.m.' : 'a.p.'}` : 'Selecione um produto'}
             </div>
@@ -176,7 +187,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         <Input
           id="value"
           {...register('value')}
-          placeholder="Ex: 80.000,00"
+          placeholder="Ex: 3.000,00"
           className={cn(errors.value ? 'border-destructive' : '')}
           disabled={isSubmitting}
           onChange={(e) => handleNumericInputChange(e, 'value')}
@@ -192,7 +203,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
               id="installments"
               type="number"
               {...register('installments')}
-              placeholder="Ex: 60"
+              placeholder="Ex: 18"
               className={errors.installments ? 'border-destructive' : ''}
               disabled={isSubmitting}
             />
@@ -203,7 +214,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
             <Input
               id="installmentValue"
               {...register('installmentValue')}
-              placeholder="Ex: 1.500,50"
+              placeholder="Ex: 379,00"
               className={errors.installmentValue ? 'border-destructive' : ''}
               disabled={isSubmitting}
               onChange={(e) => handleNumericInputChange(e, 'installmentValue')}
@@ -212,12 +223,22 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         </div>
       </div>
       
-       <div className="space-y-2 rounded-lg bg-muted/50 p-4">
-        <p className="text-sm text-muted-foreground">Valor Total a Pagar</p>
-        <p className="text-2xl font-bold">
-            R$ {totalToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
-         <p className="text-xs text-muted-foreground">Calculado a partir do número e valor das parcelas.</p>
+       <div className="space-y-4 rounded-lg bg-muted/50 p-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Valor Total a Pagar</p>
+            <p className="text-2xl font-bold">
+                R$ {totalToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+           <div>
+            <p className="text-sm text-muted-foreground">Total de Juros (Mensal)</p>
+             <p className="text-2xl font-bold text-primary">
+                {(monthlyInterestRate * 100).toFixed(2)}%
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Valores calculados com base nas informações fornecidas.</p>
       </div>
 
       <DialogFooter>

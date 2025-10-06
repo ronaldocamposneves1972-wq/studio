@@ -73,3 +73,67 @@ export function maskCEP(value: string): string {
     .replace(/(\d{5})(\d)/, '$1-$2')
     .substring(0, 9);
 }
+
+/**
+ * Calculates the monthly interest rate for a loan using the bisection method.
+ * @param principal The loan amount.
+ * @param numberOfInstallments The total number of payments.
+ * @param installmentValue The value of each installment.
+ * @returns The monthly interest rate (e.g., 0.05 for 5%).
+ */
+export function calculateMonthlyRate(
+  principal: number,
+  numberOfInstallments: number,
+  installmentValue: number
+): number {
+  if (principal <= 0 || numberOfInstallments <= 0 || installmentValue <= 0) {
+    return 0;
+  }
+
+  // If the total payments are less than or equal to the principal, there's no interest.
+  if (installmentValue * numberOfInstallments <= principal) {
+    return 0;
+  }
+
+  let low = 0;
+  let high = 1; // Assume a max monthly rate of 100%, which is very high
+  let mid = 0;
+  const precision = 0.000001; // The desired precision for the rate
+
+  // Function to calculate the present value (PV) of the installments for a given rate.
+  const calculatePresentValue = (rate: number): number => {
+    if (rate === 0) return numberOfInstallments * installmentValue;
+    return installmentValue * ((1 - Math.pow(1 + rate, -numberOfInstallments)) / rate);
+  };
+
+  // Perform a sanity check before starting the loop.
+  if (calculatePresentValue(high) > principal) {
+    // This case is unlikely if total payments > principal, but it's a safeguard.
+    // It suggests an unusual scenario, perhaps installmentValue is too low for any positive rate.
+    // We can extend the search range or return an error indicator.
+    // For now, let's extend the high range once.
+    high = 2;
+  }
+
+  // Bisection method to find the root (the interest rate)
+  for (let i = 0; i < 100; i++) { // Limit iterations to prevent infinite loops
+    mid = (low + high) / 2;
+    const pv = calculatePresentValue(mid);
+
+    if (Math.abs(pv - principal) < precision) {
+      // The rate is found
+      return mid;
+    }
+
+    if (pv > principal) {
+      // The rate is too low, so we search in the upper half
+      low = mid;
+    } else {
+      // The rate is too high, so we search in the lower half
+      high = mid;
+    }
+  }
+  
+  // Return the last calculated middle point if max iterations are reached
+  return mid;
+}
