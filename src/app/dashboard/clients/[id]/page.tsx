@@ -353,8 +353,8 @@ export default function ClientDetailPage() {
                 ...doc, 
                 validationStatus: newStatus, 
                 statusUpdatedAt: now,
-                validatedAt: now,
-                validatedBy: user?.displayName || 'Sistema'
+                validatedAt: newStatus !== 'pending' ? now : doc.validatedAt,
+                validatedBy: newStatus !== 'pending' ? (user?.displayName || 'Sistema') : doc.validatedBy,
             } : doc
         );
         await updateDoc(clientRef, {
@@ -437,6 +437,7 @@ export default function ClientDetailPage() {
 
   const documents = client.documents || [];
   const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image'));
+  const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
 
 
   return (
@@ -734,7 +735,7 @@ export default function ClientDetailPage() {
                                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
                            </Button>
-                            <Button disabled={!documents || documents.length === 0}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
+                            <Button disabled={!allDocumentsValidated}> <Send className="h-4 w-4 mr-2"/> Enviar para Validação</Button>
                          </CardFooter>
                       </Card>
                     </TabsContent>
@@ -800,3 +801,4 @@ export default function ClientDetailPage() {
 }
 
     
+
