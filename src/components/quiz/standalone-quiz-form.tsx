@@ -126,7 +126,6 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                         </FormControl>
                         {selectedFiles && selectedFiles.length > 0 && (
                             <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                                <p className="font-semibold">Arquivos selecionados:</p>
                                 {Array.from(selectedFiles).map((file, index) => (
                                     <p key={index}>{file.name}</p>
                                 ))}
