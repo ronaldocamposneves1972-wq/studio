@@ -7,7 +7,7 @@ import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
-import { collection, addDoc } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -132,7 +132,7 @@ export default function NewQuizPage() {
         ...q,
         options: q.options ? q.options.split(',').map(opt => opt.trim()) : [],
       })),
-      createdAt: new Date().toISOString(),
+      createdAt: serverTimestamp(),
     }
 
     try {
@@ -145,7 +145,7 @@ export default function NewQuizPage() {
         title: "Quiz criado com sucesso!",
         description: `O quiz "${data.name}" foi salvo.`,
       })
-      router.push("/dashboard/settings?tab=quizzes")
+      router.push("/dashboard/settings/quizzes")
     } catch (error) {
       console.error("Error creating quiz: ", error);
       toast({
@@ -153,7 +153,8 @@ export default function NewQuizPage() {
         title: "Erro ao criar quiz",
         description: "Não foi possível salvar o quiz. Verifique as permissões do Firestore.",
       })
-      setIsSubmitting(false)
+    } finally {
+        setIsSubmitting(false)
     }
   }
 
@@ -176,7 +177,7 @@ export default function NewQuizPage() {
     <div className="grid flex-1 auto-rows-max gap-4">
        <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" className="h-7 w-7" asChild>
-          <Link href="/dashboard/settings?tab=quizzes">
+          <Link href="/dashboard/settings/quizzes">
             <ChevronLeft className="h-4 w-4" />
             <span className="sr-only">Voltar</span>
           </Link>

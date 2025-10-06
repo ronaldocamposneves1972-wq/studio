@@ -42,7 +42,7 @@ export default function IntegrationsPage() {
         return doc(firestore, 'settings', 'integrations')
     }, [firestore])
 
-    const { data: savedSettings, isLoading: isLoadingSettings } = useDoc<IntegrationSettings>(settingsDocRef)
+    const { data: savedSettings, isLoading: isLoadingSettings, error } = useDoc<IntegrationSettings>(settingsDocRef)
 
     useEffect(() => {
         if (savedSettings) {
@@ -68,10 +68,14 @@ export default function IntegrationsPage() {
 
         setIsSaving(true);
         
-        const settingsToSave: Partial<IntegrationSettings> = { ...settings };
+        const settingsToSave: Partial<IntegrationSettings> = {
+            cloudinaryCloudName: settings.cloudinaryCloudName,
+            cloudinaryApiKey: settings.cloudinaryApiKey,
+            whatsappApiKey: settings.whatsappApiKey,
+        };
         // Only include the secret if a new one was typed
-        if (!settings.cloudinaryApiSecret) {
-            delete settingsToSave.cloudinaryApiSecret;
+        if (settings.cloudinaryApiSecret) {
+            settingsToSave.cloudinaryApiSecret = settings.cloudinaryApiSecret;
         }
         
         setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
@@ -109,6 +113,24 @@ export default function IntegrationsPage() {
                 </CardFooter>
             </Card>
         )
+    }
+
+    if (error) {
+       return (
+         <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="text-destructive">Acesso Negado</CardTitle>
+              <CardDescription>
+                Você não tem permissão para gerenciar as integrações. Apenas administradores podem acessar esta página.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">
+                    Se você acredita que isso é um erro, entre em contato com o suporte do sistema.
+                </p>
+            </CardContent>
+          </Card>
+       )
     }
 
     return (

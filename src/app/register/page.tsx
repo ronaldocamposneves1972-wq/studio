@@ -41,6 +41,16 @@ export default function RegisterPage() {
       return;
     }
     setIsLoading(true);
+    if (!auth || !firestore) {
+       toast({
+        variant: 'destructive',
+        title: 'Erro de Serviço',
+        description: 'Serviços de autenticação ou banco de dados não estão disponíveis.',
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -49,13 +59,15 @@ export default function RegisterPage() {
       );
       const user = userCredential.user;
 
-      const userRole = email === 'kaiqueguilhermepereiramiranda@gmail.com' ? 'Admin' : 'Atendente';
+      // Define o papel do usuário. E-mail específico se torna Admin.
+      const userRole = email.toLowerCase() === 'kaiqueguilhermepereiramiranda@gmail.com' ? 'Admin' : 'Atendente';
 
-      // Create user document in Firestore
+      // Cria um documento para o usuário no Firestore.
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         firstName,
         lastName,
+        name: `${firstName} ${lastName}`,
         email: user.email,
         role: userRole,
       });
