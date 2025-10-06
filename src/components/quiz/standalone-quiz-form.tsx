@@ -61,9 +61,20 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     const currentQuestion = quiz.questions[currentStep];
 
     const handleNext = async () => {
-        // Trigger validation for the current field if needed
         const isValid = await form.trigger(currentQuestion.id as any);
-        if (!isValid) return;
+        if (!isValid) {
+            const value = form.getValues(currentQuestion.id);
+            if (!value || (value instanceof FileList && value.length === 0)) {
+                 form.setError(currentQuestion.id as any, { type: 'manual', message: 'Este campo é obrigatório.' });
+                 return;
+            }
+        }
+        
+        const value = form.getValues(currentQuestion.id);
+        if (!value || (value instanceof FileList && value.length === 0)) {
+            form.setError(currentQuestion.id as any, { type: 'manual', message: 'Este campo é obrigatório.' });
+            return;
+        }
 
         // Handle CEP change if function is provided
         if (currentQuestion.id === 'q-cep' && onCEPChange) {
@@ -101,7 +112,9 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     const renderInput = (field: any) => {
         const mask = getMaskFunction(currentQuestion.id);
-        const selectedFiles = form.watch(field.name) as FileList | null;
+        const watchedFiles = form.watch(field.name) as FileList | null;
+        const selectedFiles = field.value instanceof FileList ? field.value : watchedFiles;
+
 
         switch (currentQuestion.type) {
             case 'file':
