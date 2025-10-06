@@ -30,17 +30,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
 import type { Product } from "@/lib/types"
 import { collection, query } from "firebase/firestore"
 
 export default function ProductsPage() {
   const router = useRouter();
   const firestore = useFirestore();
+  const { user } = useUser(); // Hook para verificar o usuário autenticado
+
+  // A query só é criada se o firestore e o usuário existirem.
   const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return query(collection(firestore, "products"));
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
