@@ -50,6 +50,7 @@ function CadastroContent() {
     try {
       const response = await fetch(`/api/cep/${cleanedCep}`);
       const data = await response.json();
+      console.log("API de CEP retornou:", data);
 
       if (!response.ok) {
         throw new Error(data.error || 'CEP não encontrado');
