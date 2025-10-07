@@ -35,7 +35,7 @@ import type { Quiz } from "@/lib/types"
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
   text: z.string().min(1, "O texto da pergunta é obrigatório"),
-  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file", "cep", "address", "address_number", "address_complement", "cpf"]),
+  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file", "cep", "address", "address_number", "address_complement", "cpf", "birthdate"]),
   options: z.string().optional(), // Comma-separated options
 })
 
@@ -55,7 +55,7 @@ const initialDataCadastro = {
   questions: [
     { id: "q-name", text: "Nome Completo*", type: "text" as const, options: "" },
     { id: "q-cpf", text: "CPF*", type: "cpf" as const, options: "" },
-    { id: "q-birthdate", text: "Data de Nascimento*", type: "text" as const, options: "" },
+    { id: "q-birthdate", text: "Data de Nascimento*", type: "birthdate" as const, options: "" },
     { id: "q-phone", text: "Telefone Celular*", type: "tel" as const, options: "" },
     { id: "q-email", text: "Email*", type: "email" as const, options: "" },
     { id: "q-mothername", text: "Nome da Mãe*", type: "text" as const, options: "" },
@@ -279,6 +279,7 @@ export default function NewQuizPage() {
                                 <SelectItem value="email">Email</SelectItem>
                                 <SelectItem value="tel">Telefone</SelectItem>
                                 <SelectItem value="cpf">CPF</SelectItem>
+                                <SelectItem value="birthdate">Data de Nascimento</SelectItem>
                                 <SelectItem value="radio">Múltipla Escolha (Radio)</SelectItem>
                                 <SelectItem value="checkbox">Seleção (Checkbox)</SelectItem>
                                 <SelectItem value="file">Arquivo</SelectItem>

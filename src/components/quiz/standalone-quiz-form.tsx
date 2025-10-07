@@ -34,7 +34,7 @@ const getMaskFunction = (questionType: string) => {
     switch (questionType) {
         case 'cpf': return maskCPF;
         case 'tel': return maskPhone;
-        case 'date': return maskDate; // Assuming you might have a date type
+        case 'birthdate': return maskDate; // Assuming you might have a date type
         case 'cep': return maskCEP;
         default: return (value: string) => value;
     }
@@ -115,6 +115,28 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                 if (!isEmailValid) {
                     setIsStepProcessing(false);
                     return;
+                }
+            }
+
+            if (currentQuestion.type === 'birthdate') {
+                const dateParts = value.split('/');
+                if (dateParts.length !== 3) {
+                    form.setError(currentQuestion.id as any, { type: 'manual', message: 'Formato de data inválido. Use DD/MM/AAAA.' });
+                    setIsStepProcessing(false);
+                    return;
+                }
+                const [day, month, year] = dateParts.map(Number);
+                const birthDate = new Date(year, month - 1, day);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                if (age < 18 || age > 100) {
+                     form.setError(currentQuestion.id as any, { type: 'manual', message: 'Você deve ter entre 18 e 100 anos para continuar.' });
+                     setIsStepProcessing(false);
+                     return;
                 }
             }
 
@@ -206,6 +228,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                 );
             case 'cpf':
             case 'cep':
+            case 'birthdate':
             case 'text':
             case 'number':
             case 'email':
