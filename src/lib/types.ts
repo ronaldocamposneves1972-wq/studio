@@ -133,7 +133,7 @@ export type Bank = {
 export type QuizQuestion = {
     id: string;
     text: string;
-    type: 'text' | 'number' | 'email' | 'tel' | 'radio' | 'checkbox' | 'file' | 'cep' | 'address' | 'address_number' | 'address_complement';
+    type: 'text' | 'number' | 'email' | 'tel' | 'radio' | 'checkbox' | 'file' | 'cep' | 'address' | 'address_number' | 'address_complement' | 'cpf';
     options?: string[];
 };
 

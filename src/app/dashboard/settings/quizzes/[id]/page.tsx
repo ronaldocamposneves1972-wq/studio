@@ -49,7 +49,7 @@ import {
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
   text: z.string().min(1, "O texto da pergunta é obrigatório"),
-  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file", "cep", "address", "address_number", "address_complement"]),
+  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file", "cep", "address", "address_number", "address_complement", "cpf"]),
   options: z.string().optional(), // Comma-separated options
 })
 
@@ -336,6 +336,7 @@ export default function EditQuizPage() {
                                     <SelectItem value="number">Número</SelectItem>
                                     <SelectItem value="email">Email</SelectItem>
                                     <SelectItem value="tel">Telefone</SelectItem>
+                                    <SelectItem value="cpf">CPF</SelectItem>
                                     <SelectItem value="radio">Múltipla Escolha (Radio)</SelectItem>
                                     <SelectItem value="checkbox">Seleção (Checkbox)</SelectItem>
                                     <SelectItem value="file">Arquivo</SelectItem>

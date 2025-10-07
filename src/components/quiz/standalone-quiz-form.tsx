@@ -68,6 +68,11 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         }
         
         const value = form.getValues(currentQuestion.id);
+        if (currentQuestion.type === 'cpf' && !validateCPF(value)) {
+            form.setError(currentQuestion.id as any, { type: 'manual', message: 'CPF inválido.' });
+            return;
+        }
+
         if (!value || (value instanceof FileList && value.length === 0)) {
             form.setError(currentQuestion.id as any, { type: 'manual', message: 'Este campo é obrigatório.' });
             return;
@@ -156,6 +161,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                         </RadioGroup>
                     </FormControl>
                 );
+            case 'cpf':
             case 'cep':
             case 'text':
             case 'number':
@@ -237,4 +243,3 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         </Form>
     );
 }
-
