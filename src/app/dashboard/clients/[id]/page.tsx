@@ -862,6 +862,18 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                       <SelectItem value="Reprovado">Reprovado</SelectItem>
                                   </SelectContent>
                               </Select>
+                                {client.status === 'Novo' && (
+                                    <Button onClick={handleInitiateDocumentation}>
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Iniciar Documentação
+                                    </Button>
+                                )}
+                                {client.status === 'Em análise' && (
+                                    <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
+                                        <Send className="h-4 w-4 mr-2"/>
+                                        Enviar para Análise
+                                    </Button>
+                                )}
                                <DropdownMenu>
                                 <DropdownMenuTrigger asChild><Button size="icon" variant="outline"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -932,15 +944,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                   <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
                                 )}
                               </CardContent>
-                               {client.status === 'Novo' && (
-                                  <CardFooter className="border-t px-6 py-4 flex justify-end">
-                                      <Button onClick={handleInitiateDocumentation}>
-                                          <Send className="h-4 w-4 mr-2" />
-                                          Iniciar Coleta de Documentos
-                                      </Button>
-                                  </CardFooter>
-                              )}
-                              {client.quizId && ! (client.status === 'Novo') && (
+                              {client.quizId && (
                               <CardFooter className="border-t px-6 py-4">
                                   <p className="text-sm text-muted-foreground">Quiz ID: <span className="font-mono text-primary">{client.quizId}</span></p>
                               </CardFooter>
@@ -1131,10 +1135,6 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                         <p className="text-xs text-muted-foreground mt-1">Envie este link para o cliente solicitar a documentação.</p>
                                     </div>
                                 </div>
-                                <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
-                                    <Send className="h-4 w-4 mr-2"/> 
-                                    Enviar para Análise de Crédito
-                                </Button>
                             </CardFooter>
                            ) : (
                              <CardFooter className="border-t px-6 py-4">
@@ -1302,3 +1302,5 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
+
+    
