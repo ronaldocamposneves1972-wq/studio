@@ -689,37 +689,59 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         if (!client) return [];
 
         const translatedLabels: { [key: string]: string } = {
-            'name': 'Nome', 'email': 'Email', 'phone': 'Telefone', 'cpf': 'CPF', 'birthDate': 'Data de Nascimento',
-            'motherName': 'Nome da Mãe', 'cep': 'CEP', 'address': 'Endereço', 'complement': 'Complemento', 'neighborhood': 'Bairro', 'city': 'Cidade', 'state': 'Estado',
+            'name': 'Nome',
+            'email': 'Email',
+            'phone': 'Telefone',
+            'cpf': 'CPF',
+            'birthDate': 'Data de Nascimento',
+            'motherName': 'Nome da Mãe',
+            'cep': 'CEP',
+            'address': 'Endereço',
+            'address-number': 'Número',
+            'complement': 'Complemento',
+            'neighborhood': 'Bairro',
+            'city': 'Cidade',
+            'state': 'Estado',
         };
 
-        const fieldOrder = ['name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'cep', 'address', 'complement', 'neighborhood', 'city', 'state'];
+        const fieldOrder = [
+            'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 
+            'cep', 'address', 'address-number', 'complement', 'neighborhood', 'city', 'state'
+        ];
         
         const combinedData: Record<string, any> = {};
 
-        // Add main client fields first
+        // Helper to add data if key doesn't exist
+        const addData = (key: string, value: any) => {
+            if (!combinedData.hasOwnProperty(key) && value) {
+                combinedData[key] = value;
+            }
+        };
+
+        // 1. Add main client fields based on fieldOrder
         fieldOrder.forEach(key => {
             if (client[key as keyof Client]) {
-                combinedData[key] = client[key as keyof Client];
+                addData(key, client[key as keyof Client]);
             }
         });
 
-        // Add answers, removing the 'q-' prefix and avoiding overwrites
+        // 2. Add answers, cleaning the key and checking for existence
         if (client.answers) {
             for (const answerKey in client.answers) {
-                const key = answerKey.replace('q-', '');
-                if (!combinedData[key] && client.answers[answerKey]) {
-                     combinedData[key] = client.answers[answerKey];
-                }
+                // remove 'q-' prefix if it exists
+                const cleanKey = answerKey.startsWith('q-') ? answerKey.substring(2) : answerKey;
+                addData(cleanKey, client.answers[answerKey]);
             }
         }
         
-        // Prepare for display
-        return Object.entries(combinedData).map(([key, value]) => ({
-            key,
-            label: translatedLabels[key] || key,
-            value: String(value) || 'Não informado',
-        }));
+        // 3. Prepare for display, mapping and translating
+        return fieldOrder
+            .filter(key => combinedData.hasOwnProperty(key)) // Only show fields that have data
+            .map(key => ({
+                key,
+                label: translatedLabels[key] || key.charAt(0).toUpperCase() + key.slice(1), // Translate or capitalize
+                value: String(combinedData[key]),
+            }));
 
     }, [client]);
 
@@ -1323,3 +1345,5 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
+
+    
