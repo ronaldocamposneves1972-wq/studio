@@ -904,10 +904,10 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                       </div>
                   </CardHeader>
                   <CardContent>
-                     <Tabs defaultValue="proposals">
+                     <Tabs defaultValue="quiz">
                       <TabsList className="mb-4">
-                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
+                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         <TabsTrigger value="documents">Documentos</TabsTrigger>
                         {hasAcceptedProposal && <TabsTrigger value="payment_guides">Guias de Pagamento</TabsTrigger>}
                         <TabsTrigger value="history">Histórico</TabsTrigger>
@@ -1302,5 +1302,3 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
-
-    
