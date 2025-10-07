@@ -73,11 +73,6 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
             return;
         }
 
-        // Handle CEP change if function is provided
-        if (currentQuestion.type === 'cep' && onCEPChange) {
-            await onCEPChange(form.getValues(currentQuestion.id));
-        }
-
         const isFileStep = currentQuestion.type === 'file' && form.getValues(currentQuestion.id);
 
         if (isFileStep) {
@@ -187,6 +182,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 field.onChange(e);
                             }}
                             onBlur={(e) => {
+                                // Handle CEP change if function is provided
                                 if (currentQuestion.type === 'cep' && onCEPChange) {
                                     onCEPChange(e.target.value);
                                 }

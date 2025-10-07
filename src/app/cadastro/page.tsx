@@ -26,13 +26,14 @@ function CadastroContent() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
+  // Initialize useForm here and pass the context down
   const form = useForm();
   
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const q = quizSlug 
       ? where('slug', '==', quizSlug) 
-      : where('placement', '==', 'landing_page');
+      : where('slug', '==', 'landing_page');
     return query(collection(firestore, 'quizzes'), q, limit(1));
   }, [firestore, quizSlug]);
 
@@ -47,12 +48,13 @@ function CadastroContent() {
 
     try {
       const response = await fetch(`/api/cep/${cleanedCep}`);
-      if (!response.ok) {
-        throw new Error('CEP não encontrado');
-      }
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'CEP não encontrado');
+      }
       
-      // Auto-fill form fields
+      // Auto-fill form fields using the form context from useForm
       form.setValue('q-address', data.logradouro);
       form.setValue('q-neighborhood', data.bairro);
       form.setValue('q-city', data.localidade);
@@ -63,11 +65,12 @@ function CadastroContent() {
           description: "Os campos de endereço foram preenchidos automaticamente."
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Não foi possível encontrar o endereço.";
       console.error('Failed to fetch address from CEP:', error);
        toast({
         variant: "destructive",
         title: "Erro ao buscar CEP",
-        description: "Não foi possível encontrar o endereço. Por favor, preencha manualmente.",
+        description: `${errorMessage} Por favor, preencha manualmente.`,
       });
     }
   };
@@ -113,7 +116,8 @@ function CadastroContent() {
         }
     }
 
-    const addressParts = [answers['q-address'], answers['q-number']].filter(Boolean);
+    // Combine address parts
+    const addressParts = [answers['q-address'], answers['q-address-number']].filter(Boolean);
     if (addressParts.length > 0) {
       newClient.address = addressParts.join(', ');
     }

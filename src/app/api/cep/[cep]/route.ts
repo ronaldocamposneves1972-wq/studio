@@ -19,17 +19,19 @@ export async function GET(
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Erro ao consultar o CEP.' }));
-      return NextResponse.json({ error: errorData.message || 'Serviço de CEP indisponível.' }, { status: response.status });
+       // Try to parse error from the upstream API, or use a default message
+      const errorData = await response.json().catch(() => ({ message: `Erro ao consultar o CEP. Status: ${response.status}` }));
+      return NextResponse.json({ error: errorData.message || 'Serviço de CEP indisponível no momento.' }, { status: response.status });
     }
 
     const data = await response.json();
     
-    // The API seems to return an array, we take the first element
+    // The API returns an array, we take the first element which is the primary result
     if (Array.isArray(data) && data.length > 0) {
         return NextResponse.json(data[0]);
     }
-
+    
+    // Fallback for cases where it might not be an array
     return NextResponse.json(data);
 
   } catch (error) {

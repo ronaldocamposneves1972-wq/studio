@@ -65,10 +65,11 @@ export default function StandaloneQuizPage() {
 
     try {
       const response = await fetch(`/api/cep/${cleanedCep}`);
-      if (!response.ok) {
-        throw new Error('CEP não encontrado');
-      }
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'CEP não encontrado');
+      }
       
       form.setValue('q-address', data.logradouro);
       form.setValue('q-neighborhood', data.bairro);
@@ -80,11 +81,12 @@ export default function StandaloneQuizPage() {
           description: "Os campos de endereço foram preenchidos automaticamente."
       })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Não foi possível encontrar o endereço.";
       console.error('Failed to fetch address from CEP:', error);
        toast({
         variant: "destructive",
         title: "Erro ao buscar CEP",
-        description: "Não foi possível encontrar o endereço. Por favor, preencha manualmente.",
+        description: `${errorMessage} Por favor, preencha manualmente.`,
       });
     }
   };
