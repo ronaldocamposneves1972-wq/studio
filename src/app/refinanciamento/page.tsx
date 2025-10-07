@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/logo';
-import { ArrowRight, CheckCircle, ChevronDown } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown, Menu } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export default function RefinanciamentoPage() {
   const router = useRouter();
@@ -75,7 +77,58 @@ export default function RefinanciamentoPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
-        <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
+        <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
+            <Sheet>
+            <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="lg:hidden">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Abrir menu</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+                <div className="grid gap-4 py-6">
+                <Link href="/" className="font-bold">Início</Link>
+                <Accordion type="single" collapsible>
+                    <AccordionItem value="pra-voce">
+                    <AccordionTrigger>Pra você</AccordionTrigger>
+                    <AccordionContent className="grid gap-2 pl-4">
+                        <Link href="/credito-pessoal">Crédito Pessoal</Link>
+                        <Link href="/credito-clt">Crédito CLT</Link>
+                        <Link href="#">Financiamento</Link>
+                        <Link href="#">Cartões de crédito</Link>
+                        <Link href="#">Investimentos</Link>
+                        <Link href="#">Título de capitalização</Link>
+                        <Link href="#">Consórcio</Link>
+                        <Link href="#">Seguros</Link>
+                    </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="aposentados">
+                    <AccordionTrigger>Para Aposentados</AccordionTrigger>
+                    <AccordionContent className="grid gap-2 pl-4">
+                        <Link href="#">Crédito consignado</Link>
+                        <Link href="/refinanciamento">Refinanciamento</Link>
+                        <Link href="#">Portabilidade</Link>
+                        <Link href="#">Siape</Link>
+                    </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="ajuda">
+                    <AccordionTrigger>Ajuda</AccordionTrigger>
+                    <AccordionContent className="grid gap-2 pl-4">
+                        <Link href="#">Central de ajuda</Link>
+                        <Link href="#">Ajuda para você</Link>
+                        <Link href="#">Ajuda para Micro empresas</Link>
+                        <Link href="#">Dúvidas frequentes</Link>
+                        <Link href="#">iToken</Link>
+                        <Link href="#">Renegociação</Link>
+                        <Link href="#">Faturas</Link>
+                    </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+                </div>
+            </SheetContent>
+            </Sheet>
+        </div>
       </header>
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32">
