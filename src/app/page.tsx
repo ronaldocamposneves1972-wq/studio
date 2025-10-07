@@ -24,7 +24,7 @@ export default function LandingPage() {
            <Button variant="link" asChild><Link href="/antecipacao-fgts">Antecipação FGTS</Link></Button>
            <Button variant="link" asChild><Link href="/refinanciamento">Refinanciamento</Link></Button>
         </nav>
-        <Button variant="ghost" onClick={() => router.push('/dashboard')}>Área do Admin</Button>
+        <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
       </header>
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-card">
