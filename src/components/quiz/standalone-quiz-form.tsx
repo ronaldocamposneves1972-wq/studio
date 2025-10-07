@@ -73,20 +73,18 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
             return;
         }
 
+        const isCepStep = currentQuestion.type === 'cep' && onCEPChange;
         const isFileStep = currentQuestion.type === 'file' && form.getValues(currentQuestion.id);
 
-        if (isFileStep) {
-            setIsStepProcessing(true);
-            setTimeout(() => {
-                setIsStepProcessing(false);
-                if (currentStep < totalSteps - 1) {
-                    setCurrentStep(currentStep + 1);
-                } else {
-                    onComplete(form.getValues());
-                }
-            }, 1000); // 1-second animation/delay
-            return;
+        setIsStepProcessing(true);
+
+        if (isCepStep) {
+            await onCEPChange(value);
+        } else if (isFileStep) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second animation/delay
         }
+        
+        setIsStepProcessing(false);
 
         if (currentStep < totalSteps - 1) {
             setCurrentStep(currentStep + 1);
@@ -181,18 +179,12 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 }
                                 field.onChange(e);
                             }}
-                            onBlur={(e) => {
-                                // Handle CEP change if function is provided
-                                if (currentQuestion.type === 'cep' && onCEPChange) {
-                                    onCEPChange(e.target.value);
-                                }
-                                field.onBlur();
-                            }}
+                            onBlur={field.onBlur}
                         />
                     </FormControl>
                 );
             default:
-                return <Input {...field} type="text" />;
+                return <Input {...field} type="text" value={field.value || ''} />;
         }
     };
 
