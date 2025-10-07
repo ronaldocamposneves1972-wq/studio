@@ -57,6 +57,33 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     // We get the current question based on the step
     const currentQuestion = quiz.questions[currentStep];
 
+    const validateEmailWithAPI = async (email: string) => {
+        try {
+            const response = await fetch(`/api/validate-email/${email}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Falha ao validar e-mail.');
+            }
+
+            if (data.status !== 'VALID') {
+                form.setError(currentQuestion.id as any, { type: 'manual', message: 'Por favor, insira um e-mail válido.' });
+                return false;
+            }
+            
+            return true;
+
+        } catch (error) {
+            console.error("Erro na validação de e-mail via API:", error);
+            // In case of API failure, we can be lenient or strict.
+            // For now, let's be lenient and let it pass, but show a warning.
+            // Or, we can be strict and show an error. Let's be strict for better data quality.
+            form.setError(currentQuestion.id as any, { type: 'manual', message: 'Não foi possível validar o e-mail. Tente novamente.' });
+            return false;
+        }
+    }
+
+
     const handleNext = async () => {
         const isValid = await form.trigger(currentQuestion.id as any);
         if (!isValid) {
@@ -68,18 +95,27 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         }
         
         const value = form.getValues(currentQuestion.id);
-        if (currentQuestion.type === 'cpf' && !validateCPF(value)) {
-            form.setError(currentQuestion.id as any, { type: 'manual', message: 'CPF inválido.' });
-            return;
-        }
 
         if (!value || (value instanceof FileList && value.length === 0)) {
             form.setError(currentQuestion.id as any, { type: 'manual', message: 'Este campo é obrigatório.' });
             return;
         }
 
-
         setIsStepProcessing(true);
+
+        if (currentQuestion.type === 'cpf' && !validateCPF(value)) {
+            form.setError(currentQuestion.id as any, { type: 'manual', message: 'CPF inválido.' });
+            setIsStepProcessing(false);
+            return;
+        }
+        
+        if (currentQuestion.type === 'email') {
+            const isEmailValid = await validateEmailWithAPI(value);
+            if (!isEmailValid) {
+                setIsStepProcessing(false);
+                return;
+            }
+        }
 
         // If current step is CEP, wait for API call
         if (currentQuestion.type === 'cep' && onCEPChange) {
@@ -197,7 +233,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     const getButtonText = () => {
         if (isSubmitting) return 'Finalizando...';
-        if (isStepProcessing) return 'Aguarde...';
+        if (isStepProcessing) return 'Validando...';
         return isFinalStep ? 'Finalizar' : 'Continuar';
     }
 
