@@ -57,10 +57,11 @@ function CadastroContent() {
       }
       
       // Auto-fill form fields using the form context from useForm
-      form.setValue('q-address', data.logradouro);
-      form.setValue('q-neighborhood', data.bairro);
-      form.setValue('q-city', data.localidade);
-      form.setValue('q-state', data.uf);
+      // BrasilAPI uses 'street', 'neighborhood', 'city', 'state'
+      form.setValue('q-address', data.street);
+      form.setValue('q-neighborhood', data.neighborhood);
+      form.setValue('q-city', data.city);
+      form.setValue('q-state', data.state);
       
       toast({
           title: "Endereço encontrado!",

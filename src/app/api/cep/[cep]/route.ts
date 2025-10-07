@@ -11,7 +11,7 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(`https://h-apigateway.conectagov.estaleiro.serpro.gov.br/api-cep/v1/consulta/cep/${cep}`, {
+    const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${cep}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -19,19 +19,11 @@ export async function GET(
     });
 
     if (!response.ok) {
-       // Try to parse error from the upstream API, or use a default message
       const errorData = await response.json().catch(() => ({ message: `Erro ao consultar o CEP. Status: ${response.status}` }));
       return NextResponse.json({ error: errorData.message || 'Serviço de CEP indisponível no momento.' }, { status: response.status });
     }
 
     const data = await response.json();
-    
-    // The API returns an array, we take the first element which is the primary result
-    if (Array.isArray(data) && data.length > 0) {
-        return NextResponse.json(data[0]);
-    }
-    
-    // Fallback for cases where it might not be an array
     return NextResponse.json(data);
 
   } catch (error) {
