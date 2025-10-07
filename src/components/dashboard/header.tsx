@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -43,6 +44,12 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 
 const flattenNavItems = (items: any[]): any[] => {
@@ -89,6 +96,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
 
 
   const handleLogout = async () => {
+    if (!auth) return;
     await signOut(auth);
     router.push('/');
   };
@@ -97,6 +105,36 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
     setOpenCommand(false)
     command()
   }
+  
+  const renderMobileNav = (items: any[]) => {
+    return items.map((item) => {
+      if (item.children) {
+        return (
+          <Accordion type="single" collapsible className="w-full" key={item.label}>
+            <AccordionItem value={item.label} className="border-b-0">
+              <AccordionTrigger className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground hover:no-underline">
+                 <item.icon className="h-5 w-5" />
+                 {item.label}
+              </AccordionTrigger>
+              <AccordionContent className="pl-8">
+                 {renderMobileNav(item.children)}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+      }
+      return (
+        <Link
+          key={item.label}
+          href={item.href}
+          className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground"
+        >
+          <item.icon className="h-5 w-5" />
+          {item.label}
+        </Link>
+      );
+    });
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
@@ -116,7 +154,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="sm:max-w-xs bg-sidebar-custom text-foreground">
+        <SheetContent side="left" className="sm:max-w-xs bg-card">
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/dashboard"
@@ -125,18 +163,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
               <AppLogo className="h-5 w-5 transition-all group-hover:scale-110" />
               <span className="sr-only">ConsorciaTech</span>
             </Link>
-            {allNavItems && allNavItems.map((item) => (
-               item.href ? (
-                 <Link
-                  key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground"
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-               ) : null
-            ))}
+             {renderMobileNav(allNavItems)}
              <Link
                 href="/dashboard/settings"
                 className="flex items-center gap-4 px-2.5 text-foreground/70 hover:text-foreground"

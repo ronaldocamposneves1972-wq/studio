@@ -3,20 +3,27 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 import {
-  Home, Users, Package, Landmark, FileText, DollarSign, Settings, ChevronRight,
-  FilePlus, FileX, LineChart, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
+  Home, Users, Package, Landmark, FileText, DollarSign, Settings,
+  FilePlus, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
   ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
-import { CircuitBoard } from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Button } from '../ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+
 
 export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
   {
-    label: 'Esteira', icon: CircuitBoard, children: [
+    label: 'Esteira', icon: GanttChart, children: [
       { href: '/dashboard/pipeline/discovery', label: 'Discovery', icon: Users },
       { href: '/dashboard/pipeline/Documentacao', label: 'Documentação', icon: Users },
       { href: '/dashboard/pipeline/valor', label: 'Valor', icon: DollarSign },
@@ -54,7 +61,7 @@ export const navItems = [
     ]
   },
   {
-    label: 'Acompanhamento', icon: LineChart, children: [
+    label: 'Acompanhamento', icon: TrendingUp, children: [
       { href: '/dashboard/proposals', label: 'Propostas', icon: FileText },
     ]
   },
@@ -75,96 +82,98 @@ export const navItems = [
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
-const SidebarItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
+const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
-  const ItemIcon = item.icon;
-
-  const hasChildren = !!item.children;
   const isActive = item.href ? pathname === item.href : false;
 
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
+  const renderLink = (item: any) => (
+    <Link
+        href={item.href}
+        className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+        isActive && "text-primary bg-muted",
+        isCollapsed && "justify-center"
+        )}
     >
-      {hasChildren ? (
-        <div
-          className={cn(
-            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm cursor-pointer transition-colors",
-            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "w-12 justify-center p-0",
-            "border-b border-gray-200" // separação entre itens
-          )}
-        >
-          <ItemIcon className="h-5 w-5" />
-          {!isCollapsed && <span className="flex-1">{item.label}</span>}
-          {!isCollapsed && <ChevronRight className="h-4 w-4 ml-auto" />}
-        </div>
-      ) : (
-        <Link
-          href={item.href || '#'}
-          className={cn(
-            "flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm transition-colors",
-            isActive ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "justify-center p-0",
-            "border-b border-gray-200" // separação entre itens
-          )}
-        >
-          <ItemIcon className="h-5 w-5" />
-          {!isCollapsed && <span>{item.label}</span>}
-        </Link>
-      )}
-
-      {hasChildren && isOpen && (
-        <div className="absolute left-full top-0 ml-1 w-48 bg-white shadow-lg z-50 rounded-md border border-gray-200">
-          {item.children.map((child: any, index: number) => (
-            <div key={child.label}>
-              <SidebarItem item={child} isCollapsed={false} />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        <item.icon className="h-4 w-4" />
+        {!isCollapsed && item.label}
+    </Link>
   );
-};
+
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          {item.children ? (
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value={item.label} className="border-b-0">
+                <AccordionTrigger
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline",
+                    isCollapsed && "justify-center",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {!isCollapsed && <span className="flex-1 text-left">{item.label}</span>}
+                </AccordionTrigger>
+                <AccordionContent className="pl-8 space-y-1">
+                  {item.children.map((child: any) => (
+                    <NavItem key={child.label} item={child} isCollapsed={isCollapsed} />
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : (
+            isCollapsed ? renderLink(item) : renderLink(item)
+          )}
+        </TooltipTrigger>
+        {isCollapsed && (
+          <TooltipContent side="right">
+            {item.label}
+          </TooltipContent>
+        )}
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean }) {
-  const pathname = usePathname();
-
   return (
     <aside className={cn(
-      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-white transition-all",
+      "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-background transition-all",
       isCollapsed ? "w-14" : "w-52"
     )}>
-      {/* Logo com separação */}
-      <div className={cn("flex h-16 items-center border-b border-gray-200 px-4", isCollapsed ? "justify-center" : "justify-start")}>
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-gray-700">
-          <AppLogo className="h-8 w-8" />
-          {!isCollapsed && <span>Consorcia</span>}
+      <div className={cn("flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6", isCollapsed ? 'justify-center' : 'justify-start')}>
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+          <AppLogo className="h-6 w-6" />
+          {!isCollapsed && <span>ConsorciaTech</span>}
         </Link>
       </div>
-
-      <nav className="flex-1 space-y-1 p-2">
-        {navItems.map((item) => (
-          <SidebarItem key={item.label} item={item} isCollapsed={isCollapsed} />
-        ))}
+      <nav className="flex-1 overflow-auto py-2">
+        <div className="grid items-start px-2 text-sm font-medium lg:px-4">
+          {navItems.map((item) => (
+            <NavItem key={item.label} item={item} isCollapsed={isCollapsed} />
+          ))}
+        </div>
       </nav>
-
-      {/* Configurações */}
-      <div className="mt-auto p-2 border-t border-gray-200">
-        <Link
-          href="/dashboard/settings"
-          className={cn(
-            "flex h-9 w-full items-center justify-center gap-2 px-3 text-sm transition-colors",
-            pathname === '/dashboard/settings' ? "font-bold text-gray-600" : "text-gray-500 hover:text-gray-700",
-            isCollapsed && "justify-center p-0"
-          )}
-        >
-          <Settings className="h-5 w-5" />
-          {!isCollapsed && <span>Configurações</span>}
-        </Link>
+       <div className="mt-auto border-t p-2">
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" className={cn("w-full", isCollapsed ? 'justify-center' : 'justify-start')}>
+                  <Link href="/dashboard/settings" className={cn("flex items-center gap-3 rounded-lg text-muted-foreground transition-all hover:text-primary", isCollapsed && "justify-center")}>
+                      <Settings className="h-4 w-4" />
+                      {!isCollapsed && "Configurações"}
+                  </Link>
+              </Button>
+            </TooltipTrigger>
+            {isCollapsed && (
+                <TooltipContent side="right">
+                    Configurações
+                </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </aside>
   );
