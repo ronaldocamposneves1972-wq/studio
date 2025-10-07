@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import type { Quiz, TimelineEvent } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
+import { useForm } from 'react-hook-form';
 
 function CadastroContent() {
   const searchParams = useSearchParams();
@@ -25,6 +26,8 @@ function CadastroContent() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
+  const form = useForm();
+  
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const q = quizSlug 
@@ -35,6 +38,40 @@ function CadastroContent() {
 
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
   const quiz = quizzes?.[0];
+
+  const handleCEPChange = async (cep: string) => {
+    const cleanedCep = cep.replace(/\D/g, '');
+    if (cleanedCep.length !== 8) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/cep/${cleanedCep}`);
+      if (!response.ok) {
+        throw new Error('CEP não encontrado');
+      }
+      const data = await response.json();
+      
+      // Auto-fill form fields
+      form.setValue('q-address', data.logradouro);
+      form.setValue('q-neighborhood', data.bairro);
+      form.setValue('q-city', data.localidade);
+      form.setValue('q-state', data.uf);
+      
+      toast({
+          title: "Endereço encontrado!",
+          description: "Os campos de endereço foram preenchidos automaticamente."
+      })
+    } catch (error) {
+      console.error('Failed to fetch address from CEP:', error);
+       toast({
+        variant: "destructive",
+        title: "Erro ao buscar CEP",
+        description: "Não foi possível encontrar o endereço. Por favor, preencha manualmente.",
+      });
+    }
+  };
+
 
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
@@ -135,7 +172,15 @@ function CadastroContent() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-       return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
+       return (
+          <StandaloneQuizForm 
+            formContext={form}
+            quiz={quiz} 
+            onComplete={handleSubmit} 
+            isSubmitting={isSubmitting}
+            onCEPChange={handleCEPChange}
+         />
+       );
     }
 
     return (

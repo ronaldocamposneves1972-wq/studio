@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, ChevronLeft, ChevronRight, Upload, CheckCircle } from 'lucide-react';
@@ -45,17 +45,13 @@ interface StandaloneQuizFormProps {
     isSubmitting: boolean;
     initialAnswers?: Record<string, any>;
     onCEPChange?: (cep: string) => Promise<void>;
+    formContext: UseFormReturn<any>; // Pass react-hook-form context
 }
 
-export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange }: StandaloneQuizFormProps) {
+export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnswers, onCEPChange, formContext: form }: StandaloneQuizFormProps) {
     const [currentStep, setCurrentStep] = useState(0);
     const [isStepProcessing, setIsStepProcessing] = useState(false);
     const totalSteps = quiz.questions.length;
-    
-    const form = useForm<FormData>({
-        resolver: zodResolver(formSchema),
-        defaultValues: initialAnswers || {},
-    });
     
     // We get the current question based on the step
     const currentQuestion = quiz.questions[currentStep];
@@ -182,9 +178,9 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 }
                                 field.onChange(e);
                             }}
-                            onBlur={() => {
+                            onBlur={(e) => {
                                 if (currentQuestion.id === 'q-cep' && onCEPChange) {
-                                    onCEPChange(field.value);
+                                    onCEPChange(e.target.value);
                                 }
                                 field.onBlur();
                             }}

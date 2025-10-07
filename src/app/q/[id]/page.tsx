@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Quiz, Client, ClientDocument, TimelineEvent } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
+import { useForm } from 'react-hook-form';
 
 
 export default function StandaloneQuizPage() {
@@ -23,10 +24,11 @@ export default function StandaloneQuizPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const clientId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const form = useForm();
 
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'quizzes'), where('placement', '==', 'client_link'), limit(1));
+    return query(collection(firestore, 'quizzes'), where('slug', '==', 'client_link'), limit(1));
   }, [firestore]);
 
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
@@ -54,6 +56,39 @@ export default function StandaloneQuizPage() {
 
     return response.json();
   };
+
+  const handleCEPChange = async (cep: string) => {
+    const cleanedCep = cep.replace(/\D/g, '');
+    if (cleanedCep.length !== 8) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/cep/${cleanedCep}`);
+      if (!response.ok) {
+        throw new Error('CEP não encontrado');
+      }
+      const data = await response.json();
+      
+      form.setValue('q-address', data.logradouro);
+      form.setValue('q-neighborhood', data.bairro);
+      form.setValue('q-city', data.localidade);
+      form.setValue('q-state', data.uf);
+      
+      toast({
+          title: "Endereço encontrado!",
+          description: "Os campos de endereço foram preenchidos automaticamente."
+      })
+    } catch (error) {
+      console.error('Failed to fetch address from CEP:', error);
+       toast({
+        variant: "destructive",
+        title: "Erro ao buscar CEP",
+        description: "Não foi possível encontrar o endereço. Por favor, preencha manualmente.",
+      });
+    }
+  };
+
 
   const handleSubmit = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
@@ -104,6 +139,7 @@ export default function StandaloneQuizPage() {
                 cloudinaryPublicId: uploadData.public_id,
                 secureUrl: uploadData.secure_url,
                 uploadedAt: now,
+                validationStatus: 'pending',
             };
         });
         
@@ -188,7 +224,13 @@ export default function StandaloneQuizPage() {
     }
     
     if (quiz && quiz.questions && quiz.questions.length > 0) {
-      return <StandaloneQuizForm quiz={quiz} onComplete={handleSubmit} isSubmitting={isSubmitting} />;
+      return <StandaloneQuizForm 
+        formContext={form}
+        quiz={quiz} 
+        onComplete={handleSubmit} 
+        isSubmitting={isSubmitting} 
+        onCEPChange={handleCEPChange}
+      />;
     }
 
     return (
@@ -218,5 +260,3 @@ export default function StandaloneQuizPage() {
     </div>
   );
 }
-
-    
