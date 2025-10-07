@@ -103,34 +103,41 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
 
         setIsStepProcessing(true);
 
-        if (currentQuestion.type === 'cpf' && !validateCPF(value)) {
-            form.setError(currentQuestion.id as any, { type: 'manual', message: 'CPF inválido.' });
-            setIsStepProcessing(false);
-            return;
-        }
-        
-        if (currentQuestion.type === 'email') {
-            const isEmailValid = await validateEmailWithAPI(value);
-            if (!isEmailValid) {
+        try {
+            if (currentQuestion.type === 'cpf' && !validateCPF(value)) {
+                form.setError(currentQuestion.id as any, { type: 'manual', message: 'CPF inválido.' });
                 setIsStepProcessing(false);
                 return;
             }
-        }
+            
+            if (currentQuestion.type === 'email') {
+                const isEmailValid = await validateEmailWithAPI(value);
+                if (!isEmailValid) {
+                    setIsStepProcessing(false);
+                    return;
+                }
+            }
 
-        // If current step is CEP, wait for API call
-        if (currentQuestion.type === 'cep' && onCEPChange) {
-            await onCEPChange(value);
-        } else if (currentQuestion.type === 'file' && value) {
-             await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second animation/delay for file upload illusion
-        }
-        
-        setIsStepProcessing(false);
+            // If current step is CEP, wait for API call
+            if (currentQuestion.type === 'cep' && onCEPChange) {
+                await onCEPChange(value);
+            } else if (currentQuestion.type === 'file' && value) {
+                 await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second animation/delay for file upload illusion
+            }
+            
+            setIsStepProcessing(false);
 
-        if (currentStep < totalSteps - 1) {
-            setCurrentStep(currentStep + 1);
-        } else {
-            // This is the final step, call the main onComplete function
-            await onComplete(form.getValues());
+            if (currentStep < totalSteps - 1) {
+                setCurrentStep(currentStep + 1);
+            } else {
+                // This is the final step, call the main onComplete function
+                await onComplete(form.getValues());
+            }
+        } catch (error) {
+             console.error("Error during step processing:", error);
+             // The error toast is already shown by the calling function (handleCEPChange)
+             setIsStepProcessing(false);
+             // We do NOT proceed to the next step.
         }
     };
     

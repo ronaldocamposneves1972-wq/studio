@@ -89,6 +89,8 @@ export default function StandaloneQuizPage() {
         title: "CEP inválido",
         description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manualmente.`,
       });
+      // Re-throw the error to be caught by the caller (handleNext in the form)
+      throw error;
     }
   };
 
