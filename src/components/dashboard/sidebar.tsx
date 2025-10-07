@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings,
   FilePlus, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart, ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
@@ -16,6 +16,16 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -82,6 +92,42 @@ export const navItems = [
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
+
+const NavItemContent = ({ item }: { item: any }) => (
+    <>
+        <item.icon className="h-4 w-4" />
+        <span className="flex-1 text-left">{item.label}</span>
+    </>
+);
+
+const renderSubMenu = (items: any[]) => {
+    return items.map((item) => {
+        if (item.children) {
+            return (
+                <DropdownMenuSub key={item.label}>
+                    <DropdownMenuSubTrigger>
+                        <item.icon className="mr-2 h-4 w-4" />
+                        <span>{item.label}</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                            {renderSubMenu(item.children)}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
+            );
+        }
+        return (
+            <DropdownMenuItem key={item.label} asChild>
+                <Link href={item.href}>
+                    <item.icon className="mr-2 h-4 w-4" />
+                    {item.label}
+                </Link>
+            </DropdownMenuItem>
+        );
+    });
+};
+
 const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
   const pathname = usePathname();
   const isActive = item.href ? pathname.startsWith(item.href) : false;
@@ -107,22 +153,19 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
       </TooltipProvider>
     );
   }
-
+  
   if (item.children) {
     return (
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value={item.label} className="border-b-0">
-          <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline [&[data-state=open]>svg]:rotate-180">
-            <item.icon className="h-4 w-4" />
-            <span className="flex-1 text-left">{item.label}</span>
-          </AccordionTrigger>
-          <AccordionContent className="pl-8 space-y-1">
-            {item.children.map((child: any) => (
-              <NavItem key={child.label} item={child} isCollapsed={isCollapsed} />
-            ))}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                 <Button variant="ghost" className="flex items-center justify-start gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary w-full">
+                    <NavItemContent item={item} />
+                 </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start">
+                {renderSubMenu(item.children)}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
   }
   
@@ -134,8 +177,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
           isActive && "bg-accent text-primary"
         )}
       >
-        <item.icon className="h-4 w-4" />
-        {item.label}
+        <NavItemContent item={item} />
       </Link>
   );
 };
