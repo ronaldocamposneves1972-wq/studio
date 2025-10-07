@@ -32,6 +32,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Quiz } from "@/lib/types"
 
+const slugToLabel: Record<Quiz['slug'], string> = {
+    'landing_page': 'Página Principal (Genérica)',
+    'credito-pessoal': 'Página - Crédito Pessoal',
+    'credito-clt': 'Página - Crédito CLT',
+    'antecipacao-fgts': 'Página - Antecipação FGTS',
+    'refinanciamento': 'Página - Refinanciamento',
+    'client_link': 'Link para Cliente (Documentos)',
+};
+
+
 export default function QuizzesPage() {
   const firestore = useFirestore()
   const { user } = useUser()
@@ -70,7 +80,7 @@ export default function QuizzesPage() {
           <Card key={quiz.id}>
             <CardHeader>
               <CardTitle className="text-base">{quiz.name}</CardTitle>
-               <CardDescription>{quiz.placement === 'landing_page' ? 'Local: Página Inicial' : 'Local: Link para Cliente'}</CardDescription>
+               <CardDescription>Local: {slugToLabel[quiz.slug] || 'Não definido'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm pt-4">
               <p>{quiz.questions?.length || 0} perguntas</p>

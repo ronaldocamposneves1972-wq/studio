@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useFirestore, useUser, useDoc, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
-import type { Quiz, QuizPlacement } from "@/lib/types"
+import type { Quiz } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import {
@@ -54,8 +54,9 @@ const questionSchema = z.object({
 
 const quizSchema = z.object({
   name: z.string().min(3, "O nome do quiz é obrigatório"),
-  slug: z.string().optional(),
-  placement: z.enum(["landing_page", "client_link"]),
+  slug: z.enum(["landing_page", "credito-pessoal", "credito-clt", "antecipacao-fgts", "refinanciamento", "client_link"], {
+      required_error: "A página do quiz é obrigatória."
+  }),
   questions: z.array(questionSchema).min(1, "O quiz deve ter pelo menos uma pergunta"),
 })
 
@@ -81,8 +82,7 @@ export default function EditQuizPage() {
     resolver: zodResolver(quizSchema),
     defaultValues: {
       name: "",
-      slug: "",
-      placement: "landing_page",
+      slug: "landing_page",
       questions: [],
     }
   })
@@ -91,8 +91,7 @@ export default function EditQuizPage() {
     if (quiz) {
       form.reset({
         name: quiz.name,
-        slug: quiz.slug || "",
-        placement: quiz.placement,
+        slug: quiz.slug,
         questions: quiz.questions.map(q => ({
           ...q,
           options: q.options?.join(", ") || "",
@@ -216,7 +215,7 @@ export default function EditQuizPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-6">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -235,20 +234,7 @@ export default function EditQuizPage() {
                     name="slug"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Identificador (slug)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="ex: credito-pessoal" {...field} disabled={isSubmitting}/>
-                        </FormControl>
-                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="placement"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Localização</FormLabel>
+                        <FormLabel>Página do Quiz</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isSubmitting}>
                           <FormControl>
                             <SelectTrigger>
@@ -256,8 +242,12 @@ export default function EditQuizPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="landing_page">Página Inicial</SelectItem>
-                            <SelectItem value="client_link">Link para Cliente</SelectItem>
+                            <SelectItem value="landing_page">Página Principal (Genérica)</SelectItem>
+                            <SelectItem value="credito-pessoal">Página - Crédito Pessoal</SelectItem>
+                            <SelectItem value="credito-clt">Página - Crédito CLT</SelectItem>
+                            <SelectItem value="antecipacao-fgts">Página - Antecipação FGTS</SelectItem>
+                            <SelectItem value="refinanciamento">Página - Refinanciamento</SelectItem>
+                            <SelectItem value="client_link">Link para Cliente (Documentos)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -286,7 +276,7 @@ export default function EditQuizPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Excluir pergunta?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. A pergunta "{field.text || `Pergunta ${index + 1}`}" será removida.
+                            Esta ação não pode ser desfeita. A pergunta "{form.getValues(`questions.${index}.text`) || `Pergunta ${index + 1}`}" será removida.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -362,7 +352,7 @@ export default function EditQuizPage() {
                           <FormItem>
                             <FormLabel>Opções (separadas por vírgula)</FormLabel>
                             <FormControl>
-                              <Input placeholder="Opção 1, Opção 2, Opção 3" {...field} disabled={isSubmitting}/>
+                              <Input placeholder="Opção 1, Opção 2, Opção 3" {...field} disabled={isSubmitting} value={field.value || ''} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

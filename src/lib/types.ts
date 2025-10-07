@@ -142,10 +142,9 @@ export type QuizPlacement = 'landing_page' | 'client_link';
 export type Quiz = {
     id: string;
     name: string;
-    slug?: string;
+    slug: 'landing_page' | 'credito-pessoal' | 'credito-clt' | 'antecipacao-fgts' | 'refinanciamento' | 'client_link';
     ownerId?: string;
     questions: QuizQuestion[];
-    placement: QuizPlacement;
     createdAt?: string;
 };
 
