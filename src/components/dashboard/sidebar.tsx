@@ -84,58 +84,62 @@ export const navItems = [
 
 const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => {
   const pathname = usePathname();
-  const isActive = item.href ? pathname === item.href : false;
+  const isActive = item.href ? pathname.startsWith(item.href) : false;
 
-  const renderLink = (item: any) => (
-    <Link
+  if (isCollapsed) {
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Link
+              href={item.href || '#'}
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-primary md:h-8 md:w-8",
+                isActive && "bg-accent text-primary"
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              <span className="sr-only">{item.label}</span>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  if (item.children) {
+    return (
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value={item.label} className="border-b-0">
+          <AccordionTrigger className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline [&[data-state=open]>svg]:rotate-180">
+            <item.icon className="h-4 w-4" />
+            <span className="flex-1 text-left">{item.label}</span>
+          </AccordionTrigger>
+          <AccordionContent className="pl-8 space-y-1">
+            {item.children.map((child: any) => (
+              <NavItem key={child.label} item={child} isCollapsed={isCollapsed} />
+            ))}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    );
+  }
+  
+  return (
+      <Link
         href={item.href}
         className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-        isActive && "text-primary bg-muted",
-        isCollapsed && "justify-center"
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+          isActive && "bg-accent text-primary"
         )}
-    >
+      >
         <item.icon className="h-4 w-4" />
-        {!isCollapsed && item.label}
-    </Link>
+        {item.label}
+      </Link>
   );
+};
 
-  return (
-    <TooltipProvider>
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>
-          {item.children ? (
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value={item.label} className="border-b-0">
-                <AccordionTrigger
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:no-underline",
-                    isCollapsed && "justify-center",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {!isCollapsed && <span className="flex-1 text-left">{item.label}</span>}
-                </AccordionTrigger>
-                <AccordionContent className="pl-8 space-y-1">
-                  {item.children.map((child: any) => (
-                    <NavItem key={child.label} item={child} isCollapsed={isCollapsed} />
-                  ))}
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          ) : (
-            isCollapsed ? renderLink(item) : renderLink(item)
-          )}
-        </TooltipTrigger>
-        {isCollapsed && (
-          <TooltipContent side="right">
-            {item.label}
-          </TooltipContent>
-        )}
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
 
 export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean }) {
   return (
@@ -150,7 +154,7 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
         </Link>
       </div>
       <nav className="flex-1 overflow-auto py-2">
-        <div className="grid items-start px-2 text-sm font-medium lg:px-4">
+        <div className={cn("grid items-start text-sm font-medium", isCollapsed ? "px-2" : "px-4")}>
           {navItems.map((item) => (
             <NavItem key={item.label} item={item} isCollapsed={isCollapsed} />
           ))}
