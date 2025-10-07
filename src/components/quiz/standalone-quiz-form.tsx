@@ -73,12 +73,14 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
             return;
         }
 
-        const isFileStep = currentQuestion.type === 'file' && form.getValues(currentQuestion.id);
 
         setIsStepProcessing(true);
 
-        if (isFileStep) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second animation/delay
+        // If current step is CEP, wait for API call
+        if (currentQuestion.type === 'cep' && onCEPChange) {
+            await onCEPChange(value);
+        } else if (currentQuestion.type === 'file' && value) {
+             await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second animation/delay for file upload illusion
         }
         
         setIsStepProcessing(false);
@@ -91,12 +93,6 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         }
     };
     
-    const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
-        if (currentQuestion.type === 'cep' && onCEPChange) {
-            await onCEPChange(e.target.value);
-        }
-    };
-
     const handleBack = () => {
         if (currentStep > 0) {
             setCurrentStep(currentStep - 1);
@@ -182,7 +178,6 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 }
                                 field.onChange(e);
                             }}
-                            onBlur={handleCepBlur}
                         />
                     </FormControl>
                 );
