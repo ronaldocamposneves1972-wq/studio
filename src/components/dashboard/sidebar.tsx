@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings,
   FilePlus, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
