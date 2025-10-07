@@ -852,7 +852,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                               </div>
                           </div>
                           <div className="flex items-center gap-2">
-                              <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status}>
+                              <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status} disabled>
                                   <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
                                   <SelectContent>
                                       <SelectItem value="Novo">Novo</SelectItem>
