@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState } from "react"
@@ -34,7 +35,7 @@ import type { Quiz } from "@/lib/types"
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
   text: z.string().min(1, "O texto da pergunta é obrigatório"),
-  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file"]),
+  type: z.enum(["text", "number", "email", "tel", "radio", "checkbox", "file", "cep", "address", "address_number", "address_complement"]),
   options: z.string().optional(), // Comma-separated options
 })
 
@@ -58,10 +59,10 @@ const initialDataCadastro = {
     { id: "q-phone", text: "Telefone Celular*", type: "tel" as const, options: "" },
     { id: "q-email", text: "Email*", type: "email" as const, options: "" },
     { id: "q-mothername", text: "Nome da Mãe*", type: "text" as const, options: "" },
-    { id: "q-cep", text: "CEP*", type: "text" as const, options: "" },
-    { id: "q-address", text: "Endereço*", type: "text" as const, options: "" },
-    { id: "q-number", text: "Número*", type: "text" as const, options: "" },
-    { id: "q-complement", text: "Complemento", type: "text" as const, options: "" },
+    { id: "q-cep", text: "CEP*", type: "cep" as const, options: "" },
+    { id: "q-address", text: "Endereço*", type: "address" as const, options: "" },
+    { id: "q-address-number", text: "Número*", type: "address_number" as const, options: "" },
+    { id: "q-address-complement", text: "Complemento", type: "address_complement" as const, options: "" },
     { id: "q-neighborhood", text: "Bairro*", type: "text" as const, options: "" },
     { id: "q-city", text: "Cidade*", type: "text" as const, options: "" },
     { id: "q-state", text: "Estado*", type: "text" as const, options: "" },
@@ -280,6 +281,10 @@ export default function NewQuizPage() {
                                 <SelectItem value="radio">Múltipla Escolha (Radio)</SelectItem>
                                 <SelectItem value="checkbox">Seleção (Checkbox)</SelectItem>
                                 <SelectItem value="file">Arquivo</SelectItem>
+                                <SelectItem value="cep">CEP</SelectItem>
+                                <SelectItem value="address">Endereço (autocomplete)</SelectItem>
+                                <SelectItem value="address_number">Número do Endereço</SelectItem>
+                                <SelectItem value="address_complement">Complemento</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

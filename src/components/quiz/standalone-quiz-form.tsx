@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -29,12 +30,12 @@ const formSchema = z.object({}).catchall(z.any());
 
 type FormData = z.infer<typeof formSchema>;
 
-const getMaskFunction = (questionId: string) => {
-    switch (questionId) {
-        case 'q-cpf': return maskCPF;
-        case 'q-phone': return maskPhone;
-        case 'q-birthdate': return maskDate;
-        case 'q-cep': return maskCEP;
+const getMaskFunction = (questionType: string) => {
+    switch (questionType) {
+        case 'cpf': return maskCPF;
+        case 'tel': return maskPhone;
+        case 'date': return maskDate; // Assuming you might have a date type
+        case 'cep': return maskCEP;
         default: return (value: string) => value;
     }
 };
@@ -73,7 +74,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
         }
 
         // Handle CEP change if function is provided
-        if (currentQuestion.id === 'q-cep' && onCEPChange) {
+        if (currentQuestion.type === 'cep' && onCEPChange) {
             await onCEPChange(form.getValues(currentQuestion.id));
         }
 
@@ -107,7 +108,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     };
     
     const renderInput = (field: any) => {
-        const mask = getMaskFunction(currentQuestion.id);
+        const mask = getMaskFunction(currentQuestion.type);
         const watchedFiles = form.watch(field.name) as FileList | null;
         const selectedFiles = field.value instanceof FileList ? field.value : watchedFiles;
 
@@ -163,13 +164,20 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                         </RadioGroup>
                     </FormControl>
                 );
-            default:
+            case 'cep':
+            case 'text':
+            case 'number':
+            case 'email':
+            case 'tel':
+            case 'address':
+            case 'address_number':
+            case 'address_complement':
                  return (
                     <FormControl>
                          <Input
                             {...field}
                             value={field.value || ''}
-                            type={currentQuestion.type}
+                            type={currentQuestion.type === 'number' ? 'number' : 'text'} // Use text for masked fields
                             placeholder={`Sua resposta para ${currentQuestion.text.toLowerCase().replace('*','')}`}
                             onChange={(e) => {
                                 if (typeof e.target.value === 'string') {
@@ -179,7 +187,7 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                                 field.onChange(e);
                             }}
                             onBlur={(e) => {
-                                if (currentQuestion.id === 'q-cep' && onCEPChange) {
+                                if (currentQuestion.type === 'cep' && onCEPChange) {
                                     onCEPChange(e.target.value);
                                 }
                                 field.onBlur();
@@ -187,6 +195,8 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                         />
                     </FormControl>
                 );
+            default:
+                return <Input {...field} type="text" />;
         }
     };
 
