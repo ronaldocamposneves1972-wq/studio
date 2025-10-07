@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
+import { ChevronLeft, PlusCircle, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
@@ -104,7 +104,7 @@ export default function NewQuizPage() {
     defaultValues: initialDataCadastro,
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, swap } = useFieldArray({
     control,
     name: "questions",
   })
@@ -238,16 +238,38 @@ export default function NewQuizPage() {
               <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
               {fields.map((field, index) => (
                 <div key={field.id} className="grid gap-4 border p-4 rounded-lg relative">
-                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7"
-                    onClick={() => remove(index)}
-                    disabled={isSubmitting}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                   <div className="absolute top-2 right-2 flex items-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => swap(index, index - 1)}
+                          disabled={index === 0 || isSubmitting}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => swap(index, index + 1)}
+                          disabled={index === fields.length - 1 || isSubmitting}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => remove(index)}
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                   </div>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
                         <Label>ID da Pergunta</Label>

@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { ChevronLeft, PlusCircle, Trash2 } from "lucide-react"
+import { ChevronLeft, PlusCircle, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import { doc } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
@@ -101,7 +101,7 @@ export default function EditQuizPage() {
     }
   }, [quiz, form])
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, swap } = useFieldArray({
     control: form.control,
     name: "questions",
   })
@@ -261,36 +261,58 @@ export default function EditQuizPage() {
                 <h3 className="text-lg font-medium border-t pt-4">Perguntas</h3>
                 {fields.map((field, index) => (
                   <div key={field.id} className="grid gap-4 border p-4 rounded-lg relative">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                         <Button
+                    <div className="absolute top-2 right-2 flex items-center">
+                        <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute top-2 right-2 h-7 w-7"
-                          disabled={isSubmitting}
+                          className="h-7 w-7"
+                          onClick={() => swap(index, index - 1)}
+                          disabled={index === 0 || isSubmitting}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <ArrowUp className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir pergunta?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. A pergunta "{form.getValues(`questions.${index}.text`) || `Pergunta ${index + 1}`}" será removida.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => remove(index)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Sim, excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => swap(index, index + 1)}
+                          disabled={index === fields.length - 1 || isSubmitting}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={isSubmitting}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir pergunta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação não pode ser desfeita. A pergunta "{form.getValues(`questions.${index}.text`) || `Pergunta ${index + 1}`}" será removida.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => remove(index)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Sim, excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                     
                     <div className="grid md:grid-cols-3 gap-4">
                        <FormField
