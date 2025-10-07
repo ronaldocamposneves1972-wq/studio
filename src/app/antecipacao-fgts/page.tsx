@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/logo';
-import { ArrowRight, CheckCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function FgtsPage() {
   const router = useRouter();
@@ -18,11 +24,56 @@ export default function FgtsPage() {
           <span className="text-xl font-semibold">ConsorciaTech</span>
         </div>
         <nav className="hidden lg:flex gap-4 sm:gap-6">
-           <Button variant="link" asChild><Link href="/">Início</Link></Button>
-           <Button variant="link" asChild><Link href="/credito-pessoal">Crédito Pessoal</Link></Button>
-           <Button variant="link" asChild><Link href="/credito-clt">Crédito CLT</Link></Button>
-           <Button variant="link" asChild><Link href="/antecipacao-fgts">Antecipação FGTS</Link></Button>
-           <Button variant="link" asChild><Link href="/refinanciamento">Refinanciamento</Link></Button>
+          <Button variant="link" asChild><Link href="/">Início</Link></Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="link">
+                Pra você <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem asChild><Link href="/credito-pessoal">Crédito Pessoal</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="/credito-clt">Crédito CLT</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Financiamento</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Cartões de crédito</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Investimentos</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Título de capitalização</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Consórcio</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Seguros</Link></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="link">
+                Para Aposentados <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem asChild><Link href="#">Crédito consignado</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="/refinanciamento">Refinanciamento</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Portabilidade</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Siape</Link></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="link">
+                Ajuda <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem asChild><Link href="#">Central de ajuda</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Ajuda para você</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Ajuda para Micro empresas</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Dúvidas frequentes</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">iToken</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Renegociação</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link href="#">Faturas</Link></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
         <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
       </header>
