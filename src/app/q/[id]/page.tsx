@@ -68,14 +68,14 @@ export default function StandaloneQuizPage() {
       const response = await fetch(`/api/cep/${cleanedCep}`);
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'CEP não encontrado');
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'CEP não encontrado ou inválido.');
       }
       
-      form.setValue('q-address', data.logradouro);
-      form.setValue('q-neighborhood', data.bairro);
-      form.setValue('q-city', data.localidade);
-      form.setValue('q-state', data.uf);
+      form.setValue('q-address', data.street);
+      form.setValue('q-neighborhood', data.neighborhood);
+      form.setValue('q-city', data.city);
+      form.setValue('q-state', data.state);
       
       toast({
           title: "Endereço encontrado!",
@@ -86,8 +86,8 @@ export default function StandaloneQuizPage() {
       console.error('Failed to fetch address from CEP:', error);
        toast({
         variant: "destructive",
-        title: "Erro ao buscar CEP",
-        description: `${errorMessage} Por favor, preencha manualmente.`,
+        title: "CEP inválido",
+        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manualmente.`,
       });
     }
   };

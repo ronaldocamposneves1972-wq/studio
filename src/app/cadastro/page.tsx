@@ -52,8 +52,8 @@ function CadastroContent() {
       const data = await response.json();
       console.log("API de CEP retornou:", data);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'CEP não encontrado');
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'CEP não encontrado ou inválido.');
       }
       
       // Auto-fill form fields using the form context from useForm
@@ -72,8 +72,8 @@ function CadastroContent() {
       console.error('Failed to fetch address from CEP:', error);
        toast({
         variant: "destructive",
-        title: "Erro ao buscar CEP",
-        description: `${errorMessage} Por favor, preencha manualmente.`,
+        title: "CEP inválido",
+        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manualmente.`,
       });
     }
   };
