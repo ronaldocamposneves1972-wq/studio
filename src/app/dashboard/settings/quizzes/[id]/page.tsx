@@ -54,6 +54,7 @@ const questionSchema = z.object({
 
 const quizSchema = z.object({
   name: z.string().min(3, "O nome do quiz é obrigatório"),
+  slug: z.string().optional(),
   placement: z.enum(["landing_page", "client_link"]),
   questions: z.array(questionSchema).min(1, "O quiz deve ter pelo menos uma pergunta"),
 })
@@ -80,6 +81,7 @@ export default function EditQuizPage() {
     resolver: zodResolver(quizSchema),
     defaultValues: {
       name: "",
+      slug: "",
       placement: "landing_page",
       questions: [],
     }
@@ -89,6 +91,7 @@ export default function EditQuizPage() {
     if (quiz) {
       form.reset({
         name: quiz.name,
+        slug: quiz.slug || "",
         placement: quiz.placement,
         questions: quiz.questions.map(q => ({
           ...q,
@@ -212,8 +215,8 @@ export default function EditQuizPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4">
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-6">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -224,6 +227,19 @@ export default function EditQuizPage() {
                           <Input placeholder="Nome do seu quiz" {...field} disabled={isSubmitting}/>
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="slug"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Identificador (slug)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="ex: credito-pessoal" {...field} disabled={isSubmitting}/>
+                        </FormControl>
+                         <FormMessage />
                       </FormItem>
                     )}
                   />

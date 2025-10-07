@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from "react"
@@ -39,6 +40,7 @@ const questionSchema = z.object({
 
 const quizSchema = z.object({
   name: z.string().min(3, "O nome do quiz é obrigatório"),
+  slug: z.string().optional(),
   placement: z.enum(["landing_page", "client_link"]),
   questions: z.array(questionSchema).min(1, "O quiz deve ter pelo menos uma pergunta"),
 })
@@ -47,6 +49,7 @@ type QuizFormData = z.infer<typeof quizSchema>
 
 const initialDataCadastro = {
   name: "Cadastro Inicial de Cliente",
+  slug: "cadastro-inicial",
   placement: "landing_page" as QuizPlacement,
   questions: [
     { id: "q-name", text: "Nome Completo*", type: "text" as const, options: "" },
@@ -67,6 +70,7 @@ const initialDataCadastro = {
 
 const initialDataDocs = {
   name: "Envio de Documentos",
+  slug: "envio-documentos",
   placement: "client_link" as QuizPlacement,
   questions: [
     { id: "q-income", text: "Renda Mensal Comprovada", type: "number" as const, options: "" },
@@ -199,8 +203,8 @@ export default function NewQuizPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4">
-              <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid gap-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="name">Nome do Quiz</Label>
                   <Input
@@ -212,13 +216,24 @@ export default function NewQuizPage() {
                   {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
                  <div>
+                  <Label htmlFor="slug">Identificador (slug para URL)</Label>
+                  <Input
+                    id="slug"
+                    {...register("slug")}
+                    placeholder="ex: credito-pessoal"
+                    className={errors.slug ? "border-destructive" : ""}
+                    disabled={isSubmitting}
+                  />
+                  {errors.slug && <p className="text-sm text-destructive mt-1">{errors.slug.message}</p>}
+                </div>
+                 <div>
                     <Label>Localização</Label>
                      <Select onValueChange={(value) => setValue("placement", value as QuizPlacement)} defaultValue="landing_page" disabled={isSubmitting}>
                         <SelectTrigger className={errors.placement ? "border-destructive" : ""}>
                             <SelectValue placeholder="Selecione onde o quiz será usado" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="landing_page">Página Inicial</SelectItem>
+                            <SelectItem value="landing_page">Página Inicial (Padrão)</SelectItem>
                             <SelectItem value="client_link">Link para Cliente</SelectItem>
                         </SelectContent>
                     </Select>

@@ -209,6 +209,10 @@
           "type": "string",
           "description": "Unique identifier for the quiz."
         },
+        "slug": {
+          "type": "string",
+          "description": "A URL-friendly identifier for the quiz."
+        },
         "questions": {
           "type": "array",
           "description": "Array of question objects.",

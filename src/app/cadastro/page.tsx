@@ -1,6 +1,8 @@
 
 'use client';
 
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, query, limit, where, arrayUnion } from 'firebase/firestore';
@@ -14,18 +16,24 @@ import Link from 'next/link';
 import type { Quiz, TimelineEvent } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 
-export default function CadastroPage() {
+function CadastroContent() {
+  const searchParams = useSearchParams();
+  const quizSlug = searchParams.get('quiz');
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
 
-  const landingPageQuizQuery = useMemoFirebase(() => {
+  const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'quizzes'), where('placement', '==', 'landing_page'), limit(1));
-  }, [firestore]);
+    const q = quizSlug 
+      ? where('slug', '==', quizSlug) 
+      : where('placement', '==', 'landing_page');
+    return query(collection(firestore, 'quizzes'), q, limit(1));
+  }, [firestore, quizSlug]);
 
-  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(landingPageQuizQuery);
+  const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
   const quiz = quizzes?.[0];
 
   const handleSubmit = async (answers: Record<string, any>) => {
@@ -35,7 +43,7 @@ export default function CadastroPage() {
     
     const timelineEvent: TimelineEvent = {
         id: `tl-${Date.now()}`,
-        activity: "Cliente cadastrado via formulário inicial",
+        activity: `Cliente cadastrado via formulário "${quiz?.name || 'Inicial'}"`,
         timestamp: now,
         user: { name: "Sistema" }
     };
@@ -134,11 +142,15 @@ export default function CadastroPage() {
         <div className="text-center text-muted-foreground py-10">
             <h3 className="text-2xl font-bold text-foreground">Formulário Indisponível</h3>
             <p>O formulário de cadastro não está disponível no momento. Tente novamente mais tarde.</p>
-            <p className="text-sm mt-2">Verifique se um quiz com a localização "Página Inicial" foi criado nas configurações.</p>
+            <p className="text-sm mt-2">Verifique se um quiz para esta página foi criado e configurado corretamente.</p>
         </div>
     );
   }
 
+  return renderContent();
+}
+
+export default function CadastroPage() {
   return (
     <div className="flex flex-col min-h-screen bg-muted/40 text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background">
@@ -153,12 +165,12 @@ export default function CadastroPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardContent className="p-6 md:p-8">
-                {renderContent()}
+              <Suspense fallback={<div>Carregando...</div>}>
+                <CadastroContent />
+              </Suspense>
             </CardContent>
         </Card>
       </main>
     </div>
   );
 }
-
-    

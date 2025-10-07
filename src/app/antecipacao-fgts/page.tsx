@@ -150,7 +150,7 @@ export default function FgtsPage() {
                 </ul>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button asChild size="lg">
-                    <Link href="/cadastro">
+                    <Link href="/cadastro?quiz=antecipacao-fgts">
                       Solicite agora
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
