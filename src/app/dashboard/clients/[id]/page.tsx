@@ -33,7 +33,7 @@ import {
   FileWarning,
   Receipt
 } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
 
 
@@ -476,14 +476,6 @@ export default function ClientDetailPage() {
     document.body.removeChild(link);
   };
 
-
-  const translatedLabels: { [key: string]: string } = {
-    'name': 'Nome', 'email': 'Email', 'phone': 'Telefone', 'cpf': 'CPF', 'birthdate': 'Data de Nascimento',
-    'mothername': 'Nome da Mãe', 'cep': 'CEP', 'address': 'Endereço', 'complement': 'Complemento', 'number': 'Número',
-    'neighborhood': 'Bairro', 'city': 'Cidade', 'state': 'Estado',
-  };
-
-  const fieldOrder = ['name', 'cpf', 'birthdate', 'phone', 'email', 'mothername', 'cep', 'address', 'number', 'complement', 'neighborhood', 'city', 'state'];
     
     const handleViewDocument = (doc: ClientDocument) => {
        setViewingDocument(doc);
@@ -693,6 +685,43 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         }
     };
 
+    const clientDataToDisplay = useMemo(() => {
+        if (!client) return [];
+
+        const translatedLabels: { [key: string]: string } = {
+            'name': 'Nome', 'email': 'Email', 'phone': 'Telefone', 'cpf': 'CPF', 'birthDate': 'Data de Nascimento',
+            'motherName': 'Nome da Mãe', 'cep': 'CEP', 'address': 'Endereço', 'complement': 'Complemento', 'neighborhood': 'Bairro', 'city': 'Cidade', 'state': 'Estado',
+        };
+
+        const fieldOrder = ['name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'cep', 'address', 'complement', 'neighborhood', 'city', 'state'];
+        
+        const combinedData: Record<string, any> = {};
+
+        // Add main client fields first
+        fieldOrder.forEach(key => {
+            if (client[key as keyof Client]) {
+                combinedData[key] = client[key as keyof Client];
+            }
+        });
+
+        // Add answers, removing the 'q-' prefix and avoiding overwrites
+        if (client.answers) {
+            for (const answerKey in client.answers) {
+                const key = answerKey.replace('q-', '');
+                if (!combinedData[key] && client.answers[answerKey]) {
+                     combinedData[key] = client.answers[answerKey];
+                }
+            }
+        }
+        
+        // Prepare for display
+        return Object.entries(combinedData).map(([key, value]) => ({
+            key,
+            label: translatedLabels[key] || key,
+            value: String(value) || 'Não informado',
+        }));
+
+    }, [client]);
 
 
   if (isLoadingClient) {
@@ -919,29 +948,21 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                   <CardDescription>Respostas fornecidas pelo cliente no formulário de qualificação.</CardDescription>
                               </CardHeader>
                               <CardContent className="space-y-4">
-                                {client.answers ? (
-                                  <>
-                                    {fieldOrder.map((fieldKey) => {
-                                      const answerKey = `q-${fieldKey.toLowerCase().replace(' ', '')}`;
-                                      const value = client.answers![answerKey];
-                                      if (value === undefined) return null;
-                                      const questionLabel = translatedLabels[fieldKey.toLowerCase() as keyof typeof translatedLabels] || fieldKey;
-                                      return (
-                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={fieldKey}>
-                                          <p className="font-medium text-sm text-muted-foreground">{questionLabel}</p>
-                                          <p className="text-foreground">{String(value) || "Não informado"}</p>
+                                {clientDataToDisplay.length > 0 ? (
+                                    <>
+                                        {clientDataToDisplay.map(({ key, label, value }) => (
+                                            <div className="grid grid-cols-[150px_1fr] gap-2 items-center" key={key}>
+                                                <p className="font-medium text-sm text-muted-foreground">{label}</p>
+                                                <p className="text-foreground">{value}</p>
+                                            </div>
+                                        ))}
+                                        <div className="grid grid-cols-[150px_1fr] gap-2 items-center border-t pt-4 mt-4">
+                                            <p className="font-medium text-sm text-muted-foreground">Data do Cadastro</p>
+                                            <p className="text-foreground">{new Date(client.createdAt).toLocaleString('pt-BR')}</p>
                                         </div>
-                                      );
-                                    })}
-                                    {client.createdAt && (
-                                      <div className="grid grid-cols-[150px_1fr] gap-2 items-center border-t pt-4 mt-4">
-                                        <p className="font-medium text-sm text-muted-foreground">Data do Cadastro</p>
-                                        <p className="text-foreground">{new Date(client.createdAt).toLocaleString('pt-BR')}</p>
-                                      </div>
-                                    )}
-                                  </>
+                                    </>
                                 ) : (
-                                  <p className="text-muted-foreground">Nenhuma resposta do quiz encontrada.</p>
+                                    <p className="text-muted-foreground">Nenhum dado do cliente encontrado.</p>
                                 )}
                               </CardContent>
                               {client.quizId && (
