@@ -188,6 +188,13 @@
         "quizId": {
           "type": "string",
           "description": "Reference to a Quiz. (Relationship: Client 1:1 Quiz)"
+        },
+        "salesOrders": {
+          "type": "array",
+          "description": "Summary of sales orders for this client.",
+          "items": {
+            "$ref": "#/backend/entities/SalesOrderSummary"
+          }
         }
       },
       "required": [
@@ -392,6 +399,97 @@
         "type",
         "url"
       ]
+    },
+    "SalesOrderItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SalesOrderItem",
+      "type": "object",
+      "description": "Represents a single item within a sales order.",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "description": "Reference to the product."
+        },
+        "productName": {
+          "type": "string",
+          "description": "Denormalized name of the product."
+        },
+        "value": {
+          "type": "number",
+          "description": "The value of this item."
+        }
+      },
+      "required": ["productId", "productName", "value"]
+    },
+    "SalesOrder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SalesOrder",
+      "type": "object",
+      "description": "Represents a sales order containing items like insurance, commission, etc.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the sales order."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the client."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Denormalized name of the client."
+        },
+        "salesRepId": {
+          "type": "string",
+          "description": "Reference to the sales representative (user)."
+        },
+        "salesRepName": {
+          "type": "string",
+          "description": "Denormalized name of the sales representative."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the order was created."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/SalesOrderItem"
+          }
+        },
+        "totalValue": {
+          "type": "number",
+          "description": "The total value of all items in the order."
+        }
+      },
+      "required": ["id", "clientId", "clientName", "salesRepId", "salesRepName", "createdAt", "items", "totalValue"]
+    },
+    "SalesOrderSummary": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SalesOrderSummary",
+      "type": "object",
+      "description": "A summarized version of a sales order for denormalization.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the sales order."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the order was created."
+        },
+        "totalValue": {
+          "type": "number",
+          "description": "The total value of the order."
+        },
+        "itemCount": {
+          "type": "number",
+          "description": "Number of items in the order."
+        }
+      },
+      "required": ["id", "createdAt", "totalValue", "itemCount"]
     }
   },
   "auth": {
@@ -550,6 +648,22 @@
           ]
         }
       },
+       {
+        "path": "/sales_orders/{salesOrderId}",
+        "definition": {
+          "entityName": "SalesOrder",
+          "schema": {
+            "$ref": "#/backend/entities/SalesOrder"
+          },
+          "description": "Stores sales order data.",
+          "params": [
+            {
+              "name": "salesOrderId",
+              "description": "The unique identifier of the sales order."
+            }
+          ]
+        }
+      },
       {
         "path": "/commissions/{commissionId}",
         "definition": {
@@ -602,3 +716,5 @@
     "reasoning": "The Firestore data structure is designed to support the ConsorciaTech application, focusing on authorization independence, clarity, and scalability. It addresses the 'Missing or insufficient permissions' error by structuring data with clear ownership and access control. The structure separates concerns into collections like `users`, `clients`, `financial_institutions`, `products` (split into `consortiums` and `credit_products`), `product_combos`, `sales_proposals`, `commissions`, `quizzes`, and `questions`. Importantly, to achieve Authorization Independence (CRITICAL), data is denormalized where needed to avoid `get()` calls in security rules.  For example, the `clientId` is denormalized within `sales_proposals` to grant access for the specific client. The structure supports required QAPs by using segregation and path-based ownership, providing secure `list` operations."
   }
 }
+
+  

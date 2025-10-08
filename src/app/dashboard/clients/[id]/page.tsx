@@ -76,7 +76,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -689,11 +689,66 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     };
 
     const handleSaveSalesOrder = async (data: any) => {
-        // TODO: Implement sales order saving logic
-        console.log("Saving sales order:", data);
-        toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido de venda foi registrado."});
-        setIsSalesOrderDialogOpen(false);
+        if (!firestore || !user || !client || !clientRef) return;
+
+        const batch = writeBatch(firestore);
+        const now = new Date().toISOString();
+
+        try {
+            // 1. Create the main sales order document in 'sales_orders'
+            const salesOrderCollection = collection(firestore, 'sales_orders');
+            const newSalesOrderRef = doc(salesOrderCollection);
+
+            const newSalesOrderData: SalesOrder = {
+                id: newSalesOrderRef.id,
+                clientId: client.id,
+                clientName: client.name,
+                salesRepId: user.uid,
+                salesRepName: user.displayName || user.email || 'Usuário',
+                createdAt: now,
+                items: data.items,
+                totalValue: data.totalValue,
+            };
+            batch.set(newSalesOrderRef, newSalesOrderData);
+
+            // 2. Create the summary for the client document
+            const salesOrderSummary: SalesOrderSummary = {
+                id: newSalesOrderRef.id,
+                createdAt: now,
+                totalValue: data.totalValue,
+                itemCount: data.items.length,
+            };
+
+            // 3. Create the timeline event
+            const timelineEvent: TimelineEvent = {
+                id: `tl-${Date.now()}-salesorder`,
+                activity: `Novo pedido de venda (R$ ${data.totalValue.toLocaleString('pt-br')}) criado.`,
+                timestamp: now,
+                user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+            };
+
+            // 4. Update the client document
+            batch.update(clientRef, {
+                salesOrders: arrayUnion(salesOrderSummary),
+                timeline: arrayUnion(timelineEvent),
+            });
+
+            // 5. Commit all writes
+            await batch.commit();
+
+            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido de venda foi registrado com sucesso." });
+            setIsSalesOrderDialogOpen(false);
+
+        } catch (error) {
+            console.error("Error saving sales order:", error);
+            toast({
+                variant: 'destructive',
+                title: "Erro ao Salvar Pedido",
+                description: "Não foi possível registrar o pedido de venda."
+            });
+        }
     }
+
 
     const clientDataToDisplay = useMemo(() => {
         if (!client) return [];
@@ -1398,3 +1453,5 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
+
+  

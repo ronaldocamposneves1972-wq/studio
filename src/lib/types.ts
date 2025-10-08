@@ -39,6 +39,13 @@ export type ProposalSummary = {
   formalizationLink?: string;
 }
 
+export type SalesOrderSummary = {
+  id: string;
+  createdAt: string;
+  totalValue: number;
+  itemCount: number;
+}
+
 export type Client = {
   id: string;
   name: string; // Full name
@@ -54,6 +61,7 @@ export type Client = {
   answers?: Record<string, any>; // Optional: Client's answers to the quiz
   documents?: ClientDocument[];
   proposals?: ProposalSummary[];
+  salesOrders?: SalesOrderSummary[];
   cpf?: string;
   birthDate?: string;
   motherName?: string;
@@ -187,3 +195,22 @@ export type Transaction = {
   accountId: string;
   accountName?: string;
 };
+
+export type SalesOrderItem = {
+  productId: string;
+  productName: string;
+  value: number;
+}
+
+export type SalesOrder = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  salesRepId: string;
+  salesRepName: string;
+  createdAt: string;
+  items: SalesOrderItem[];
+  totalValue: number;
+}
+
+  
