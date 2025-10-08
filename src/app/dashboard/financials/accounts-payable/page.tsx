@@ -220,12 +220,16 @@ function ExpenseDialog({
                     control={control}
                     name="supplierId"
                     render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Selecione um fornecedor" /></SelectTrigger>
-                        <SelectContent>
-                        {suppliers?.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                        <Combobox
+                            items={suppliers?.map(s => ({ value: s.id, label: s.name })) || []}
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Pesquisar fornecedor..."
+                            searchPlaceholder="Buscar fornecedor..."
+                            notFoundMessage={
+                                <span>Nenhum fornecedor encontrado. <Link href="/dashboard/suppliers" className='text-primary underline'>Cadastrar</Link></span>
+                            }
+                        />
                     )}
                 />
                </div>
@@ -499,5 +503,3 @@ export default function AccountsPayablePage() {
     </>
   )
 }
-
-    
