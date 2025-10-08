@@ -10,7 +10,7 @@ import {
   Loader2,
   Truck,
 } from "lucide-react"
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -59,14 +59,23 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 import type { Supplier } from "@/lib/types"
+import { Badge } from "@/components/ui/badge"
 
 const supplierSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
+  type: z.enum(["Empresa", "Funcionário"], { required_error: "Selecione o tipo de fornecedor."}),
   cnpjCpf: z.string().optional(),
   contactName: z.string().optional(),
   phone: z.string().optional(),
@@ -91,15 +100,16 @@ function SupplierDialog({
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<SupplierFormValues>({
     resolver: zodResolver(supplierSchema),
-    defaultValues: supplier || { name: '', cnpjCpf: '', contactName: '', phone: '', email: ''},
+    defaultValues: supplier || { name: '', type: 'Empresa', cnpjCpf: '', contactName: '', phone: '', email: ''},
   })
 
   useState(() => {
-    reset(supplier || { name: '', cnpjCpf: '', contactName: '', phone: '', email: ''})
+    reset(supplier || { name: '', type: 'Empresa', cnpjCpf: '', contactName: '', phone: '', email: ''})
   })
 
   const handleFormSubmit = (values: SupplierFormValues) => {
@@ -117,17 +127,38 @@ function SupplierDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)}>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Nome do Fornecedor</Label>
-              <Input
-                id="name"
-                {...register('name')}
-                placeholder="Ex: Companhia de Software Ltda"
-                className={errors.name ? 'border-destructive' : ''}
-              />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name">Nome do Fornecedor</Label>
+                    <Input
+                        id="name"
+                        {...register('name')}
+                        placeholder="Ex: Companhia de Software Ltda"
+                        className={errors.name ? 'border-destructive' : ''}
+                    />
+                    {errors.name && (
+                        <p className="text-sm text-destructive">{errors.name.message}</p>
+                    )}
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="type">Tipo</Label>
+                     <Controller
+                        control={control}
+                        name="type"
+                        render={({ field }) => (
+                           <Select onValueChange={field.onChange} value={field.value} defaultValue="Empresa">
+                            <SelectTrigger className={errors.type ? 'border-destructive' : ''}>
+                                <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="Empresa">Empresa</SelectItem>
+                               <SelectItem value="Funcionário">Funcionário</SelectItem>
+                            </SelectContent>
+                           </Select>
+                        )}
+                    />
+                    {errors.type && <p className="text-sm text-destructive">{errors.type.message}</p>}
+                </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="cnpjCpf">CNPJ / CPF</Label>
@@ -260,6 +291,7 @@ export default function SuppliersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Fornecedor</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>CNPJ/CPF</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -269,6 +301,7 @@ export default function SuppliersPage() {
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-40" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -276,7 +309,7 @@ export default function SuppliersPage() {
               ))}
               {!isLoading && suppliers?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">Nenhum fornecedor encontrado.</TableCell>
+                  <TableCell colSpan={5} className="h-24 text-center">Nenhum fornecedor encontrado.</TableCell>
                 </TableRow>
               )}
               {suppliers?.map((supplier) => (
@@ -286,6 +319,9 @@ export default function SuppliersPage() {
                         <Truck className="h-5 w-5 text-muted-foreground"/>
                         {supplier.name}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                      {supplier.type && <Badge variant={supplier.type === 'Empresa' ? 'secondary' : 'outline'}>{supplier.type}</Badge>}
                   </TableCell>
                   <TableCell>{supplier.cnpjCpf || '—'}</TableCell>
                   <TableCell>
@@ -354,5 +390,3 @@ export default function SuppliersPage() {
     </>
   )
 }
-
-    

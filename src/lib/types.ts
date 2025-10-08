@@ -190,6 +190,7 @@ export type Account = {
 export type Supplier = {
   id: string;
   name: string;
+  type: 'Empresa' | 'Funcionário';
   cnpjCpf?: string;
   contactName?: string;
   phone?: string;
@@ -230,5 +231,3 @@ export type SalesOrder = {
   items: SalesOrderItem[];
   totalValue: number;
 }
-
-    
