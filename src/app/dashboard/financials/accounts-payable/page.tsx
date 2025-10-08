@@ -125,15 +125,24 @@ function ExpenseDialog({
   });
   
   const selectedCategoryId = watch('categoryId');
+  const [costCenterName, setCostCenterName] = useState('');
+
 
   useEffect(() => {
-    if (selectedCategoryId) {
-      const category = categories?.find(c => c.id === selectedCategoryId);
-      if (category?.costCenterId) {
-        setValue('costCenterId', category.costCenterId, { shouldValidate: true });
+    if (selectedCategoryId && categories) {
+      const category = categories.find(c => c.id === selectedCategoryId);
+      if (category?.costCenterId && category?.costCenterName) {
+        setValue('costCenterId', category.costCenterId);
+        setCostCenterName(category.costCenterName);
+      } else {
+        setValue('costCenterId', '');
+        setCostCenterName('');
       }
+    } else {
+        setCostCenterName('');
     }
   }, [selectedCategoryId, categories, setValue]);
+
 
   const onSubmit = async (data: ExpenseFormData) => {
     setIsSubmitting(true);
@@ -232,7 +241,7 @@ function ExpenseDialog({
                                 items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Selecione o tipo"
+                                placeholder="Pesquise o tipo"
                                 searchPlaceholder="Buscar tipo..."
                                 notFoundMessage="Nenhum tipo encontrado."
                             />
@@ -242,19 +251,13 @@ function ExpenseDialog({
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="costCenterId">Centro de Custo</Label>
-                     <Controller
-                        control={control}
-                        name="costCenterId"
-                        render={({ field }) => (
-                           <Combobox
-                                items={costCenters?.map(c => ({ value: c.id, label: c.name })) || []}
-                                value={field.value}
-                                onChange={field.onChange}
-                                placeholder="Selecione o centro"
-                                searchPlaceholder="Buscar centro..."
-                                notFoundMessage="Nenhum centro de custo."
-                            />
-                        )}
+                    <Input
+                        id="costCenterName"
+                        value={costCenterName}
+                        readOnly
+                        disabled
+                        placeholder="Selecione um tipo de despesa"
+                        className="bg-muted"
                     />
                </div>
             </div>
