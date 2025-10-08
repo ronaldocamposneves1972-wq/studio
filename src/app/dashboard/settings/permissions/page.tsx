@@ -75,12 +75,12 @@ export default function PermissionsPage() {
     }
 
     const generateRules = () => {
-      let rulesString = `
-rules_version = '2';
+      let rulesString = `rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
@@ -89,89 +89,88 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isAdmin() {
-      return getUserRole() == 'Admin';
+    function isRole(role) {
+        return isSignedIn() && getUserData().role == role;
     }
 
-    function isGestor() {
-      return getUserRole() == 'Gestor';
-    }
-    
-    function isAtendente() {
-        return getUserRole() == 'Atendente';
-    }
-
-    function isFinanceiro() {
-        return getUserRole() == 'Financeiro';
-    }
 `;
 
-      for (const collection of collections) {
-          rulesString += `
-    match /${collection}/{docId} {`;
+    for (const collection of collections) {
+      rulesString += `    match /${collection}/{docId} {\n`;
 
-          const rolePermissions: Record<string, string[]> = {};
+      const permsByAction: Record<string, string[]> = {
+        read: [],
+        list: [],
+        create: [],
+        update: [],
+        delete: [],
+      };
 
-          for (const role of roles) {
-              const perms = permissions[role][collection];
-              const allowedActions = Object.entries(perms)
-                  .filter(([, allowed]) => allowed)
-                  .map(([action]) => {
-                      if (action === 'read') return 'get, list';
-                      if (action === 'create') return 'create';
-                      if (action === 'update') return 'update';
-                      if (action === 'delete') return 'delete';
-                      return '';
-                  })
-                  .filter(Boolean)
-                  .join(', ');
-
-              if (allowedActions) {
-                  const roleCheck = role === 'Anonimo' ? '!isSignedIn()' : `is${role}()`;
-                  if (!rolePermissions[allowedActions]) {
-                      rolePermissions[allowedActions] = [];
-                  }
-                  rolePermissions[allowedActions].push(roleCheck);
-              }
-          }
-           
-          // Add owner-based rule for users collection
-          if (collection === 'users') {
-              const ownerRule = 'isOwner(docId)';
-              if (!rolePermissions['read, update']) {
-                  rolePermissions['read, update'] = [];
-              }
-               // Avoid duplicates
-              if (!rolePermissions['read, update'].includes(ownerRule)) {
-                rolePermissions['read, update'].push(ownerRule);
-              }
-          }
-
-          if (Object.keys(rolePermissions).length === 0) {
-              rulesString += `
-      allow read, write: if false;`;
-          } else {
-              for (const [actions, roles] of Object.entries(rolePermissions)) {
-                  rulesString += `
-      allow ${actions}: if ${roles.join(' || ')};`;
-              }
-          }
-
-          rulesString += `
-    }
-`;
+      for (const role of roles) {
+        const rolePerms = permissions[role][collection];
+        const roleCheck = `isRole('${role}')`;
+        const anonCheck = `!isSignedIn()`;
+        
+        if (rolePerms.create) permsByAction.create.push(role === 'Anonimo' ? anonCheck : roleCheck);
+        if (rolePerms.read) {
+            permsByAction.read.push(role === 'Anonimo' ? anonCheck : roleCheck);
+            permsByAction.list.push(role === 'Anonimo' ? anonCheck : roleCheck);
+        }
+        if (rolePerms.update) permsByAction.update.push(role === 'Anonimo' ? anonCheck : roleCheck);
+        if (rolePerms.delete) permsByAction.delete.push(role === 'Anonimo' ? anonCheck : roleCheck);
       }
 
-      rulesString += `
-  }
-}
-`;
-      return rulesString;
+      // Special owner-based rules
+      if (collection === 'users') {
+        permsByAction.read.push('isOwner(docId)');
+        permsByAction.update.push('isOwner(docId)');
+      }
+
+      const writeActions = ['create', 'update', 'delete'];
+      let combinedWriteRoles = new Set<string>();
+      
+      const createRoles = permsByAction.create;
+      const updateRoles = permsByAction.update;
+      const deleteRoles = permsByAction.delete;
+
+      // Check if all write actions have the same roles
+      const allSame = writeActions.every(action => 
+        JSON.stringify(permsByAction[action].sort()) === JSON.stringify(createRoles.sort())
+      );
+
+      if (allSame && createRoles.length > 0) {
+        rulesString += `      allow read: if ${[...new Set(permsByAction.read)].join(' || ') || 'false'};\n`;
+        rulesString += `      allow write: if ${[...new Set(createRoles)].join(' || ') || 'false'};\n`;
+      } else {
+         if (permsByAction.read.length > 0) {
+             rulesString += `      allow get, list: if ${[...new Set(permsByAction.read)].join(' || ')};\n`;
+         }
+         if (createRoles.length > 0) {
+             rulesString += `      allow create: if ${[...new Set(createRoles)].join(' || ')};\n`;
+         }
+         if (updateRoles.length > 0) {
+              rulesString += `      allow update: if ${[...new Set(updateRoles)].join(' || ')};\n`;
+         }
+         if (deleteRoles.length > 0) {
+             rulesString += `      allow delete: if ${[...new Set(deleteRoles)].join(' || ')};\n`;
+         }
+      }
+      
+       if (Object.values(permsByAction).every(arr => arr.length === 0)) {
+            rulesString += `      allow read, write: if false;\n`;
+       }
+
+
+      rulesString += `    }\n`;
     }
+
+    rulesString += `  }\n}\n`;
+    return rulesString;
+  };
     
     const handleSave = () => {
         setIsSaving(true);
@@ -189,7 +188,7 @@ service cloud.firestore {
             // For now, we'll just log it and show a toast.
             toast({
                 title: "Regras de Segurança Geradas",
-                description: "As regras foram geradas. A integração para salvar o arquivo será implementada.",
+                description: "As regras foram geradas no console do navegador para verificação.",
             });
             setIsSaving(false);
         }, 1000);
