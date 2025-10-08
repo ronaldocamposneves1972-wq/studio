@@ -19,12 +19,21 @@ export const createUserDocument = functions.auth.user().onCreate((user) => {
     email: email,
     role: "Atendente", // Default role for new users
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    name: email, // Default name to email until updated
+    name: email || 'Novo Usuário', // Default name to email until updated
   };
 
   // Set the document in the 'users' collection.
   // The path is 'users/{uid}'.
-  return admin.firestore().collection("users").doc(uid).set(newUser);
+  return admin.firestore().collection("users").doc(uid).set(newUser)
+    .then(() => {
+      console.log(`Successfully created user document for UID: ${uid}`);
+      return null;
+    })
+    .catch((error) => {
+      console.error(`Error creating user document for UID: ${uid}`, error);
+      // Throwing an error is important for retries and visibility in logs
+      throw new functions.https.HttpsError("internal", "Could not create user document.");
+    });
 });
 
 
@@ -70,3 +79,4 @@ export const provisionAdmin = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", "Could not provision admin user.", error);
   }
 });
+
