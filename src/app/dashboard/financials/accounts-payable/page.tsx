@@ -241,7 +241,7 @@ function ExpenseDialog({
                                 items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Pesquise o tipo"
+                                placeholder="Pesquisar tipo de despesa..."
                                 searchPlaceholder="Buscar tipo..."
                                 notFoundMessage="Nenhum tipo encontrado."
                             />
@@ -322,8 +322,9 @@ export default function AccountsPayablePage() {
     if (!firestore) return;
 
     const supplier = suppliers?.find(s => s.id === data.supplierId);
-    const costCenter = costCenters?.find(c => c.id === data.costCenterId);
     const category = categories?.find(c => c.id === data.categoryId);
+    // The cost center is now derived from the category, not directly from the form
+    const costCenter = costCenters?.find(c => c.id === category?.costCenterId);
     
     const newTransaction: Omit<Transaction, 'id'> = {
         description: data.description,
@@ -333,7 +334,7 @@ export default function AccountsPayablePage() {
         status: 'pending',
         supplierId: data.supplierId,
         supplierName: supplier?.name,
-        costCenterId: data.costCenterId,
+        costCenterId: costCenter?.id,
         costCenterName: costCenter?.name,
         categoryId: data.categoryId,
         category: category?.name,
@@ -496,3 +497,5 @@ export default function AccountsPayablePage() {
     </>
   )
 }
+
+    
