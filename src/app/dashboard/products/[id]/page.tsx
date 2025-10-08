@@ -10,9 +10,22 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, Edit, Trash2, Landmark, Percent } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase'
+import { useDoc, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase'
 import type { Product } from '@/lib/types'
 import { doc } from 'firebase/firestore'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
+
 
 function ProductDetailSkeleton() {
   return (
@@ -54,6 +67,7 @@ export default function ProductDetailPage() {
   const router = useRouter()
   const firestore = useFirestore()
   const productId = params.id as string
+  const { toast } = useToast()
   
   const productRef = useMemoFirebase(() => {
     if (!firestore || !productId) return null
@@ -61,6 +75,16 @@ export default function ProductDetailPage() {
   }, [firestore, productId]);
 
   const { data: product, isLoading, error } = useDoc<Product>(productRef);
+
+  const handleDelete = () => {
+    if (!productRef) return;
+    deleteDocumentNonBlocking(productRef);
+    toast({
+      title: "Produto Excluído",
+      description: `O produto "${product?.name}" foi removido.`
+    })
+    router.push('/dashboard/products');
+  }
 
   if (isLoading) {
     return <ProductDetailSkeleton />;
@@ -94,13 +118,33 @@ export default function ProductDetailPage() {
           {product.name}
         </h1>
         <div className="hidden items-center gap-2 md:ml-auto md:flex">
-          <Button variant="destructive" size="sm">
-            <Trash2 className="h-4 w-4 mr-2"/>
-            Excluir
-          </Button>
-          <Button size="sm">
-            <Edit className="h-4 w-4 mr-2"/>
-            Editar Produto
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="h-4 w-4 mr-2"/>
+                Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita. O produto <strong>{product.name}</strong> será excluído permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                  Sim, excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button size="sm" asChild>
+            <Link href={`/dashboard/products/edit/${product.id}`}>
+              <Edit className="h-4 w-4 mr-2"/>
+              Editar Produto
+            </Link>
           </Button>
         </div>
       </div>
@@ -137,7 +181,7 @@ export default function ProductDetailPage() {
                </div>
                <Separator />
 
-              {product.behavior === 'Proposta' ? (
+              {product.behavior === 'Proposta' && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
@@ -170,7 +214,8 @@ export default function ProductDetailPage() {
                         </div>
                     </div>
                 </>
-              ) : (
+              )}
+               {(product.behavior === 'Fixo' || product.behavior === 'Variável') && (
                  <div className="grid gap-2">
                       <p className="text-sm font-medium text-muted-foreground">Valor do Produto</p>
                       <p className="font-mono text-foreground">R$ {product.value?.toLocaleString('pt-BR')}</p>
@@ -184,8 +229,10 @@ export default function ProductDetailPage() {
           <Button variant="destructive" size="sm">
             Excluir
           </Button>
-          <Button size="sm">
-            Editar
+          <Button size="sm" asChild>
+            <Link href={`/dashboard/products/edit/${product.id}`}>
+              Editar
+            </Link>
           </Button>
         </div>
     </div>

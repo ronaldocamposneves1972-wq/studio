@@ -3,7 +3,7 @@
 'use client'
 
 import Link from "next/link"
-import { PlusCircle, MoreHorizontal } from "lucide-react"
+import { PlusCircle, MoreHorizontal, Edit, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
@@ -31,14 +31,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
+import { useCollection, useFirestore, useMemoFirebase, useUser, deleteDocumentNonBlocking } from "@/firebase"
 import type { Product } from "@/lib/types"
-import { collection, query } from "firebase/firestore"
+import { collection, query, doc } from "firebase/firestore"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
+
 
 export default function ProductsPage() {
   const router = useRouter();
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -46,6 +60,15 @@ export default function ProductsPage() {
   }, [firestore]);
 
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
+
+  const handleDelete = (product: Product) => {
+    if(!firestore) return;
+    deleteDocumentNonBlocking(doc(firestore, 'products', product.id));
+    toast({
+      title: "Produto Excluído",
+      description: `O produto "${product.name}" foi removido.`
+    });
+  }
 
   const renderProductRows = () => {
     if (isLoading) {
@@ -71,17 +94,17 @@ export default function ProductsPage() {
     }
 
     return products.map((product) => (
-      <TableRow key={product.id} onClick={() => router.push(`/dashboard/products/${product.id}`)} className="cursor-pointer">
-        <TableCell className="font-medium">{product.name}</TableCell>
+      <TableRow key={product.id}>
+        <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/products/${product.id}`)}>{product.name}</TableCell>
         <TableCell>
           <Badge variant="secondary">
             {product.behavior}
           </Badge>
         </TableCell>
-        <TableCell>
+        <TableCell className="cursor-pointer" onClick={() => router.push(`/dashboard/products/${product.id}`)}>
             {product.bankName || 'N/A'}
         </TableCell>
-        <TableCell>
+        <TableCell className="cursor-pointer" onClick={() => router.push(`/dashboard/products/${product.id}`)}>
             {product.behavior === 'Proposta'
               ? `R$ ${product.minAmount?.toLocaleString('pt-BR')} - R$ ${product.maxAmount?.toLocaleString('pt-BR')}`
               : `R$ ${product.value?.toLocaleString('pt-BR')}`
@@ -98,8 +121,33 @@ export default function ProductsPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
               <DropdownMenuItem onSelect={() => router.push(`/dashboard/products/${product.id}`)}>Ver Detalhes</DropdownMenuItem>
-              <DropdownMenuItem onSelect={(e) => e.stopPropagation()}>Editar</DropdownMenuItem>
-              <DropdownMenuItem onSelect={(e) => e.stopPropagation()} className="text-destructive">Excluir</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push(`/dashboard/products/edit/${product.id}`)}>
+                <Edit className="mr-2 h-4 w-4" /> Editar
+              </DropdownMenuItem>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta ação não pode ser desfeita. O produto <strong>{product.name}</strong> será excluído permanentemente.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={() => handleDelete(product)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                        Sim, excluir
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
