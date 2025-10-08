@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   PlusCircle,
   MoreHorizontal,
@@ -73,6 +73,7 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, query, doc, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
 import type { ExpenseCategory, CostCenter } from "@/lib/types"
 import Link from "next/link"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const expenseCategorySchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
@@ -107,9 +108,9 @@ function ExpenseCategoryDialog({
     defaultValues: category || { name: '', costCenterId: '' },
   })
 
-  useState(() => {
+  useEffect(() => {
     reset(category || { name: '', costCenterId: '' })
-  })
+  }, [category, reset])
 
   const handleFormSubmit = (values: ExpenseCategoryFormValues) => {
     onSave(values, category?.id)
@@ -198,6 +199,9 @@ function BatchExpenseCategoryDialog({
   costCenters: CostCenter[] | null;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+  const [bulkCostCenterId, setBulkCostCenterId] = useState<string>('');
+
   const form = useForm<BatchExpenseCategoryFormData>({
     resolver: zodResolver(batchExpenseCategorySchema),
     defaultValues: {
@@ -205,7 +209,7 @@ function BatchExpenseCategoryDialog({
     },
   });
 
-  const { control, handleSubmit, formState: { errors }, getValues, reset } = form;
+  const { control, handleSubmit, formState: { errors }, getValues, reset, setValue } = form;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -215,7 +219,8 @@ function BatchExpenseCategoryDialog({
   const handleFormSubmit = async (data: BatchExpenseCategoryFormData) => {
     setIsSubmitting(true);
     await onSave(data);
-    reset({ categories: [{ name: '', costCenterId: '' }] }); // Reset after save
+    reset({ categories: [{ name: '', costCenterId: '' }] }); 
+    setSelectedRows([]);
     setIsSubmitting(false);
   };
   
@@ -223,14 +228,38 @@ function BatchExpenseCategoryDialog({
     const categories = getValues('categories');
     const lastCategory = categories[categories.length - 1];
     append({
-      name: '', // Always start with a fresh name
-      costCenterId: lastCategory?.costCenterId || '', // Copy previous cost center
+      name: '',
+      costCenterId: lastCategory?.costCenterId || '',
     });
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedRows(fields.map((_, index) => index));
+    } else {
+      setSelectedRows([]);
+    }
+  }
+
+  const handleSelectRow = (index: number, checked: boolean) => {
+    if (checked) {
+      setSelectedRows(prev => [...prev, index]);
+    } else {
+      setSelectedRows(prev => prev.filter(i => i !== index));
+    }
+  }
+
+  const handleBulkUpdate = () => {
+    if (!bulkCostCenterId || selectedRows.length === 0) return;
+    selectedRows.forEach(index => {
+      setValue(`categories.${index}.costCenterId`, bulkCostCenterId, { shouldValidate: true });
+    });
+    setSelectedRows([]);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Adicionar Despesas em Lote</DialogTitle>
           <DialogDescription>
@@ -238,10 +267,30 @@ function BatchExpenseCategoryDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)}>
+           {selectedRows.length > 0 && (
+            <div className="p-4 bg-muted/50 rounded-lg mb-4 flex items-center gap-4">
+              <span className="text-sm font-medium">{selectedRows.length} linha(s) selecionada(s)</span>
+              <Select onValueChange={setBulkCostCenterId}>
+                  <SelectTrigger className="w-[250px]">
+                      <SelectValue placeholder="Selecione um Centro de Custo"/>
+                  </SelectTrigger>
+                  <SelectContent>
+                      {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+              <Button type="button" size="sm" onClick={handleBulkUpdate}>Alterar Selecionados</Button>
+            </div>
+           )}
           <div className="max-h-[60vh] overflow-y-auto p-1">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                        checked={selectedRows.length === fields.length && fields.length > 0}
+                        onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Nome da Despesa</TableHead>
                   <TableHead>Centro de Custo</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -250,7 +299,13 @@ function BatchExpenseCategoryDialog({
               <TableBody>
                 {fields.map((field, index) => (
                   <TableRow key={field.id} className="align-top">
-                    <TableCell className="p-1">
+                     <TableCell className="p-2">
+                        <Checkbox
+                            checked={selectedRows.includes(index)}
+                            onCheckedChange={(checked) => handleSelectRow(index, !!checked)}
+                        />
+                     </TableCell>
+                    <TableCell className="p-2">
                        <Controller
                         control={control}
                         name={`categories.${index}.name`}
@@ -258,7 +313,7 @@ function BatchExpenseCategoryDialog({
                       />
                       {errors.categories?.[index]?.name && <p className="text-sm text-destructive mt-1">{errors.categories[index]?.name?.message}</p>}
                     </TableCell>
-                    <TableCell className="p-1">
+                    <TableCell className="p-2">
                        <Controller
                         control={control}
                         name={`categories.${index}.costCenterId`}
@@ -274,7 +329,7 @@ function BatchExpenseCategoryDialog({
                         )}
                       />
                     </TableCell>
-                    <TableCell className="p-1 text-right">
+                    <TableCell className="p-2 text-right">
                       <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
