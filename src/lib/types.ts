@@ -197,6 +197,12 @@ export type Supplier = {
   email?: string;
 }
 
+export type CostCenter = {
+  id: string;
+  name: string;
+};
+
+
 export type Transaction = {
   id: string;
   description: string;
@@ -211,6 +217,8 @@ export type Transaction = {
   clientName?: string;
   supplierId?: string;
   supplierName?: string;
+  costCenterId?: string;
+  costCenterName?: string;
   category?: string;
 };
 

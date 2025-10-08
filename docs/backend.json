@@ -543,6 +543,26 @@
         "name",
         "type"
       ]
+    },
+    "CostCenter": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CostCenter",
+      "type": "object",
+      "description": "Represents a cost center for categorizing expenses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the cost center."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the cost center."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
     }
   },
   "auth": {
@@ -780,8 +800,24 @@
             }
           ]
         }
+      },
+       {
+        "path": "/cost_centers/{costCenterId}",
+        "definition": {
+          "entityName": "CostCenter",
+          "schema": {
+            "$ref": "#/backend/entities/CostCenter"
+          },
+          "description": "Stores cost center data.",
+          "params": [
+            {
+              "name": "costCenterId",
+              "description": "The unique identifier of the cost center."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the ConsorciaTech application, focusing on authorization independence, clarity, and scalability. It addresses the 'Missing or insufficient permissions' error by structuring data with clear ownership and access control. The structure separates concerns into collections like `users`, `clients`, `financial_institutions`, `products` (split into `consortiums` and `credit_products`), `product_combos`, `sales_proposals`, `commissions`, `quizzes`, and `questions`. Importantly, to achieve Authorization Independence (CRITICAL), data is denormalized where needed to avoid `get()` calls in security rules.  For example, the `clientId` is denormalized within `sales_proposals` to grant access for the specific client. The structure supports required QAPs by using segregation and path-based ownership, providing secure `list` operations."
+    "reasoning": "The Firestore data structure is designed to support the ConsorciaTech application, focusing on authorization independence, clarity, and scalability. It addresses the 'Missing or insufficient permissions' error by structuring data with clear ownership and access control. The structure separates concerns into collections like `users`, `clients`, `financial_institutions`, `products` (split into `consortiums` and `credit_products`), `product_combos`, `sales_proposals`, `commissions`, `quizzes`, `questions`, and now `cost_centers`. Importantly, to achieve Authorization Independence (CRITICAL), data is denormalized where needed to avoid `get()` calls in security rules.  For example, the `clientId` is denormalized within `sales_proposals` to grant access for the specific client. The structure supports required QAPs by using segregation and path-based ownership, providing secure `list` operations."
   }
 }
