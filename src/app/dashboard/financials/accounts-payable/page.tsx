@@ -228,17 +228,14 @@ function ExpenseDialog({
                         control={control}
                         name="categoryId"
                         render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className={errors.categoryId ? 'border-destructive' : ''}><SelectValue placeholder="Selecione o tipo de despesa" /></SelectTrigger>
-                            <SelectContent>
-                            {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            {categories?.length === 0 && (
-                                <div className="p-4 text-sm text-center text-muted-foreground">
-                                    Nenhum tipo encontrado. <Link href="/dashboard/expense-categories" className="text-primary underline">Cadastre um.</Link>
-                                </div>
-                            )}
-                            </SelectContent>
-                        </Select>
+                            <Combobox
+                                items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Selecione o tipo"
+                                searchPlaceholder="Buscar tipo de despesa..."
+                                notFoundMessage="Nenhum tipo encontrado."
+                            />
                         )}
                     />
                     {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
