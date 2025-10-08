@@ -111,22 +111,36 @@ export type FinancialInstitution = {
 export type ProductBehavior = 'Fixo' | 'Variável' | 'Proposta';
 export type CommissionBase = 'liquido' | 'bruto';
 
-export type Product = {
+type ProductBase = {
   id: string;
   name: string;
   behavior: ProductBehavior;
-  bankId: string; // Reference to FinancialInstitution
+  bankId: string;
   bankName: string;
+}
+
+type ProductFixo = ProductBase & {
+  behavior: 'Fixo';
+  value: number;
+}
+
+type ProductVariavel = ProductBase & {
+  behavior: 'Variável';
+  value: number;
+}
+
+type ProductProposta = ProductBase & {
+  behavior: 'Proposta';
+  minAmount: number;
+  maxAmount: number;
+  interestRate: number;
+  terms: number[];
   commissionRate: number;
-  // Fields for Fixo/Variável
-  value?: number;
-  // Fields for Proposta
-  minAmount?: number;
-  maxAmount?: number;
-  interestRate?: number;
-  terms?: number[];
-  commissionBase?: CommissionBase;
-};
+  commissionBase: CommissionBase;
+}
+
+export type Product = ProductFixo | ProductVariavel | ProductProposta;
+
 
 export type Bank = {
   id: string;

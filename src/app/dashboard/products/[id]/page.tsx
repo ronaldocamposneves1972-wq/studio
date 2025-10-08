@@ -154,6 +154,21 @@ export default function ProductDetailPage() {
                       <p className="text-sm font-medium text-muted-foreground">Prazos (meses)</p>
                       <p className="text-foreground">{product.terms?.join(', ')}</p>
                     </div>
+                   <Separator />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Taxa de Juros / Admin.</p>
+                        <p className="text-foreground">{product.interestRate}%</p>
+                        </div>
+                        <div className="grid gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Comissão</p>
+                        <p className="text-foreground">{product.commissionRate}%</p>
+                        </div>
+                        <div className="grid gap-2">
+                        <p className="text-sm font-medium text-muted-foreground">Base da Comissão</p>
+                        <p className="text-foreground capitalize">{product.commissionBase || 'N/A'}</p>
+                        </div>
+                    </div>
                 </>
               ) : (
                  <div className="grid gap-2">
@@ -161,26 +176,6 @@ export default function ProductDetailPage() {
                       <p className="font-mono text-foreground">R$ {product.value?.toLocaleString('pt-BR')}</p>
                  </div>
               )}
-              
-               <Separator />
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Comissão</p>
-                  <p className="text-foreground">{product.commissionRate}%</p>
-                </div>
-                {product.behavior === 'Proposta' && (
-                    <>
-                         <div className="grid gap-2">
-                          <p className="text-sm font-medium text-muted-foreground">Taxa de Juros / Admin.</p>
-                          <p className="text-foreground">{product.interestRate}%</p>
-                        </div>
-                        <div className="grid gap-2">
-                           <p className="text-sm font-medium text-muted-foreground">Base da Comissão</p>
-                           <p className="text-foreground capitalize">{product.commissionBase || 'N/A'}</p>
-                        </div>
-                    </>
-                )}
-              </div>
             </div>
           </CardContent>
         </Card>

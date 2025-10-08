@@ -44,10 +44,6 @@ import { query } from "firebase/firestore"
 const baseSchema = z.object({
   name: z.string().min(3, "O nome do produto é obrigatório."),
   bankId: z.string({ required_error: "O banco é obrigatório." }),
-  commissionRate: z.preprocess(
-    (a) => parseFloat(String(a).replace(",", ".")),
-    z.number().min(0, "A comissão não pode ser negativa.")
-  ),
   behavior: z.enum(["Fixo", "Variável", "Proposta"]),
 });
 
@@ -82,6 +78,10 @@ const proposalSchema = baseSchema.extend({
     z.number().min(0, "A taxa não pode ser negativa.")
   ),
   terms: z.string().min(1, "Informe ao menos um prazo.").transform(value => value.split(',').map(term => Number(term.trim()))),
+  commissionRate: z.preprocess(
+    (a) => parseFloat(String(a).replace(",", ".")),
+    z.number().min(0, "A comissão não pode ser negativa.")
+  ),
   commissionBase: z.enum(["liquido", "bruto"], { required_error: "Base de comissão é obrigatória."}),
 });
 
@@ -200,37 +200,34 @@ function ProductForm({
                              {'terms' in errors && errors.terms && <p className="text-sm text-destructive">{(errors as any).terms.message}</p>}
                         </div>
                    </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="commissionRate">Comissão (%)</Label>
+                            <Input id="commissionRate" type="number" step="0.01" {...register("commissionRate")} placeholder="2.5" disabled={isSubmitting} />
+                            {'commissionRate' in errors && errors.commissionRate && <p className="text-sm text-destructive">{(errors as any).commissionRate.message}</p>}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Base de Cálculo da Comissão</Label>
+                            <Controller
+                                control={control}
+                                name="commissionBase"
+                                render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione a base" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="liquido">Valor Líquido (principal)</SelectItem>
+                                        <SelectItem value="bruto">Valor Bruto (total do contrato)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                )}
+                            />
+                            {'commissionBase' in errors && errors.commissionBase && <p className="text-sm text-destructive">{(errors as any).commissionBase.message}</p>}
+                        </div>
+                    </div>
                 </>
             )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="grid gap-2">
-                    <Label htmlFor="commissionRate">Comissão (%)</Label>
-                    <Input id="commissionRate" type="number" step="0.01" {...register("commissionRate")} placeholder="2.5" disabled={isSubmitting} />
-                    {errors.commissionRate && <p className="text-sm text-destructive">{errors.commissionRate.message}</p>}
-                </div>
-                 { behavior === 'Proposta' && (
-                    <div className="grid gap-2">
-                        <Label>Base de Cálculo da Comissão</Label>
-                         <Controller
-                            control={control}
-                            name="commissionBase"
-                            render={({ field }) => (
-                               <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione a base" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="liquido">Valor Líquido (principal)</SelectItem>
-                                    <SelectItem value="bruto">Valor Bruto (total do contrato)</SelectItem>
-                                </SelectContent>
-                               </Select>
-                            )}
-                        />
-                        {'commissionBase' in errors && errors.commissionBase && <p className="text-sm text-destructive">{(errors as any).commissionBase.message}</p>}
-                    </div>
-                 )}
-            </div>
 
             <div className="mt-6 flex justify-end gap-2">
                  <Button variant="outline" type="button" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
