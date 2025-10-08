@@ -113,6 +113,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
+import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -196,6 +197,7 @@ export default function ClientDetailPage() {
   const [isCopied, setIsCopied] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
   const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
+  const [isSalesOrderDialogOpen, setIsSalesOrderDialogOpen] = useState(false);
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
   const [proposalToAccept, setProposalToAccept] = useState<ProposalSummary | null>(null);
   const [formalizationLink, setFormalizationLink] = useState('');
@@ -686,6 +688,13 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         }
     };
 
+    const handleSaveSalesOrder = async (data: any) => {
+        // TODO: Implement sales order saving logic
+        console.log("Saving sales order:", data);
+        toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido de venda foi registrado."});
+        setIsSalesOrderDialogOpen(false);
+    }
+
     const clientDataToDisplay = useMemo(() => {
         if (!client) return [];
 
@@ -802,6 +811,12 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
           onOpenChange={setIsProposalDialogOpen}
           onSave={handleSaveProposal}
           client={client}
+      />
+      <SalesOrderDialog
+        open={isSalesOrderDialogOpen}
+        onOpenChange={setIsSalesOrderDialogOpen}
+        onSave={handleSaveSalesOrder}
+        client={client}
       />
        <AlertDialog open={!!proposalToAccept} onOpenChange={(open) => !open && setProposalToAccept(null)}>
         <AlertDialogContent>
@@ -1344,7 +1359,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                         <p className="text-muted-foreground max-w-sm">
                                             Após a formalização, lance o pedido de venda para este contrato.
                                         </p>
-                                        <Button>
+                                        <Button onClick={() => setIsSalesOrderDialogOpen(true)}>
                                             <PlusCircle className="mr-2 h-4 w-4" />
                                             Lançar Novo Pedido de Venda
                                         </Button>
