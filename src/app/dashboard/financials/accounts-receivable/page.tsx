@@ -58,8 +58,8 @@ import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import type { Transaction } from "@/lib/types"
-import { collection, query, where, doc, updateDoc } from "firebase/firestore"
+import type { Transaction, Account } from "@/lib/types"
+import { collection, query, where, doc, updateDoc, writeBatch, getDoc, increment } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useForm, Controller } from 'react-hook-form'
@@ -67,6 +67,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 
 const getStatusVariant = (status: 'pending' | 'paid' | 'overdue') => {
@@ -85,6 +92,9 @@ const markAsPaidSchema = z.object({
   paymentDate: z.date({
     required_error: "A data de pagamento é obrigatória.",
   }),
+  accountId: z.string({
+    required_error: "Selecione a conta creditada.",
+  }),
 });
 
 type MarkAsPaidFormData = z.infer<typeof markAsPaidSchema>;
@@ -93,12 +103,14 @@ function MarkAsPaidDialog({
   isOpen,
   onOpenChange,
   transaction,
+  accounts,
   onConfirm,
 }: {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   transaction: Transaction | null;
-  onConfirm: (transactionId: string, paymentDate: Date) => void;
+  accounts: Account[] | null;
+  onConfirm: (transaction: Transaction, data: MarkAsPaidFormData) => void;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { control, handleSubmit, formState: { errors } } = useForm<MarkAsPaidFormData>({
@@ -111,7 +123,7 @@ function MarkAsPaidDialog({
   const onSubmit = async (data: MarkAsPaidFormData) => {
     if (!transaction) return;
     setIsSubmitting(true);
-    await onConfirm(transaction.id, data.paymentDate);
+    await onConfirm(transaction, data);
     setIsSubmitting(false);
   }
 
@@ -132,38 +144,60 @@ function MarkAsPaidDialog({
             <p><strong>Valor:</strong> R$ {transaction.amount.toLocaleString('pt-br', { minimumFractionDigits: 2 })}</p>
             <p><strong>Vencimento:</strong> {new Date(transaction.dueDate).toLocaleDateString('pt-BR')}</p>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="paymentDate" className={errors.paymentDate ? "text-destructive" : ""}>Data de Compensação</Label>
-             <Controller
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="paymentDate" className={errors.paymentDate ? "text-destructive" : ""}>Data de Compensação</Label>
+              <Controller
+                  control={control}
+                  name="paymentDate"
+                  render={({ field }) => (
+                      <Popover>
+                          <PopoverTrigger asChild>
+                              <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                      "w-full justify-start text-left font-normal",
+                                      !field.value && "text-muted-foreground",
+                                      errors.paymentDate && "border-destructive"
+                                  )}
+                              >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "PPP") : <span>Selecione uma data</span>}
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                              />
+                          </PopoverContent>
+                      </Popover>
+                  )}
+              />
+              {errors.paymentDate && <p className="text-sm text-destructive">{errors.paymentDate.message}</p>}
+            </div>
+             <div className="grid gap-2">
+              <Label htmlFor="accountId" className={errors.accountId ? "text-destructive" : ""}>Conta Creditada</Label>
+               <Controller
                 control={control}
-                name="paymentDate"
+                name="accountId"
                 render={({ field }) => (
-                     <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground",
-                                    errors.paymentDate && "border-destructive"
-                                )}
-                            >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "PPP") : <span>Selecione uma data</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                            />
-                        </PopoverContent>
-                    </Popover>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts?.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.name} ({acc.bankName})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
-            />
-            {errors.paymentDate && <p className="text-sm text-destructive">{errors.paymentDate.message}</p>}
+              />
+               {errors.accountId && <p className="text-sm text-destructive">{errors.accountId.message}</p>}
+            </div>
           </div>
 
           <DialogFooter>
@@ -205,18 +239,39 @@ export default function AccountsReceivablePage() {
   }, [firestore])
 
   const { data: transactions, isLoading } = useCollection<Transaction>(transactionsQuery)
+  
+  const accountsQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, "accounts"))
+  }, [firestore]);
+  const { data: accounts } = useCollection<Account>(accountsQuery);
 
-  const handleMarkAsPaid = async (transactionId: string, paymentDate: Date) => {
+  const handleMarkAsPaid = async (transaction: Transaction, data: MarkAsPaidFormData) => {
     if (!firestore) return;
-    const transactionRef = doc(firestore, 'transactions', transactionId);
-    try {
-      await updateDoc(transactionRef, {
+
+    const batch = writeBatch(firestore);
+    
+    // 1. Update Transaction
+    const transactionRef = doc(firestore, 'transactions', transaction.id);
+    const selectedAccount = accounts?.find(a => a.id === data.accountId);
+    batch.update(transactionRef, {
         status: 'paid',
-        paymentDate: paymentDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-      });
+        paymentDate: data.paymentDate.toISOString().split('T')[0],
+        accountId: data.accountId,
+        accountName: selectedAccount?.name || '',
+    });
+
+    // 2. Update Account Balance
+    const accountRef = doc(firestore, 'accounts', data.accountId);
+    batch.update(accountRef, {
+      balance: increment(transaction.amount)
+    });
+
+    try {
+      await batch.commit();
       toast({
         title: "Transação atualizada!",
-        description: "A conta foi marcada como recebida.",
+        description: "A conta foi marcada como recebida e o saldo atualizado.",
       });
       setIsMarkAsPaidDialogOpen(false);
       setTransactionToPay(null);
@@ -377,6 +432,7 @@ export default function AccountsReceivablePage() {
             isOpen={isMarkAsPaidDialogOpen}
             onOpenChange={setIsMarkAsPaidDialogOpen}
             transaction={transactionToPay}
+            accounts={accounts}
             onConfirm={handleMarkAsPaid}
         />
     </>
