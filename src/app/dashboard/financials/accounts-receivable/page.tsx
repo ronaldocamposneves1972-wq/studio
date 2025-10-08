@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   CalendarIcon,
   Loader2,
+  Undo2,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState, useMemo } from "react"
@@ -53,13 +54,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import type { Transaction, Account } from "@/lib/types"
-import { collection, query, where, doc, updateDoc, writeBatch, getDoc, increment } from "firebase/firestore"
+import { collection, query, where, doc, updateDoc, writeBatch, getDoc, increment, serverTimestamp, deleteField } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useForm, Controller } from 'react-hook-form'
@@ -285,6 +297,45 @@ export default function AccountsReceivablePage() {
       });
     }
   }
+
+  const handleRevertToPending = async (transaction: Transaction) => {
+    if (!firestore || !transaction.accountId) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Dados da transação incompletos para estorno.' });
+      return;
+    }
+
+    const batch = writeBatch(firestore);
+
+    // 1. Revert transaction status
+    const transactionRef = doc(firestore, 'transactions', transaction.id);
+    batch.update(transactionRef, {
+      status: 'pending',
+      paymentDate: deleteField(),
+      accountId: deleteField(),
+      accountName: deleteField()
+    });
+
+    // 2. Subtract amount from account balance
+    const accountRef = doc(firestore, 'accounts', transaction.accountId);
+    batch.update(accountRef, {
+      balance: increment(-transaction.amount)
+    });
+
+    try {
+      await batch.commit();
+      toast({
+        title: "Recebimento Estornado!",
+        description: `O valor de R$ ${transaction.amount.toLocaleString('pt-br')} foi revertido da conta.`,
+      });
+    } catch (error) {
+      console.error("Error reverting transaction: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao Estornar",
+        description: "Não foi possível reverter o recebimento.",
+      });
+    }
+  };
   
   const openMarkAsPaidDialog = (transaction: Transaction) => {
     setTransactionToPay(transaction);
@@ -346,9 +397,32 @@ export default function AccountsReceivablePage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => openMarkAsPaidDialog(transaction)} disabled={transaction.status === 'paid'}>
-                <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como Recebida
-              </DropdownMenuItem>
+              {transaction.status === 'paid' ? (
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                       <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Undo2 className="mr-2 h-4 w-4" /> Estornar Recebimento
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Estornar Recebimento?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação irá reverter o status para "pendente" e subtrair o valor de R$ {transaction.amount.toLocaleString('pt-br')} do saldo da conta associada. Deseja continuar?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleRevertToPending(transaction)}>Sim, Estornar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+              ) : (
+                 <DropdownMenuItem onSelect={() => openMarkAsPaidDialog(transaction)} disabled={transaction.status === 'paid'}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como Recebida
+                </DropdownMenuItem>
+              )}
+             
               <DropdownMenuItem>Editar</DropdownMenuItem>
               <DropdownMenuItem>Excluir</DropdownMenuItem>
             </DropdownMenuContent>
@@ -439,3 +513,5 @@ export default function AccountsReceivablePage() {
     </>
   )
 }
+
+    
