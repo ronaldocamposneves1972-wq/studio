@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Loader2,
   CalendarIcon,
+  Search,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
@@ -74,6 +75,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
 import Link from "next/link"
+import { Combobox } from "@/components/ui/combobox"
 
 
 const getStatusVariant = (status: 'pending' | 'paid' | 'overdue') => {
@@ -243,21 +245,18 @@ function ExpenseDialog({
                 </div>
                 <div className="grid gap-2">
                     <Label htmlFor="costCenterId">Centro de Custo</Label>
-                    <Controller
+                     <Controller
                         control={control}
                         name="costCenterId"
                         render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger><SelectValue placeholder="Selecione um centro de custo" /></SelectTrigger>
-                            <SelectContent>
-                            {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                             {costCenters?.length === 0 && (
-                                <div className="p-4 text-sm text-center text-muted-foreground">
-                                    Nenhum centro de custo. <Link href="/dashboard/cost-centers" className="text-primary underline">Cadastre um.</Link>
-                                </div>
-                             )}
-                            </SelectContent>
-                        </Select>
+                           <Combobox
+                                items={costCenters?.map(c => ({ value: c.id, label: c.name })) || []}
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder="Selecione um centro de custo"
+                                searchPlaceholder="Buscar centro de custo..."
+                                notFoundMessage="Nenhum centro de custo encontrado."
+                            />
                         )}
                     />
                </div>
@@ -292,6 +291,7 @@ export default function AccountsPayablePage() {
   const firestore = useFirestore()
   const { toast } = useToast()
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -307,6 +307,16 @@ export default function AccountsPayablePage() {
   
   const categoriesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "expense_categories")) : null, [firestore]);
   const { data: categories } = useCollection<ExpenseCategory>(categoriesQuery);
+  
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return null;
+    if (!searchTerm) return transactions;
+    return transactions.filter(t => 
+      t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [transactions, searchTerm]);
 
   const handleSaveExpense = async (data: ExpenseFormData) => {
     if (!firestore) return;
@@ -432,10 +442,24 @@ export default function AccountsPayablePage() {
         <TabsContent value="all">
           <Card>
             <CardHeader>
-              <CardTitle>Despesas</CardTitle>
-              <CardDescription>
-                Visualize e gerencie todas as suas contas a pagar.
-              </CardDescription>
+               <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Despesas</CardTitle>
+                    <CardDescription>
+                      Visualize e gerencie todas as suas contas a pagar.
+                    </CardDescription>
+                  </div>
+                   <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                          type="search"
+                          placeholder="Pesquisar..."
+                          className="pl-8 sm:w-[300px]"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                  </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -453,7 +477,7 @@ export default function AccountsPayablePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {renderTableContent(transactions)}
+                  {renderTableContent(filteredTransactions)}
                 </TableBody>
               </Table>
             </CardContent>
