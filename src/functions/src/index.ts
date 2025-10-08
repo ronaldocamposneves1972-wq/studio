@@ -5,38 +5,6 @@ import * as admin from "firebase-admin";
 // Initialize the Firebase Admin SDK
 admin.initializeApp();
 
-/**
- * Triggered when a new user is created in Firebase Authentication.
- * Creates a corresponding user document in Firestore.
- */
-export const createUserDocument = functions.auth.user().onCreate((user) => {
-  const { uid, email } = user;
-
-  // Data to be saved in the new document.
-  // We include a default 'Atendente' role and basic info.
-  const newUser = {
-    id: uid,
-    email: email,
-    role: "Atendente", // Default role for new users
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    name: email || 'Novo Usuário', // Default name to email until updated
-  };
-
-  // Set the document in the 'users' collection.
-  // The path is 'users/{uid}'.
-  return admin.firestore().collection("users").doc(uid).set(newUser)
-    .then(() => {
-      console.log(`Successfully created user document for UID: ${uid}`);
-      return null;
-    })
-    .catch((error) => {
-      console.error(`Error creating user document for UID: ${uid}`, error);
-      // Throwing an error is important for retries and visibility in logs
-      throw new functions.https.HttpsError("internal", "Could not create user document.");
-    });
-});
-
-
 const ADMIN_USER_UID = "zt6xq8RcNGX1Ct8OwysKCGY8H7s2";
 const ADMIN_USER_EMAIL = "kaiqueguilhermepereiramiranda@gmail.com";
 
@@ -55,28 +23,38 @@ const allPermissions = {
 };
 
 /**
- * An HTTP-callable function to provision or update the admin user.
- * Can be called manually or from a script for setup.
+ * Triggered when a new user is created in Firebase Authentication.
+ * Creates a corresponding user document in Firestore, assigning a role.
+ * If the user is the designated admin, they get full permissions.
  */
-export const provisionAdmin = functions.https.onCall(async (data, context) => {
-  const adminDocRef = admin.firestore().collection("users").doc(ADMIN_USER_UID);
+export const createUserDocument = functions.auth.user().onCreate(async (user) => {
+  const { uid, email, displayName } = user;
+  const userDocRef = admin.firestore().collection("users").doc(uid);
 
-  try {
-    await adminDocRef.set({
-      id: ADMIN_USER_UID,
-      firstName: 'Kaique',
-      lastName: 'Miranda',
-      name: 'Kaique Miranda',
-      email: ADMIN_USER_EMAIL,
+  // Check if the new user is the designated admin
+  if (uid === ADMIN_USER_UID) {
+    console.log(`Admin user ${email} detected. Provisioning with full permissions.`);
+    const adminData = {
+      id: uid,
+      email: email || ADMIN_USER_EMAIL,
+      name: displayName || 'Admin Kaique Miranda',
       role: 'Admin',
-      permissions: allPermissions
-    }, { merge: true });
-
-    console.log(`Admin user ${ADMIN_USER_EMAIL} provisioned successfully.`);
-    return { success: true, message: "Admin user provisioned." };
-  } catch (error) {
-    console.error(`Failed to provision admin user:`, error);
-    throw new functions.https.HttpsError("internal", "Could not provision admin user.", error);
+      permissions: allPermissions,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    return userDocRef.set(adminData);
+  } 
+  
+  // For all other users, assign the 'Atendente' role by default
+  else {
+    console.log(`New user ${email} detected. Creating standard user document.`);
+    const newUser = {
+      id: uid,
+      email: email,
+      name: displayName || email || 'Novo Usuário',
+      role: "Atendente",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    return userDocRef.set(newUser);
   }
 });
-
