@@ -232,8 +232,8 @@ function ExpenseDialog({
                                 items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Selecione o tipo de despesa"
-                                searchPlaceholder="Buscar tipo de despesa..."
+                                placeholder="Selecione o tipo"
+                                searchPlaceholder="Buscar tipo..."
                                 notFoundMessage="Nenhum tipo encontrado."
                             />
                         )}
@@ -250,9 +250,9 @@ function ExpenseDialog({
                                 items={costCenters?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Selecione um centro de custo"
-                                searchPlaceholder="Buscar centro de custo..."
-                                notFoundMessage="Nenhum centro de custo encontrado."
+                                placeholder="Selecione o centro"
+                                searchPlaceholder="Buscar centro..."
+                                notFoundMessage="Nenhum centro de custo."
                             />
                         )}
                     />
