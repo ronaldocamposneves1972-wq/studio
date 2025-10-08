@@ -232,7 +232,7 @@ function ExpenseDialog({
                                 items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Selecione o tipo"
+                                placeholder="Selecione o tipo de despesa"
                                 searchPlaceholder="Buscar tipo de despesa..."
                                 notFoundMessage="Nenhum tipo encontrado."
                             />
