@@ -1,11 +1,21 @@
 
 
+type CollectionKey = typeof collections[number];
+
+export type Permissions = Record<CollectionKey, {
+  create: boolean;
+  read: boolean;
+  update: boolean;
+  delete: boolean;
+}>
+
 export type User = {
   id: string;
   name: string;
   email: string;
   avatarUrl: string;
   role: 'Admin' | 'Gestor' | 'Atendente' | 'Financeiro';
+  permissions?: Permissions;
 };
 
 export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado' | 'Ledger';
@@ -247,3 +257,17 @@ export type SalesOrder = {
   items: SalesOrderItem[];
   totalValue: number;
 }
+
+export const collections = [
+  'clients',
+  'products',
+  'sales_proposals',
+  'transactions',
+  'users',
+  'suppliers',
+  'cost_centers',
+  'expense_categories',
+  'quizzes',
+  'financial_institutions',
+  'commissions'
+] as const;

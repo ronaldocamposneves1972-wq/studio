@@ -323,6 +323,19 @@
         "role": {
           "type": "string",
           "description": "Role of the user (Admin, Gestor, Atendente, Financeiro)."
+        },
+        "permissions": {
+          "type": "object",
+          "description": "Granular permissions for the user.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "create": { "type": "boolean" },
+              "read": { "type": "boolean" },
+              "update": { "type": "boolean" },
+              "delete": { "type": "boolean" }
+            }
+          }
         }
       },
       "required": [

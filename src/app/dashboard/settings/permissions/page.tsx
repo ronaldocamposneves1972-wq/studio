@@ -29,18 +29,8 @@ import {
 } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldCheck } from 'lucide-react';
+import { collections } from '@/lib/types';
 
-const collections = [
-  'clients',
-  'products',
-  'sales_proposals',
-  'transactions',
-  'users',
-  'suppliers',
-  'cost_centers',
-  'expense_categories',
-  'quizzes',
-];
 
 const roles = ['Admin', 'Gestor', 'Atendente', 'Financeiro', 'Anonimo'];
 
@@ -119,7 +109,7 @@ export default function PermissionsPage() {
                     <TableBody>
                         {collections.map(collection => (
                             <TableRow key={collection}>
-                                <TableCell className="font-medium capitalize">{collection.replace('_', ' ')}</TableCell>
+                                <TableCell className="font-medium capitalize">{collection.replace(/_/g, ' ')}</TableCell>
                                 <TableCell className="text-center">
                                     <Checkbox 
                                         checked={permissions[selectedRole][collection].create}
