@@ -103,9 +103,20 @@ export default function Dashboard() {
     }, [openProposals]);
 
 
-    const newClientsCount = useMemo(() => {
+    const clientsRegisteredToday = useMemo(() => {
         if (!clients) return 0;
-        return clients.filter(c => c.status === 'Novo').length;
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0];
+
+        return clients.filter(c => {
+            if (!c.createdAt) return false;
+            try {
+                const clientDate = new Date(c.createdAt).toISOString().split('T')[0];
+                return clientDate === todayString;
+            } catch (e) {
+                return false;
+            }
+        }).length;
     }, [clients]);
     
     const salesData = useMemo(() => {
@@ -133,19 +144,19 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
         <KPICard
             title="Volume Aprovado"
             icon={DollarSign}
             value={`R$ ${totalApproved.toLocaleString('pt-BR')}`}
-            subtext="+20.1% em relação ao mês passado"
+            subtext="Total de propostas finalizadas"
             isLoading={isLoading}
         />
         <KPICard
-            title="Novos Clientes"
+            title="Clientes Registrados Hoje"
             icon={Users}
-            value={`+${newClientsCount}`}
-            subtext="+180.1% em relação ao mês passado"
+            value={`+${clientsRegisteredToday}`}
+            subtext="Novos clientes no dia de hoje"
             isLoading={isLoading}
         />
         <KPICard
