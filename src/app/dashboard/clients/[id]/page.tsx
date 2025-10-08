@@ -597,7 +597,7 @@ export default function ClientDetailPage() {
     };
     
 const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: string) => {
-    if (!firestore || !client || !clientRef || !user || !link) return;
+    if (!firestore || !client || !clientRef || !user || !link || !acceptedProposal) return;
     
     toast({ title: 'Processando aceitação...' });
     
