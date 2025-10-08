@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Link from "next/link"
@@ -40,9 +41,9 @@ export default function ProductsPage() {
   const { user } = useUser();
 
   const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore) return null;
     return query(collection(firestore, "products"));
-  }, [firestore, user]);
+  }, [firestore]);
 
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
@@ -73,15 +74,18 @@ export default function ProductsPage() {
       <TableRow key={product.id} onClick={() => router.push(`/dashboard/products/${product.id}`)} className="cursor-pointer">
         <TableCell className="font-medium">{product.name}</TableCell>
         <TableCell>
-          <Badge variant={product.type === 'Consórcio' ? 'secondary' : 'outline'}>
-            {product.type}
+          <Badge variant="secondary">
+            {product.behavior}
           </Badge>
         </TableCell>
         <TableCell>
             {product.bankName || 'N/A'}
         </TableCell>
         <TableCell>
-            {`R$ ${product.minAmount.toLocaleString('pt-BR')} - R$ ${product.maxAmount.toLocaleString('pt-BR')}`}
+            {product.behavior === 'Proposta'
+              ? `R$ ${product.minAmount?.toLocaleString('pt-BR')} - R$ ${product.maxAmount?.toLocaleString('pt-BR')}`
+              : `R$ ${product.value?.toLocaleString('pt-BR')}`
+            }
         </TableCell>
         <TableCell>
           <DropdownMenu>
@@ -133,7 +137,7 @@ export default function ProductsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Tipo</TableHead>
+                <TableHead>Comportamento</TableHead>
                 <TableHead>Banco</TableHead>
                 <TableHead>Faixa de Valor</TableHead>
                 <TableHead>

@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
@@ -119,10 +120,10 @@ export default function ProductDetailPage() {
                   <p className="text-foreground">{product.name}</p>
                 </div>
                 <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Tipo</p>
+                  <p className="text-sm font-medium text-muted-foreground">Tipo de Comportamento</p>
                   <p>
-                      <Badge variant={product.type === 'Consórcio' ? 'secondary' : 'outline'}>
-                          {product.type}
+                      <Badge variant={'secondary'}>
+                          {product.behavior}
                       </Badge>
                   </p>
                 </div>
@@ -135,32 +136,51 @@ export default function ProductDetailPage() {
                 </div>
                </div>
                <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Valor Mínimo</p>
-                  <p className="font-mono text-foreground">R$ {product.minAmount.toLocaleString('pt-BR')}</p>
-                </div>
-                <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Valor Máximo</p>
-                  <p className="font-mono text-foreground">R$ {product.maxAmount.toLocaleString('pt-BR')}</p>
-                </div>
-              </div>
+
+              {product.behavior === 'Proposta' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <p className="text-sm font-medium text-muted-foreground">Valor Mínimo</p>
+                      <p className="font-mono text-foreground">R$ {product.minAmount?.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <p className="text-sm font-medium text-muted-foreground">Valor Máximo</p>
+                      <p className="font-mono text-foreground">R$ {product.maxAmount?.toLocaleString('pt-BR')}</p>
+                    </div>
+                  </div>
+                  <Separator />
+                   <div className="grid gap-2">
+                      <p className="text-sm font-medium text-muted-foreground">Prazos (meses)</p>
+                      <p className="text-foreground">{product.terms?.join(', ')}</p>
+                    </div>
+                </>
+              ) : (
+                 <div className="grid gap-2">
+                      <p className="text-sm font-medium text-muted-foreground">Valor do Produto</p>
+                      <p className="font-mono text-foreground">R$ {product.value?.toLocaleString('pt-BR')}</p>
+                 </div>
+              )}
+              
                <Separator />
                <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Taxa de Juros / Admin.</p>
-                  <p className="text-foreground">{product.interestRate}% {product.type === 'Crédito' ? 'a.m.' : 'a.p.'}</p>
-                </div>
                  <div className="grid gap-2">
                   <p className="text-sm font-medium text-muted-foreground">Comissão</p>
                   <p className="text-foreground">{product.commissionRate}%</p>
                 </div>
+                {product.behavior === 'Proposta' && (
+                    <>
+                         <div className="grid gap-2">
+                          <p className="text-sm font-medium text-muted-foreground">Taxa de Juros / Admin.</p>
+                          <p className="text-foreground">{product.interestRate}%</p>
+                        </div>
+                        <div className="grid gap-2">
+                           <p className="text-sm font-medium text-muted-foreground">Base da Comissão</p>
+                           <p className="text-foreground capitalize">{product.commissionBase || 'N/A'}</p>
+                        </div>
+                    </>
+                )}
               </div>
-               <Separator />
-                <div className="grid gap-2">
-                  <p className="text-sm font-medium text-muted-foreground">Prazos (meses)</p>
-                  <p className="text-foreground">{product.terms.join(', ')}</p>
-                </div>
             </div>
           </CardContent>
         </Card>

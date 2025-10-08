@@ -72,7 +72,7 @@ export type TimelineEvent = {
   activity: string;
   details?: string;
   user: {
-    name: string;
+    name:string;
     avatarUrl?: string;
   }
 };
@@ -108,18 +108,24 @@ export type FinancialInstitution = {
   logoUrl?: string;
 };
 
+export type ProductBehavior = 'Fixo' | 'Variável' | 'Proposta';
+export type CommissionBase = 'liquido' | 'bruto';
+
 export type Product = {
   id: string;
   name: string;
-  type: 'Consórcio' | 'Crédito' | string;
-  productTypeId: string; // Reference to ProductType
+  behavior: ProductBehavior;
   bankId: string; // Reference to FinancialInstitution
-  bankName?: string;
-  minAmount: number;
-  maxAmount: number;
-  interestRate: number;
+  bankName: string;
   commissionRate: number;
-  terms: number[];
+  // Fields for Fixo/Variável
+  value?: number;
+  // Fields for Proposta
+  minAmount?: number;
+  maxAmount?: number;
+  interestRate?: number;
+  terms?: number[];
+  commissionBase?: CommissionBase;
 };
 
 export type Bank = {
