@@ -34,7 +34,7 @@ const getMaskFunction = (questionType: string) => {
     switch (questionType) {
         case 'cpf': return maskCPF;
         case 'tel': return maskPhone;
-        case 'birthdate': return maskDate; // Assuming you might have a date type
+        // case 'birthdate': return maskDate; // No longer needed with type="date"
         case 'cep': return maskCEP;
         default: return (value: string) => value;
     }
@@ -119,13 +119,13 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
             }
 
             if (currentQuestion.type === 'birthdate') {
-                const dateParts = value.split('/');
+                const dateParts = value.split('-'); // Input type 'date' returns YYYY-MM-DD
                 if (dateParts.length !== 3) {
-                    form.setError(currentQuestion.id as any, { type: 'manual', message: 'Formato de data inválido. Use DD/MM/AAAA.' });
+                    form.setError(currentQuestion.id as any, { type: 'manual', message: 'Formato de data inválido.' });
                     setIsStepProcessing(false);
                     return;
                 }
-                const [day, month, year] = dateParts.map(Number);
+                const [year, month, day] = dateParts.map(Number);
                 const birthDate = new Date(year, month - 1, day);
                 const today = new Date();
                 let age = today.getFullYear() - birthDate.getFullYear();
@@ -226,9 +226,18 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                         </RadioGroup>
                     </FormControl>
                 );
+            case 'birthdate':
+                return (
+                    <FormControl>
+                         <Input
+                            {...field}
+                            value={field.value || ''}
+                            type="date"
+                        />
+                    </FormControl>
+                );
             case 'cpf':
             case 'cep':
-            case 'birthdate':
             case 'text':
             case 'number':
             case 'email':
