@@ -6,8 +6,10 @@ import {
   ListFilter,
   MoreHorizontal,
   PlusCircle,
+  Search,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
+import { useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,6 +42,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import type { Transaction } from "@/lib/types"
 import { collection, query, where } from "firebase/firestore"
@@ -73,6 +76,7 @@ function TransactionRowSkeleton() {
 
 export default function AccountsReceivablePage() {
   const firestore = useFirestore()
+  const [searchTerm, setSearchTerm] = useState("")
   
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -80,6 +84,14 @@ export default function AccountsReceivablePage() {
   }, [firestore])
 
   const { data: transactions, isLoading } = useCollection<Transaction>(transactionsQuery)
+
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return null;
+    if (!searchTerm) return transactions;
+    return transactions.filter(t => 
+      t.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [transactions, searchTerm]);
 
   const renderTableContent = (transactionList: Transaction[] | null) => {
      if (isLoading) {
@@ -162,10 +174,24 @@ export default function AccountsReceivablePage() {
         <TabsContent value="all">
           <Card>
             <CardHeader>
-              <CardTitle>Receitas</CardTitle>
-              <CardDescription>
-                Visualize e gerencie todas as suas contas a receber.
-              </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <CardTitle>Receitas</CardTitle>
+                        <CardDescription>
+                            Visualize e gerencie todas as suas contas a receber.
+                        </CardDescription>
+                    </div>
+                     <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Pesquisar por título..."
+                            className="pl-8 sm:w-[300px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -182,7 +208,7 @@ export default function AccountsReceivablePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {renderTableContent(transactions)}
+                  {renderTableContent(filteredTransactions)}
                 </TableBody>
               </Table>
             </CardContent>
