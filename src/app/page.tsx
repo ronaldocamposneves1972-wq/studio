@@ -67,8 +67,8 @@ export default function LandingPage() {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                    <DropdownMenuItem asChild><Link href="/dashboard/financials/transactions?type=payable">Contas a Pagar</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link href="/dashboard/financials/transactions?type=receivable">Contas a Receber</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/accounts-payable">Contas a Pagar</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/accounts-receivable">Contas a Receber</Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/financials/cash-flow">Fluxo de Caixa</Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/financials/bank-reconciliation">Conciliação Bancária</Link></DropdownMenuItem>
                     <DropdownMenuItem asChild><Link href="/dashboard/financials/financial-planning">Planejamento Financeiro</Link></DropdownMenuItem>
@@ -131,8 +131,8 @@ export default function LandingPage() {
                     <AccordionItem value="financeiro">
                         <AccordionTrigger>Financeiro</AccordionTrigger>
                         <AccordionContent className="grid gap-2 pl-4">
-                            <Link href="/dashboard/financials/transactions?type=payable">Contas a Pagar</Link>
-                            <Link href="/dashboard/financials/transactions?type=receivable">Contas a Receber</Link>
+                            <Link href="/dashboard/financials/accounts-payable">Contas a Pagar</Link>
+                            <Link href="/dashboard/financials/accounts-receivable">Contas a Receber</Link>
                             <Link href="/dashboard/financials/cash-flow">Fluxo de Caixa</Link>
                             <Link href="/dashboard/financials/bank-reconciliation">Conciliação Bancária</Link>
                             <Link href="/dashboard/financials/financial-planning">Planejamento Financeiro</Link>
