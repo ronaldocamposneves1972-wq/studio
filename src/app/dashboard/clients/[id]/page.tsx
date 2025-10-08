@@ -31,7 +31,8 @@ import {
   MoreHorizontal,
   PlusCircle,
   FileWarning,
-  Receipt
+  Receipt,
+  ShoppingCart
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
@@ -973,6 +974,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                         <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
                         <TabsTrigger value="documents">Documentos</TabsTrigger>
                         <TabsTrigger value="proposals">Propostas</TabsTrigger>
+                        {hasAcceptedProposal && <TabsTrigger value="venda">Venda</TabsTrigger>}
                         {hasAcceptedProposal && <TabsTrigger value="payment_guides">Guias de Pagamento</TabsTrigger>}
                         <TabsTrigger value="history">Histórico</TabsTrigger>
                       </TabsList>
@@ -1327,6 +1329,29 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                 </CardContent>
                             </Card>
                         </TabsContent>
+                        <TabsContent value="venda">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Pedido de Venda</CardTitle>
+                                    <CardDescription>
+                                        Gerencie o pedido de venda para o contrato aprovado.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
+                                        <ShoppingCart className="h-12 w-12 text-muted-foreground" />
+                                        <h3 className="text-xl font-semibold">Nenhum pedido de venda criado</h3>
+                                        <p className="text-muted-foreground max-w-sm">
+                                            Após a formalização, lance o pedido de venda para este contrato.
+                                        </p>
+                                        <Button>
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Lançar Novo Pedido de Venda
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
                          <TabsContent value="payment_guides">
                             <Card>
                                 <CardHeader>
@@ -1358,9 +1383,3 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
-
-    
-
-    
-
-      
