@@ -1,16 +1,21 @@
 /**
- * @file Firestore Security Rules for ConsorciaTech
- * @core_philosophy This ruleset prioritizes security by enforcing strict ownership and explicit access controls.
- * Data access is granted based on verified identity (request.auth) and path-based ownership.
- * Public read access is enabled only for specific collections (e.g., Quizzes) where all documents are intended to be public.
- * @data_structure Data is organized into top-level collections such as `users`, `clients`, `financial_institutions`, `consortiums`, `credit_products`, `product_combos`, `sales_proposals`, `commissions`, `quizzes`, and `questions`. User-specific data (e.g., user profiles) is stored under `/users/{userId}` to enforce ownership.
- * @key_security_decisions
- *   - User listing is generally disallowed unless explicitly required and secured.
- *   - All write operations are protected by authorization checks (e.g., `isOwner()`, `isSignedIn()`).
- *   - Data required for authorization decisions is denormalized to avoid costly `get()` calls.
- *   - The rules are structured to prevent unauthorized data modification and deletion.
- * @denormalization_for_authorization The `clientId` is denormalized within `sales_proposals` to enable direct access authorization based on client ownership, avoiding the need for additional reads to verify client relationships.
- * @structural_segregation No explicit structural segregation between public and private data is implemented, but the rules are written to allow for public read access to certain collections (e.g., `quizzes`) while maintaining strict control over write access.
+ * @fileoverview Firestore Security Rules for ConsorciaTech Application
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes ease of prototyping by focusing on authentication-based access.
+ * Authenticated users have full read/write access to all collections.
+ * Unauthenticated users have limited access: create access for 'clients' and read access for 'quizzes'.
+ *
+ * Data Structure:
+ * The database comprises several top-level collections, including 'users', 'clients', 'financial_institutions',
+ * 'consortiums', 'credit_products', 'product_combos', 'sales_proposals', 'commissions', 'quizzes',
+ * 'questions', 'suppliers', 'cost_centers', and 'expense_categories'. The 'clients' collection also has a
+ * subcollection 'documents'.  No user subcollections are employed.
+ *
+ * Key Security Decisions:
+ * - Authenticated users can read and write all data.
+ * - Unauthenticated users can only create clients and read quizzes.
+ * - Full schema validation is not implemented in this prototyping phase.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -18,268 +23,210 @@ service cloud.firestore {
 
     /**
      * @description Checks if the request is authenticated.
-     * @return {boolean} True if the request is authenticated, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the resource.
-     * @param {string} userId The user ID to compare with the authenticated user's ID.
-     * @return {boolean} True if the authenticated user is the owner, false otherwise.
+     * @description Allows access if the user is signed in.
      */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function allowAllIfSignedIn() {
+      return isSignedIn();
     }
 
     /**
-     * @description Checks if the authenticated user is the owner of the existing resource.
-     * @param {string} userId The user ID to compare with the authenticated user's ID.
-     * @return {boolean} True if the authenticated user is the owner and the resource exists, false otherwise.
+     * @description Allows unauthenticated users to create clients.
      */
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+    function allowUnauthenticatedClientCreation() {
+      return request.auth == null;
     }
 
     /**
-     * @description Grants owner-only access to user documents.
+     * @description Allows unauthenticated users to read quizzes.
+     */
+    function allowUnauthenticatedQuizRead() {
+      return request.auth == null;
+    }
+
+    /**
+     * @description Rules for the 'users' collection.
      * @path /users/{userId}
-     * @allow (create) User 'user_abc' can create their own profile document.
-     * @allow (get, update, delete) User 'user_abc' can read, update, and delete their own profile document.
-     * @deny (create) User 'user_xyz' cannot create a profile document for user 'user_abc'.
-     * @deny (get, update, delete) User 'user_xyz' cannot read, update, or delete the profile document of user 'user_abc'.
-     * @principle Enforces document ownership for writes.
+     * @allow (read, write) Authenticated user accessing any user document.
+     * @deny (read, write) Unauthenticated user attempting to read or write user data.
+     * @principle Authenticated users can read and write all user data.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
-      /**
-       * @description Grants admin role based on document existence in roles_admin collection.
-       * @path /roles_admin/{userId}
-       * @allow (create) User 'user_abc' can create an admin role if they are authenticated
-       * @allow (get,update,delete) Admin user can read, update and delete other users roles.
-       * @deny (create) User 'user_xyz' cannot create a role document for user 'user_abc'.
-       *   If user_xyz is not authenticated
-       * @deny (get,update,delete) User 'user_xyz' cannot read, update, or delete the role document of user 'user_abc'.
-       *  If user_xyz is not authenticated
-       * @principle Enforces document ownership for writes.
-       */
+    /**
+     * @description Rules for the 'roles_admin' collection.
+     * @path /roles_admin/{userId}
+     * @allow (read, write) Authenticated user accessing any roles_admin document.
+     * @deny (read, write) Unauthenticated user attempting to read or write roles_admin data.
+     * @principle Authenticated users can read and write all roles_admin data.
+     */
     match /roles_admin/{userId} {
-        allow get: if isSignedIn();
-        allow list: if false;
-        allow create: if isSignedIn();
-        allow update: if false;
-        allow delete: if false;
-      }
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
 
     /**
-     * @description Allows reading quizzes and creating clients for anonymous users.
+     * @description Rules for the 'clients' collection.
      * @path /clients/{clientId}
-     * @allow (create) Anonymous user can create a client document.
-     * @deny (get, list, update, delete) Authenticated users cannot create a client document.
-     * @principle Allows unauthenticated access to create clients.
+     * @allow (create) Unauthenticated user creating a client.
+     * @allow (read, write) Authenticated user accessing any client document.
+     * @deny (update, delete) Unauthenticated user attempting to update or delete client data.
+     * @principle Authenticated users can read and write all client data. Unauthenticated can only create.
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if request.auth == null;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list, update, delete: if allowAllIfSignedIn();
+      allow create: if allowAllIfSignedIn() || allowUnauthenticatedClientCreation();
     }
 
     /**
-     * @description Grants owner-only access to client documents.
+     * @description Rules for the 'clients/{clientId}/documents' subcollection.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) User 'user_abc' can create a document for their own client.
-     * @allow (get, update, delete) User 'user_abc' can read, update, and delete a document for their own client.
-     * @deny (create) User 'user_xyz' cannot create a document for client 'user_abc'.
-     * @deny (get, update, delete) User 'user_xyz' cannot read, update, or delete a document for client 'user_abc'.
-     * @principle Enforces document ownership for writes.
+     * @allow (read, write) Authenticated user accessing any client document.
+     * @deny (read, write) Unauthenticated user attempting to read or write client document data.
+     * @principle Authenticated users can read and write all client document data.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to financial institution documents.
+     * @description Rules for the 'financial_institutions' collection.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list) Any user can read financial institution documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete financial institution documents.
-     * @principle Allows public read access with restricted write access.
+     * @allow (read, write) Authenticated user accessing any financial institution document.
+     * @deny (read, write) Unauthenticated user attempting to read or write financial institution data.
+     * @principle Authenticated users can read and write all financial institution data.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to consortium product documents.
+     * @description Rules for the 'consortiums' collection.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list) Any user can read consortium product documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete consortium product documents.
-     * @principle Allows public read access with restricted write access.
+     * @allow (read, write) Authenticated user accessing any consortium document.
+     * @deny (read, write) Unauthenticated user attempting to read or write consortium data.
+     * @principle Authenticated users can read and write all consortium data.
      */
     match /consortiums/{consortiumId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to credit product documents.
+     * @description Rules for the 'credit_products' collection.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list) Any user can read credit product documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete credit product documents.
-     * @principle Allows public read access with restricted write access.
+     * @allow (read, write) Authenticated user accessing any credit product document.
+     * @deny (read, write) Unauthenticated user attempting to read or write credit product data.
+     * @principle Authenticated users can read and write all credit product data.
      */
     match /credit_products/{creditProductId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to product combo documents.
+     * @description Rules for the 'product_combos' collection.
      * @path /product_combos/{productComboId}
-     * @allow (get, list) Any user can read product combo documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete product combo documents.
-     * @principle Allows public read access with restricted write access.
+     * @allow (read, write) Authenticated user accessing any product combo document.
+     * @deny (read, write) Unauthenticated user attempting to read or write product combo data.
+     * @principle Authenticated users can read and write all product combo data.
      */
     match /product_combos/{productComboId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
-     /**
-      * @description Grants access to sales proposal documents.
-      * @path /sales_proposals/{salesProposalId}
-      * @allow (get) Any user can read sales proposal documents.
-      * @deny (create, update, delete) Only authenticated users can create, update, or delete sales proposal documents.
-      */
-     match /sales_proposals/{salesProposalId} {
-       allow get: if true;
-       allow list: if false;
-       allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     }
-
-     /**
-      * @description Grants access to sales order documents.
-      * @path /sales_orders/{salesOrderId}
-      * @allow (get) Any user can read sales order documents.
-      * @deny (create, update, delete) Only authenticated users can create, update, or delete sales order documents.
-      */
-     match /sales_orders/{salesOrderId} {
-       allow get: if true;
-       allow list: if false;
-       allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     }
+    /**
+     * @description Rules for the 'sales_proposals' collection.
+     * @path /sales_proposals/{salesProposalId}
+     * @allow (read, write) Authenticated user accessing any sales proposal document.
+     * @deny (read, write) Unauthenticated user attempting to read or write sales proposal data.
+     * @principle Authenticated users can read and write all sales proposal data.
+     */
+    match /sales_proposals/{salesProposalId} {
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
 
     /**
-     * @description Grants access to commission documents.
+     * @description Rules for the 'sales_orders' collection.
+     * @path /sales_orders/{salesOrderId}
+     * @allow (read, write) Authenticated user accessing any sales order document.
+     * @deny (read, write) Unauthenticated user attempting to read or write sales order data.
+     * @principle Authenticated users can read and write all sales order data.
+     */
+    match /sales_orders/{salesOrderId} {
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
+
+    /**
+     * @description Rules for the 'commissions' collection.
      * @path /commissions/{commissionId}
-     * @allow (get) Any user can read commission documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete commission documents.
+     * @allow (read, write) Authenticated user accessing any commission document.
+     * @deny (read, write) Unauthenticated user attempting to read or write commission data.
+     * @principle Authenticated users can read and write all commission data.
      */
     match /commissions/{commissionId} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to quiz documents.
+     * @description Rules for the 'quizzes' collection.
      * @path /quizzes/{quizId}
-     * @allow (get, list) Any user can read quiz documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete quiz documents.
+     * @allow (read) Unauthenticated user reading a quiz.
+     * @allow (write) Authenticated user accessing any quiz document.
+     * @deny (write) Unauthenticated user attempting to write quiz data.
+     * @principle Authenticated users can read and write all quiz data. Unauthenticated can only read.
      */
     match /quizzes/{quizId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list: if allowAllIfSignedIn() || allowUnauthenticatedQuizRead();
+      allow create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Allows public read access to question documents.
+     * @description Rules for the 'questions' collection.
      * @path /questions/{questionId}
-     * @allow (get, list) Any user can read question documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete question documents.
+     * @allow (read, write) Authenticated user accessing any question document.
+     * @deny (read, write) Unauthenticated user attempting to read or write question data.
+     * @principle Authenticated users can read and write all question data.
      */
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
     }
 
     /**
-     * @description Grants access to supplier documents.
+     * @description Rules for the 'suppliers' collection.
      * @path /suppliers/{supplierId}
-     * @allow (get) Any user can read supplier documents.
-     * @deny (create, update, delete) Only authenticated users can create, update, or delete supplier documents.
+     * @allow (read, write) Authenticated user accessing any supplier document.
+     * @deny (read, write) Unauthenticated user attempting to read or write supplier data.
+     * @principle Authenticated users can read and write all supplier data.
      */
-     match /suppliers/{supplierId} {
-       allow get: if true;
-       allow list: if false;
-       allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     }
+    match /suppliers/{supplierId} {
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
 
-     /**
-      * @description Grants access to cost center documents.
-      * @path /cost_centers/{costCenterId}
-      * @allow (get) Any user can read cost center documents.
-      * @deny (create, update, delete) Only authenticated users can create, update, or delete cost center documents.
-      */
-     match /cost_centers/{costCenterId} {
-       allow get: if true;
-       allow list: if false;
-       allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     }
+    /**
+     * @description Rules for the 'cost_centers' collection.
+     * @path /cost_centers/{costCenterId}
+     * @allow (read, write) Authenticated user accessing any cost center document.
+     * @deny (read, write) Unauthenticated user attempting to read or write cost center data.
+     * @principle Authenticated users can read and write all cost center data.
+     */
+    match /cost_centers/{costCenterId} {
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
 
-     /**
-      * @description Grants access to expense category documents.
-      * @path /expense_categories/{categoryId}
-      * @allow (get) Any user can read expense category documents.
-      * @deny (create, update, delete) Only authenticated users can create, update, or delete expense category documents.
-      */
-     match /expense_categories/{categoryId} {
-       allow get: if true;
-       allow list: if false;
-       allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-       allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     }
+    /**
+     * @description Rules for the 'expense_categories' collection.
+     * @path /expense_categories/{categoryId}
+     * @allow (read, write) Authenticated user accessing any expense category document.
+     * @deny (read, write) Unauthenticated user attempting to read or write expense category data.
+     * @principle Authenticated users can read and write all expense category data.
+     */
+    match /expense_categories/{categoryId} {
+      allow get, list, create, update, delete: if allowAllIfSignedIn();
+    }
   }
 }
