@@ -10,7 +10,7 @@ import {
   Loader2,
   Shapes,
 } from "lucide-react"
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -59,14 +59,23 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore'
-import type { ExpenseCategory } from "@/lib/types"
+import type { ExpenseCategory, CostCenter } from "@/lib/types"
+import Link from "next/link"
 
 const expenseCategorySchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
+  costCenterId: z.string().optional(),
 })
 
 type ExpenseCategoryFormValues = z.infer<typeof expenseCategorySchema>
@@ -77,25 +86,28 @@ function ExpenseCategoryDialog({
   onSave,
   isSubmitting,
   category,
+  costCenters,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (values: ExpenseCategoryFormValues, id?: string) => void
   isSubmitting: boolean
   category?: ExpenseCategory | null
+  costCenters: CostCenter[] | null
 }) {
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<ExpenseCategoryFormValues>({
     resolver: zodResolver(expenseCategorySchema),
-    defaultValues: category || { name: '' },
+    defaultValues: category || { name: '', costCenterId: '' },
   })
 
   useState(() => {
-    reset(category || { name: '' })
+    reset(category || { name: '', costCenterId: '' })
   })
 
   const handleFormSubmit = (values: ExpenseCategoryFormValues) => {
@@ -108,7 +120,7 @@ function ExpenseCategoryDialog({
         <DialogHeader>
           <DialogTitle>{category ? 'Editar' : 'Adicionar'} Categoria de Despesa</DialogTitle>
           <DialogDescription>
-            {category ? 'Atualize o nome' : 'Crie uma nova'} categoria.
+            {category ? 'Atualize as informações' : 'Crie uma nova'} categoria.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)}>
@@ -124,6 +136,27 @@ function ExpenseCategoryDialog({
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
+            </div>
+            <div className="grid gap-2">
+                <Label htmlFor="costCenterId">Centro de Custo Padrão (Opcional)</Label>
+                 <Controller
+                    control={control}
+                    name="costCenterId"
+                    render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger><SelectValue placeholder="Selecione um centro de custo" /></SelectTrigger>
+                        <SelectContent>
+                         <SelectItem value="none">Nenhum</SelectItem>
+                         {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                          {costCenters?.length === 0 && (
+                            <div className="p-4 text-sm text-center text-muted-foreground">
+                                Nenhum centro de custo. <Link href="/dashboard/cost-centers" className="text-primary underline">Cadastre um.</Link>
+                            </div>
+                         )}
+                        </SelectContent>
+                    </Select>
+                    )}
+                />
             </div>
           </div>
           <DialogFooter>
@@ -155,8 +188,13 @@ export default function ExpenseCategoriesPage() {
     if (!firestore) return null
     return query(collection(firestore, 'expense_categories'))
   }, [firestore])
-
   const { data: categories, isLoading } = useCollection<ExpenseCategory>(categoriesQuery)
+
+  const costCentersQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, 'cost_centers'))
+  }, [firestore]);
+  const { data: costCenters } = useCollection<CostCenter>(costCentersQuery);
   
   const handleOpenDialog = (category?: ExpenseCategory) => {
     setSelectedCategory(category || null)
@@ -167,12 +205,21 @@ export default function ExpenseCategoriesPage() {
     if (!firestore) return
     setIsSubmitting(true)
     try {
+        const costCenter = costCenters?.find(c => c.id === values.costCenterId);
+        const dataToSave = {
+            ...values,
+            costCenterName: values.costCenterId && values.costCenterId !== 'none' ? costCenter?.name : null
+        };
+        if (values.costCenterId === 'none') {
+            dataToSave.costCenterId = undefined;
+        }
+
       if (id) {
         const docRef = doc(firestore, 'expense_categories', id)
-        await updateDoc(docRef, values)
+        await updateDoc(docRef, dataToSave)
         toast({ title: 'Categoria atualizada com sucesso!' })
       } else {
-        await addDoc(collection(firestore, 'expense_categories'), values)
+        await addDoc(collection(firestore, 'expense_categories'), dataToSave)
         toast({ title: 'Categoria criada com sucesso!' })
       }
       setIsDialogOpen(false)
@@ -233,6 +280,7 @@ export default function ExpenseCategoriesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Centro de Custo Padrão</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -240,12 +288,13 @@ export default function ExpenseCategoriesPage() {
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))}
               {!isLoading && categories?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={2} className="h-24 text-center">Nenhuma categoria encontrada.</TableCell>
+                  <TableCell colSpan={3} className="h-24 text-center">Nenhuma categoria encontrada.</TableCell>
                 </TableRow>
               )}
               {categories?.map((category) => (
@@ -256,6 +305,7 @@ export default function ExpenseCategoriesPage() {
                         {category.name}
                     </div>
                   </TableCell>
+                  <TableCell>{category.costCenterName || '—'}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -314,6 +364,7 @@ export default function ExpenseCategoriesPage() {
         onSave={handleSave}
         isSubmitting={isSubmitting}
         category={selectedCategory}
+        costCenters={costCenters}
       />
     </>
   )

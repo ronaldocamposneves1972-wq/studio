@@ -577,6 +577,14 @@
         "name": {
           "type": "string",
           "description": "Name of the expense category."
+        },
+        "costCenterId": {
+          "type": "string",
+          "description": "Optional reference to a default CostCenter."
+        },
+        "costCenterName": {
+          "type": "string",
+          "description": "Denormalized name of the default cost center."
         }
       },
       "required": [

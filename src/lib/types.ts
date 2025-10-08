@@ -205,6 +205,8 @@ export type CostCenter = {
 export type ExpenseCategory = {
     id: string;
     name: string;
+    costCenterId?: string;
+    costCenterName?: string;
 }
 
 

@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   File,
   ListFilter,
@@ -118,9 +118,20 @@ function ExpenseDialog({
   categories: ExpenseCategory[] | null;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { control, register, handleSubmit, formState: { errors } } = useForm<ExpenseFormData>({
+  const { control, register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
   });
+  
+  const selectedCategoryId = watch('categoryId');
+
+  useEffect(() => {
+    if (selectedCategoryId) {
+      const category = categories?.find(c => c.id === selectedCategoryId);
+      if (category?.costCenterId) {
+        setValue('costCenterId', category.costCenterId, { shouldValidate: true });
+      }
+    }
+  }, [selectedCategoryId, categories, setValue]);
 
   const onSubmit = async (data: ExpenseFormData) => {
     setIsSubmitting(true);
@@ -192,8 +203,7 @@ function ExpenseDialog({
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-               <div className="grid gap-2">
+            <div className="grid gap-2">
                 <Label htmlFor="supplierId">Fornecedor (Opcional)</Label>
                 <Controller
                     control={control}
@@ -208,42 +218,49 @@ function ExpenseDialog({
                     )}
                 />
                </div>
-               <div className="grid gap-2">
-                <Label htmlFor="costCenterId">Centro de Custo (Opcional)</Label>
-                 <Controller
-                    control={control}
-                    name="costCenterId"
-                    render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Selecione um centro de custo" /></SelectTrigger>
-                        <SelectContent>
-                         {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    )}
-                />
+            
+             <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="categoryId">Tipo de Despesa</Label>
+                    <Controller
+                        control={control}
+                        name="categoryId"
+                        render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger className={errors.categoryId ? 'border-destructive' : ''}><SelectValue placeholder="Selecione o tipo de despesa" /></SelectTrigger>
+                            <SelectContent>
+                            {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            {categories?.length === 0 && (
+                                <div className="p-4 text-sm text-center text-muted-foreground">
+                                    Nenhum tipo encontrado. <Link href="/dashboard/expense-categories" className="text-primary underline">Cadastre um.</Link>
+                                </div>
+                            )}
+                            </SelectContent>
+                        </Select>
+                        )}
+                    />
+                    {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="costCenterId">Centro de Custo</Label>
+                    <Controller
+                        control={control}
+                        name="costCenterId"
+                        render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger><SelectValue placeholder="Selecione um centro de custo" /></SelectTrigger>
+                            <SelectContent>
+                            {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                             {costCenters?.length === 0 && (
+                                <div className="p-4 text-sm text-center text-muted-foreground">
+                                    Nenhum centro de custo. <Link href="/dashboard/cost-centers" className="text-primary underline">Cadastre um.</Link>
+                                </div>
+                             )}
+                            </SelectContent>
+                        </Select>
+                        )}
+                    />
                </div>
-            </div>
-             <div className="grid gap-2">
-                <Label htmlFor="categoryId">Tipo de Despesa</Label>
-                 <Controller
-                    control={control}
-                    name="categoryId"
-                    render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className={errors.categoryId ? 'border-destructive' : ''}><SelectValue placeholder="Selecione o tipo de despesa" /></SelectTrigger>
-                        <SelectContent>
-                         {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                         {categories?.length === 0 && (
-                            <div className="p-4 text-sm text-center text-muted-foreground">
-                                Nenhum tipo encontrado. <Link href="/dashboard/expense-categories" className="text-primary underline">Cadastre um.</Link>
-                            </div>
-                         )}
-                        </SelectContent>
-                    </Select>
-                    )}
-                />
-                {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
             </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
