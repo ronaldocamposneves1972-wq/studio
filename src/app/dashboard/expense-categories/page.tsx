@@ -377,6 +377,7 @@ export default function ExpenseCategoriesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [bulkCostCenterId, setBulkCostCenterId] = useState<string>('');
   const { toast } = useToast()
   const firestore = useFirestore()
 
@@ -512,6 +513,34 @@ export default function ExpenseCategoriesPage() {
         });
     }
   }
+  
+  const handleBulkCostCenterUpdate = async () => {
+    if (!firestore || selectedRows.length === 0 || !bulkCostCenterId) {
+      toast({ variant: 'destructive', title: 'Seleção inválida', description: 'Selecione as linhas e um centro de custo para alterar.'});
+      return;
+    }
+
+    const batch = writeBatch(firestore);
+    const selectedCostCenter = costCenters?.find(c => c.id === bulkCostCenterId);
+    
+    selectedRows.forEach(categoryId => {
+      const categoryRef = doc(firestore, 'expense_categories', categoryId);
+      batch.update(categoryRef, { 
+        costCenterId: bulkCostCenterId,
+        costCenterName: selectedCostCenter?.name || null
+      });
+    });
+
+    try {
+      await batch.commit();
+      toast({ title: 'Categorias atualizadas!', description: `${selectedRows.length} categorias foram movidas para ${selectedCostCenter?.name}.`});
+      setSelectedRows([]);
+      setBulkCostCenterId('');
+    } catch (error) {
+      console.error("Error on bulk update:", error);
+      toast({ variant: 'destructive', title: 'Erro na atualização', description: 'Não foi possível alterar o centro de custo em massa.'});
+    }
+  }
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -565,11 +594,22 @@ export default function ExpenseCategoriesPage() {
           <CardDescription>
             Adicione, edite ou remova suas categorias de despesa.
              {numSelected > 0 && (
-                <div className="mt-4 flex items-center gap-4 bg-muted/50 p-2 rounded-md">
-                    <span className="text-sm font-medium">{numSelected} selecionado(s)</span>
+                <div className="mt-4 flex items-center gap-4 bg-muted/50 p-2 rounded-md border">
+                    <span className="text-sm font-medium pl-2">{numSelected} selecionado(s)</span>
+                    <Select onValueChange={setBulkCostCenterId} value={bulkCostCenterId}>
+                        <SelectTrigger className="w-[250px] h-8">
+                            <SelectValue placeholder="Selecione um Centro de Custo"/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <Button size="sm" className="h-8 gap-1" onClick={handleBulkCostCenterUpdate} disabled={!bulkCostCenterId}>
+                        Alterar em Massa
+                    </Button>
                      <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="h-7 gap-1">
+                            <Button variant="destructive" size="sm" className="h-8 gap-1">
                                 <Trash2 className="h-3.5 w-3.5" />
                                 Excluir
                             </Button>
