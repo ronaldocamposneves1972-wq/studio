@@ -1,10 +1,10 @@
 
 'use client'
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query, where, orderBy } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase"
+import { collection, query, where, doc } from "firebase/firestore"
 import type { Client, Proposal, ProposalSummary } from "@/lib/types"
 
 import {
@@ -23,20 +23,49 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { File, MoreHorizontal } from "lucide-react"
+import { File, MoreHorizontal, Eye } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
 
+
+const getProposalStatusVariant = (status: Proposal['status']) => {
+  switch (status) {
+    case 'Finalizada':
+      return 'default';
+    case 'Cancelada':
+      return 'destructive';
+    case 'Em negociação':
+      return 'secondary';
+    case 'Aberta':
+    default:
+      return 'outline';
+  }
+}
 
 export default function ContractsByClientPage() {
   const firestore = useFirestore()
   const router = useRouter()
+  const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
+
+  const proposalRef = useMemoFirebase(() => {
+    if (!firestore || !viewingProposalId) return null;
+    return doc(firestore, 'sales_proposals', viewingProposalId);
+  }, [firestore, viewingProposalId]);
+
+  const { data: viewingProposal, isLoading: isLoadingProposal } = useDoc<Proposal>(proposalRef);
 
   const clientsWithFinalizedProposalsQuery = useMemoFirebase(() => {
     if (!firestore) return null
-    // Query for approved clients, as they are the only ones who can have finalized contracts.
     return query(
         collection(firestore, 'clients'), 
         where('status', '==', 'Aprovado')
@@ -79,8 +108,8 @@ export default function ContractsByClientPage() {
     }
 
     return contracts.map(contract => (
-      <TableRow key={contract.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${contract.clientId}`)}>
-        <TableCell className="font-medium">{contract.clientName}</TableCell>
+      <TableRow key={contract.id}>
+        <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/clients/${contract.clientId}`)}>{contract.clientName}</TableCell>
         <TableCell>
             <div>{contract.productName}</div>
             <div className="text-xs text-muted-foreground">{contract.bankName}</div>
@@ -96,9 +125,10 @@ export default function ContractsByClientPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => setViewingProposalId(contract.id)}>
+                        <Eye className="mr-2 h-4 w-4" /> Ver Detalhes da Proposta
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${contract.clientId}`)}>Ver Cliente</DropdownMenuItem>
-                    {/* The page below does not exist yet */}
-                    {/* <DropdownMenuItem onSelect={() => router.push(`/dashboard/proposals/${contract.id}`)}>Ver Proposta</DropdownMenuItem> */}
                 </DropdownMenuContent>
             </DropdownMenu>
         </TableCell>
@@ -107,6 +137,57 @@ export default function ContractsByClientPage() {
   }
 
   return (
+    <>
+    <Dialog open={!!viewingProposalId} onOpenChange={(open) => !open && setViewingProposalId(null)}>
+        <DialogContent className="sm:max-w-[625px]">
+            <DialogHeader>
+                <DialogTitle>Detalhes da Proposta</DialogTitle>
+                <DialogDescription>
+                    Informações completas do contrato finalizado.
+                </DialogDescription>
+            </DialogHeader>
+            {isLoadingProposal && <div className="space-y-4 py-4">
+                <Skeleton className="h-4 w-1/2"/>
+                <Skeleton className="h-4 w-3/4"/>
+                <Skeleton className="h-4 w-1/2"/>
+                <Skeleton className="h-4 w-2/3"/>
+            </div>}
+            {viewingProposal && (
+                <div className="grid gap-4 py-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Produto</p><p>{viewingProposal.productName}</p></div>
+                        <div><p className="text-muted-foreground">Status</p><p><Badge variant={getProposalStatusVariant(viewingProposal.status)}>{viewingProposal.status}</Badge></p></div>
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Banco</p><p>{viewingProposal.bankName || 'N/A'}</p></div>
+                        <div><p className="text-muted-foreground">Atendente</p><p>{viewingProposal.salesRepName}</p></div>
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Valor Solicitado</p><p>R$ {viewingProposal.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p></div>
+                         {viewingProposal.installments && <div><p className="text-muted-foreground">Parcelas</p><p>{viewingProposal.installments}x de R$ {viewingProposal.installmentValue?.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p></div>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><p className="text-muted-foreground">Data de Criação</p><p>{new Date(viewingProposal.createdAt).toLocaleString('pt-br')}</p></div>
+                        <div><p className="text-muted-foreground">Data de Aprovação</p><p>{viewingProposal.approvedAt ? new Date(viewingProposal.approvedAt).toLocaleString('pt-br') : '—'}</p></div>
+                    </div>
+                     {viewingProposal.formalizationLink && (
+                         <div className="grid gap-2">
+                             <p className="text-muted-foreground">Link de Formalização</p>
+                             <div className="flex items-center gap-2">
+                                <Button asChild variant="secondary" className="w-full justify-start">
+                                    <a href={viewingProposal.formalizationLink} target="_blank" rel="noopener noreferrer" className="truncate">
+                                        {viewingProposal.formalizationLink}
+                                    </a>
+                                </Button>
+                             </div>
+                         </div>
+                    )}
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
+
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
@@ -154,5 +235,6 @@ export default function ContractsByClientPage() {
         </CardFooter>
       </Card>
     </div>
+    </>
   )
 }
