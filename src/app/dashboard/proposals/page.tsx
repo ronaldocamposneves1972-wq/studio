@@ -1,9 +1,14 @@
+
+'use client'
+
 import {
   File,
   ListFilter,
   MoreHorizontal,
   PlusCircle,
+  Users,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,8 +43,10 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { proposals } from "@/lib/placeholder-data"
-import type { ProposalStatus } from "@/lib/types"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
+import { collection, query, where, doc } from "firebase/firestore"
+import type { Proposal, ProposalStatus } from "@/lib/types"
 
 const getStatusVariant = (status: ProposalStatus) => {
   switch (status) {
@@ -57,6 +64,70 @@ const getStatusVariant = (status: ProposalStatus) => {
 }
 
 export default function ProposalsPage() {
+  const router = useRouter()
+  const firestore = useFirestore()
+  const { user } = useUser()
+
+  const proposalsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null
+    return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid))
+  }, [firestore, user])
+
+  const { data: proposals, isLoading } = useCollection<Proposal>(proposalsQuery)
+
+  const renderTableContent = (proposalList: Proposal[] | null) => {
+    if (isLoading) {
+      return Array.from({ length: 5 }).map((_, i) => (
+        <TableRow key={i}>
+          <TableCell><Skeleton className="h-5 w-32"/></TableCell>
+          <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-40"/></TableCell>
+          <TableCell><Skeleton className="h-6 w-20 rounded-full"/></TableCell>
+          <TableCell className="text-right"><Skeleton className="h-5 w-24 ml-auto"/></TableCell>
+          <TableCell><Skeleton className="h-8 w-8 ml-auto"/></TableCell>
+        </TableRow>
+      ))
+    }
+
+    if (!proposalList || proposalList.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={5} className="h-24 text-center">
+            Nenhuma proposta encontrada para este vendedor.
+          </TableCell>
+        </TableRow>
+      )
+    }
+
+    return proposalList.map(proposal => (
+      <TableRow key={proposal.id} onClick={() => router.push(`/dashboard/clients/${proposal.clientId}`)} className="cursor-pointer">
+        <TableCell className="font-medium">{proposal.clientName}</TableCell>
+        <TableCell className="hidden md:table-cell">{proposal.productName}</TableCell>
+        <TableCell>
+          <Badge variant={getStatusVariant(proposal.status)}>{proposal.status}</Badge>
+        </TableCell>
+        <TableCell className="text-right">R$ {proposal.value.toLocaleString('pt-br')}</TableCell>
+        <TableCell onClick={e => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button aria-haspopup="true" size="icon" variant="ghost">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Alternar menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${proposal.clientId}`)}>
+                <Users className="mr-2 h-4 w-4" /> Ver Cliente
+              </DropdownMenuItem>
+              <DropdownMenuItem>Enviar por WhatsApp</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    ))
+  }
+
+
   return (
     <Tabs defaultValue="all">
       <div className="flex items-center">
@@ -93,20 +164,14 @@ export default function ProposalsPage() {
               Exportar
             </span>
           </Button>
-          <Button size="sm" className="h-8 gap-1">
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              Nova Proposta
-            </span>
-          </Button>
         </div>
       </div>
       <TabsContent value="all">
         <Card>
           <CardHeader>
-            <CardTitle>Propostas</CardTitle>
+            <CardTitle>Minhas Propostas</CardTitle>
             <CardDescription>
-              Gerencie todas as propostas de vendas.
+              Gerencie suas propostas de vendas.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -116,7 +181,6 @@ export default function ProposalsPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead className="hidden md:table-cell">Produto</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Atendente</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead>
                     <span className="sr-only">Ações</span>
@@ -124,39 +188,13 @@ export default function ProposalsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {proposals.map(proposal => (
-                <TableRow key={proposal.id}>
-                  <TableCell className="font-medium">{proposal.clientName}</TableCell>
-                  <TableCell className="hidden md:table-cell">{proposal.productName}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(proposal.status)}>{proposal.status}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{proposal.salesRepName}</TableCell>
-                  <TableCell className="text-right">R$ {proposal.value.toLocaleString('pt-br')}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Alternar menu</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                        <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                        <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem>Enviar por WhatsApp</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-                ))}
+                {renderTableContent(proposals)}
               </TableBody>
             </Table>
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-              Mostrando <strong>1-10</strong> de <strong>{proposals.length}</strong> propostas
+              Mostrando <strong>{proposals?.length || 0}</strong> propostas.
             </div>
           </CardFooter>
         </Card>

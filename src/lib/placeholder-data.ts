@@ -28,12 +28,6 @@ export const clients: Client[] = [
   { id: 'client-5', name: 'Juliana Barbosa', email: 'juliana.b@email.com', phone: '(51) 97777-6666', status: 'Reprovado', createdAt: '2023-09-28', avatarUrl: 'https://picsum.photos/seed/client5/100/100', income: 3200, salesRep: users[2], timeline: timeline.slice(1) },
 ];
 
-export const proposals: Proposal[] = [
-  { id: 'prop-1', clientName: 'Fernanda Rocha', productName: 'Consórcio Imobiliário', value: 350000, status: 'Finalizada', createdAt: '2023-10-02', salesRepName: 'Carlos Dias' },
-  { id: 'prop-2', clientName: 'Gabriel Martins', productName: 'Crédito Pessoal', value: 25000, status: 'Em negociação', createdAt: '2023-10-06', salesRepName: 'Carlos Dias' },
-  { id: 'prop-3', clientName: 'Heloisa Santos', productName: 'Consórcio Automotivo', value: 80000, status: 'Aberta', createdAt: '2023-10-11', salesRepName: 'Carlos Dias' },
-  { id: 'prop-4', clientName: 'Fernanda Rocha', productName: 'Crédito Consignado', value: 50000, status: 'Cancelada', createdAt: '2023-09-20', salesRepName: 'Carlos Dias' },
-];
 
 export const products: Product[] = [
     { id: 'prod-1', name: 'Consórcio Imobiliário', type: 'Consórcio', minAmount: 100000, maxAmount: 1000000, interestRate: 0.1, terms: [120, 180, 240], imageUrl: 'https://picsum.photos/seed/house/400/300' },
