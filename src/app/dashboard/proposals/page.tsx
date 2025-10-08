@@ -72,12 +72,20 @@ export default function ProposalsPage() {
 
 
   const proposalsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null
+    if (!firestore || !user) return null;
     if (activeTab === 'all') {
-        return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid))
+      // It's better to avoid querying all documents if security rules don't allow it.
+      // If you have a role that can see all, you'd check for that role here.
+      // For a salesperson, it's safer to only allow querying their own proposals.
+      return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid));
     }
-    return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid), where('status', '==', activeTab))
-  }, [firestore, user, activeTab])
+    // Filter by both salesRepId and status for other tabs
+    return query(
+      collection(firestore, 'sales_proposals'),
+      where('salesRepId', '==', user.uid),
+      where('status', '==', activeTab)
+    );
+  }, [firestore, user, activeTab]);
 
   const { data: proposals, isLoading } = useCollection<Proposal>(proposalsQuery)
 
