@@ -767,6 +767,38 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         }
     }
 
+    const handleDeleteSalesOrder = async (orderToDelete: SalesOrderSummary) => {
+        if (!firestore || !client || !clientRef) return;
+
+        toast({ title: 'Excluindo pedido de venda...' });
+
+        const batch = writeBatch(firestore);
+
+        // 1. Remove from client's salesOrders array
+        batch.update(clientRef, {
+            salesOrders: arrayRemove(orderToDelete)
+        });
+
+        // 2. Delete from sales_orders collection
+        const salesOrderDocRef = doc(firestore, 'sales_orders', orderToDelete.id);
+        batch.delete(salesOrderDocRef);
+
+        try {
+            await batch.commit();
+            toast({
+                title: "Pedido de Venda Excluído!",
+                description: `O pedido foi removido com sucesso.`
+            });
+        } catch (error) {
+            console.error("Error deleting sales order:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao excluir',
+                description: 'Não foi possível remover o pedido de venda.'
+            });
+        }
+    };
+
 
     const clientDataToDisplay = useMemo(() => {
         if (!client) return [];
@@ -1471,6 +1503,23 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                         <Pencil className="mr-2 h-4 w-4" />
                                                                         Editar
                                                                     </DropdownMenuItem>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild>
+                                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                                                            </DropdownMenuItem>
+                                                                        </AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader>
+                                                                                <AlertDialogTitle>Excluir Pedido de Venda?</AlertDialogTitle>
+                                                                                <AlertDialogDescription>O pedido de venda será permanentemente removido. Esta ação não pode ser desfeita.</AlertDialogDescription>
+                                                                            </AlertDialogHeader>
+                                                                            <AlertDialogFooter>
+                                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                <AlertDialogAction onClick={() => handleDeleteSalesOrder(order)} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
+                                                                            </AlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
                                                         </TableCell>
