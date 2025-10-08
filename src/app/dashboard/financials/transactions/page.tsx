@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import {
@@ -7,7 +8,6 @@ import {
   MoreHorizontal,
   PlusCircle,
 } from "lucide-react"
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,6 +44,7 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import type { Transaction } from "@/lib/types"
 import { collection, query } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 const getStatusVariant = (status: 'pending' | 'paid' | 'overdue') => {
   switch (status) {

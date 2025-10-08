@@ -597,7 +597,14 @@ export default function ClientDetailPage() {
     };
     
 const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: string) => {
-    if (!firestore || !client || !clientRef || !user || !link || !acceptedProposal) return;
+    if (!firestore || !client || !clientRef || !user || !link || !acceptedProposal?.productId) {
+        toast({
+            variant: 'destructive',
+            title: 'Erro de Dados',
+            description: 'Informações da proposta ou do produto estão ausentes.',
+        });
+        return;
+    }
     
     toast({ title: 'Processando aceitação...' });
     
@@ -785,11 +792,28 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                 salesOrders: arrayUnion(salesOrderSummary),
                 timeline: arrayUnion(timelineEvent),
             });
+            
+             // 5. Create Transaction (Contas a Receber)
+            const transactionCollection = collection(firestore, 'transactions');
+            const newTransactionRef = doc(transactionCollection);
+            const newTransactionData: Transaction = {
+                id: newTransactionRef.id,
+                description: `Recebimento - Pedido de Venda - ${client.name}`,
+                amount: data.totalValue,
+                type: 'income',
+                status: 'pending',
+                dueDate: data.dueDate,
+                clientId: client.id,
+                clientName: client.name,
+                category: 'Venda de Produto/Serviço',
+                accountId: '', // Needs to be assigned later
+            };
+            batch.set(newTransactionRef, newTransactionData);
 
-            // 5. Commit all writes
+            // 6. Commit all writes
             await batch.commit();
 
-            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido foi registrado com sucesso." });
+            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido e a conta a receber foram registrados." });
             setIsSalesOrderDialogOpen(false);
 
         } catch (error) {
