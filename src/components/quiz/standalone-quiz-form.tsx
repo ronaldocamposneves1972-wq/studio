@@ -133,8 +133,8 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
                 if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
                     age--;
                 }
-                if (age < 18 || age > 100) {
-                     form.setError(currentQuestion.id as any, { type: 'manual', message: 'Você deve ter entre 18 e 100 anos para continuar.' });
+                if (age < 18 || age >= 100) {
+                     form.setError(currentQuestion.id as any, { type: 'manual', message: 'Você deve ter 18 anos ou mais e menos de 100 anos.' });
                      setIsStepProcessing(false);
                      return;
                 }
