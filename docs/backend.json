@@ -563,6 +563,26 @@
         "id",
         "name"
       ]
+    },
+    "ExpenseCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExpenseCategory",
+      "type": "object",
+      "description": "Represents a category for expenses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the expense category."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the expense category."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
     }
   },
   "auth": {
@@ -813,6 +833,22 @@
             {
               "name": "costCenterId",
               "description": "The unique identifier of the cost center."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/expense_categories/{categoryId}",
+        "definition": {
+          "entityName": "ExpenseCategory",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseCategory"
+          },
+          "description": "Stores expense category data.",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier of the expense category."
             }
           ]
         }

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings,
   FilePlus, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart, ChevronRight, Truck, WalletCards
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart, ChevronRight, Truck, WalletCards, Shapes
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
@@ -47,6 +47,7 @@ export const navItems = [
       { href: '/dashboard/banks', label: 'Bancos', icon: Landmark },
       { href: '/dashboard/suppliers', label: 'Fornecedores', icon: Truck },
       { href: '/dashboard/cost-centers', label: 'Centro de Custo', icon: WalletCards },
+      { href: '/dashboard/expense-categories', label: 'Tipos de Despesa', icon: Shapes },
       { href: '/dashboard/financials/accounts', label: 'Contas Bancária', icon: CreditCard },
       { href: '/dashboard/settings/users', label: 'Vendedores', icon: Users },
       { href: '/dashboard/settings/users', label: 'Usúarios', icon: Users },

@@ -202,6 +202,11 @@ export type CostCenter = {
   name: string;
 };
 
+export type ExpenseCategory = {
+    id: string;
+    name: string;
+}
+
 
 export type Transaction = {
   id: string;
@@ -219,6 +224,7 @@ export type Transaction = {
   supplierName?: string;
   costCenterId?: string;
   costCenterName?: string;
+  categoryId?: string;
   category?: string;
 };
 

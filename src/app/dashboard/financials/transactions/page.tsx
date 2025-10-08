@@ -66,6 +66,7 @@ function TransactionRowSkeleton() {
       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
     </TableRow>
   )
@@ -87,7 +88,7 @@ export default function TransactionsPage() {
     if (!transactionList || transactionList.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-24 text-center">
+          <TableCell colSpan={7} className="h-24 text-center">
             Nenhuma transação encontrada.
           </TableCell>
         </TableRow>
@@ -96,7 +97,10 @@ export default function TransactionsPage() {
     
     return transactionList.map(transaction => (
       <TableRow key={transaction.id}>
-        <TableCell className="font-medium">{transaction.description}</TableCell>
+        <TableCell>
+            <div className="font-medium">{transaction.description}</div>
+            <div className="text-xs text-muted-foreground">{transaction.clientName || transaction.supplierName}</div>
+        </TableCell>
         <TableCell>
             <Badge variant={getStatusVariant(transaction.status)}>{transaction.status}</Badge>
         </TableCell>
@@ -108,7 +112,8 @@ export default function TransactionsPage() {
               {transaction.type === 'income' ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-br')}
             </span>
         </TableCell>
-        <TableCell className="hidden md:table-cell">{transaction.category}</TableCell>
+        <TableCell className="hidden md:table-cell">{transaction.category || 'N/A'}</TableCell>
+         <TableCell className="hidden md:table-cell">{transaction.costCenterName || 'N/A'}</TableCell>
         <TableCell className="hidden md:table-cell">
           {new Date(transaction.dueDate).toLocaleDateString('pt-BR')}
         </TableCell>
@@ -179,6 +184,7 @@ export default function TransactionsPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead className="hidden md:table-cell">Categoria</TableHead>
+                    <TableHead className="hidden md:table-cell">Centro de Custo</TableHead>
                     <TableHead className="hidden md:table-cell">Vencimento</TableHead>
                     <TableHead>
                       <span className="sr-only">Ações</span>
