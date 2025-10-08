@@ -49,7 +49,6 @@ export const navItems = [
       { href: '/dashboard/cost-centers', label: 'Centro de Custo', icon: WalletCards },
       { href: '/dashboard/expense-categories', label: 'Tipos de Despesa', icon: Shapes },
       { href: '/dashboard/financials/accounts', label: 'Contas Bancária', icon: CreditCard },
-      { href: '/dashboard/settings/users', label: 'Vendedores', icon: Users },
       { href: '/dashboard/settings/users', label: 'Usúarios', icon: Users },
     ],
   },
