@@ -39,7 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useMemo } from "react"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query, limit, orderBy } from "firebase/firestore"
+import { collection, query, limit, orderBy, where } from "firebase/firestore"
 
 
 function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: string, icon: React.ElementType, value: string, subtext: string, isLoading: boolean }) {
@@ -70,29 +70,38 @@ function KPICard({ title, icon: Icon, value, subtext, isLoading }: { title: stri
 export default function Dashboard() {
     const firestore = useFirestore();
 
-    const proposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals')) : null, [firestore]);
+    // Specific queries for approved and open proposals to avoid broad "list" calls
+    const approvedProposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals'), where('status', '==', 'Finalizada')) : null, [firestore]);
+    const openProposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals'), where('status', 'in', ['Aberta', 'Em negociação'])) : null, [firestore]);
     const recentProposalsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sales_proposals'), orderBy('createdAt', 'desc'), limit(5)) : null, [firestore]);
     const clientsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'clients')) : null, [firestore]);
     const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
 
-    const { data: proposals, isLoading: isLoadingProposals } = useCollection<Proposal>(proposalsQuery);
+    const { data: approvedProposals, isLoading: isLoadingApproved } = useCollection<Proposal>(approvedProposalsQuery);
+    const { data: openProposals, isLoading: isLoadingOpen } = useCollection<Proposal>(openProposalsQuery);
     const { data: recentProposals, isLoading: isLoadingRecentProposals } = useCollection<Proposal>(recentProposalsQuery);
     const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
     const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
 
 
-    const { totalApproved, pendingProposalsCount, inNegotiationCount, commissionValue } = useMemo(() => {
-        if (!proposals) return { totalApproved: 0, pendingProposalsCount: 0, inNegotiationCount: 0, commissionValue: 0 };
-        const approved = proposals.filter(p => p.status === 'Finalizada');
-        const total = approved.reduce((sum, p) => sum + p.value, 0);
+    const { totalApproved, commissionValue } = useMemo(() => {
+        if (!approvedProposals) return { totalApproved: 0, commissionValue: 0 };
+        const total = approvedProposals.reduce((sum, p) => sum + p.value, 0);
         const commission = total * 0.025; // Assuming 2.5% commission
         return {
             totalApproved: total,
-            pendingProposalsCount: proposals.filter(p => p.status === 'Aberta').length,
-            inNegotiationCount: proposals.filter(p => p.status === 'Em negociação').length,
             commissionValue: commission,
         };
-    }, [proposals]);
+    }, [approvedProposals]);
+    
+    const { pendingProposalsCount, inNegotiationCount } = useMemo(() => {
+        if (!openProposals) return { pendingProposalsCount: 0, inNegotiationCount: 0 };
+        return {
+             pendingProposalsCount: openProposals.filter(p => p.status === 'Aberta').length,
+             inNegotiationCount: openProposals.filter(p => p.status === 'Em negociação').length,
+        }
+    }, [openProposals]);
+
 
     const newClientsCount = useMemo(() => {
         if (!clients) return 0;
@@ -100,12 +109,12 @@ export default function Dashboard() {
     }, [clients]);
     
     const salesData = useMemo(() => {
-        if (!proposals || !users) return [];
+        if (!approvedProposals || !users) return [];
         
         const salesByRep: Record<string, number> = {};
 
-        proposals.forEach(proposal => {
-            if (proposal.status === 'Finalizada' && proposal.salesRepName) {
+        approvedProposals.forEach(proposal => {
+            if (proposal.salesRepName) {
                 if (!salesByRep[proposal.salesRepName]) {
                     salesByRep[proposal.salesRepName] = 0;
                 }
@@ -118,9 +127,9 @@ export default function Dashboard() {
             .sort((a, b) => b.total - a.total)
             .slice(0, 5);
 
-    }, [proposals, users]);
+    }, [approvedProposals, users]);
 
-  const isLoading = isLoadingProposals || isLoadingClients || isLoadingRecentProposals || isLoadingUsers;
+  const isLoading = isLoadingApproved || isLoadingOpen || isLoadingClients || isLoadingRecentProposals || isLoadingUsers;
 
   return (
     <>
@@ -272,3 +281,5 @@ export default function Dashboard() {
     </>
   )
 }
+
+    
