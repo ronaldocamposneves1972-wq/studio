@@ -854,6 +854,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
   }
 
   const documents = client.documents || [];
+  const salesOrders = client.salesOrders || [];
   const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image'));
   const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
   const hasAcceptedProposal = proposals.some(p => p.status === 'Finalizada');
@@ -1401,24 +1402,49 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                         </TabsContent>
                         <TabsContent value="venda">
                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Pedido de Venda</CardTitle>
-                                    <CardDescription>
-                                        Gerencie o pedido de venda para o contrato aprovado.
-                                    </CardDescription>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <div>
+                                        <CardTitle>Pedidos de Venda</CardTitle>
+                                        <CardDescription>
+                                            Gerencie os pedidos de venda para o contrato aprovado.
+                                        </CardDescription>
+                                    </div>
+                                     <Button onClick={() => setIsSalesOrderDialogOpen(true)}>
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Lançar Novo Pedido
+                                    </Button>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
-                                        <ShoppingCart className="h-12 w-12 text-muted-foreground" />
-                                        <h3 className="text-xl font-semibold">Nenhum pedido de venda criado</h3>
-                                        <p className="text-muted-foreground max-w-sm">
-                                            Após a formalização, lance o pedido de venda para este contrato.
-                                        </p>
-                                        <Button onClick={() => setIsSalesOrderDialogOpen(true)}>
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            Lançar Novo Pedido de Venda
-                                        </Button>
-                                    </div>
+                                    {salesOrders.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
+                                            <ShoppingCart className="h-12 w-12 text-muted-foreground" />
+                                            <h3 className="text-xl font-semibold">Nenhum pedido de venda criado</h3>
+                                            <p className="text-muted-foreground max-w-sm">
+                                                Após a formalização, lance o pedido de venda para este contrato.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>ID Pedido</TableHead>
+                                                    <TableHead>Data</TableHead>
+                                                    <TableHead>Itens</TableHead>
+                                                    <TableHead className="text-right">Valor Total</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {salesOrders.map(order => (
+                                                    <TableRow key={order.id}>
+                                                        <TableCell className="font-mono">{order.id.substring(0, 8)}...</TableCell>
+                                                        <TableCell>{new Date(order.createdAt).toLocaleDateString('pt-br')}</TableCell>
+                                                        <TableCell>{order.itemCount}</TableCell>
+                                                        <TableCell className="text-right">R$ {order.totalValue.toLocaleString('pt-br', { minimumFractionDigits: 2 })}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
