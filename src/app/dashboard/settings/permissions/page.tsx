@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { collections } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -219,14 +218,6 @@ service cloud.firestore {
                         </SelectContent>
                     </Select>
                 </div>
-                 <Alert>
-                  <ShieldCheck className="h-4 w-4" />
-                  <AlertTitle>Gerador de Regras de Segurança</AlertTitle>
-                  <AlertDescription>
-                    Esta tela funciona como um gerador para o seu arquivo `firestore.rules`. Ao clicar em "Salvar", as regras de segurança correspondentes à sua configuração serão geradas.
-                  </AlertDescription>
-                </Alert>
-
                <div className="border rounded-lg overflow-hidden">
                  <Table>
                     <TableHeader>
