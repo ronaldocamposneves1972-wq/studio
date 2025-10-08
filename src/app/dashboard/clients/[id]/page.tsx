@@ -1215,7 +1215,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                 <TableHead>Valor Principal</TableHead>
                                                 <TableHead>Parcelas</TableHead>
                                                 <TableHead>Juros (Mês)</TableHead>
-                                                <TableHead>Juros (Ano)</TableHead>
+                                                <TableHead>Juros (Total)</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead>Criado em</TableHead>
                                                 <TableHead>Aprovado em</TableHead>
@@ -1232,7 +1232,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                             ) : proposals?.length > 0 ? (
                                                 proposals.map(p => {
                                                     const monthlyRate = p.installments && p.installmentValue ? calculateMonthlyRate(p.value, p.installments, p.installmentValue) : 0;
-                                                    const annualRate = monthlyRate > 0 ? (Math.pow(1 + monthlyRate, 12) - 1) : 0;
+                                                    const totalRate = monthlyRate * (p.installments || 0);
 
                                                     return (
                                                         <TableRow key={p.id}>
@@ -1243,7 +1243,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                             <TableCell>R$ {p.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</TableCell>
                                                             <TableCell>{p.installments ? `${p.installments}x de R$ ${p.installmentValue?.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : 'N/A'}</TableCell>
                                                             <TableCell className="font-mono">{(monthlyRate * 100).toFixed(2)}%</TableCell>
-                                                            <TableCell className="font-mono">{(annualRate * 100).toFixed(2)}%</TableCell>
+                                                            <TableCell className="font-mono">{(totalRate * 100).toFixed(2)}%</TableCell>
                                                             <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
                                                             <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>
                                                             <TableCell>{p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>

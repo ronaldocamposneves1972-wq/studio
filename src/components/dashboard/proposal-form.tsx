@@ -53,7 +53,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalToPay, setTotalToPay] = useState(0);
   const [monthlyInterestRate, setMonthlyInterestRate] = useState(0);
-  const [annualInterestRate, setAnnualInterestRate] = useState(0);
+  const [totalInterestRate, setTotalInterestRate] = useState(0);
   const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: Product['behavior']} | null>(null);
   const firestore = useFirestore();
 
@@ -86,15 +86,14 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
           const monthlyRate = calculateMonthlyRate(parsedPrincipal, parsedInstallments, parsedInstallmentValue);
           setMonthlyInterestRate(monthlyRate);
           
-          // Calculate effective annual rate
-          const annualRate = (Math.pow(1 + monthlyRate, 12) - 1);
-          setAnnualInterestRate(annualRate);
+          const totalRate = monthlyRate * parsedInstallments;
+          setTotalInterestRate(totalRate);
 
         }
     } else {
         setTotalToPay(0);
         setMonthlyInterestRate(0);
-        setAnnualInterestRate(0);
+        setTotalInterestRate(0);
     }
   }, [principal, installments, installmentValue]);
   
@@ -246,9 +245,9 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
                     </p>
                 </div>
                 <div>
-                    <p className="text-sm text-muted-foreground">Juros (Anual)</p>
+                    <p className="text-sm text-muted-foreground">Juros (Total)</p>
                     <p className="text-lg font-bold text-primary">
-                        {(annualInterestRate * 100).toFixed(2)}%
+                        {(totalInterestRate * 100).toFixed(2)}%
                     </p>
                 </div>
             </div>
