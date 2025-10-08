@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import Link from 'next/link';
 import { DialogFooter } from '../ui/dialog';
@@ -54,11 +54,11 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
   const [totalToPay, setTotalToPay] = useState(0);
   const [monthlyInterestRate, setMonthlyInterestRate] = useState(0);
   const [annualInterestRate, setAnnualInterestRate] = useState(0);
-  const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: string} | null>(null);
+  const [selectedProductInfo, setSelectedProductInfo] = useState<{rate: number, type: Product['behavior']} | null>(null);
   const firestore = useFirestore();
 
   const productsQuery = useMemoFirebase(() => {
-    return firestore ? query(collection(firestore, 'products')) : null;
+    return firestore ? query(collection(firestore, 'products'), where('behavior', '==', 'Proposta')) : null;
   }, [firestore]);
 
   const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
@@ -101,8 +101,8 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
   useEffect(() => {
     if (selectedProductId && products) {
         const product = products.find(p => p.id === selectedProductId);
-        if (product) {
-            setSelectedProductInfo({ rate: product.interestRate, type: product.type });
+        if (product && product.behavior === 'Proposta') {
+            setSelectedProductInfo({ rate: product.interestRate, type: product.behavior });
         } else {
             setSelectedProductInfo(null);
         }
@@ -184,7 +184,7 @@ export function ProposalForm({ onSave }: ProposalFormProps) {
         <div className="grid gap-2">
             <Label>Taxa de Juros / Admin. do Produto</Label>
             <div className={cn("flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm", selectedProductInfo ? 'text-foreground' : 'text-muted-foreground')}>
-                {selectedProductInfo ? `${selectedProductInfo.rate}% ${selectedProductInfo.type === 'Crédito' ? 'a.m.' : 'a.p.'}` : 'Selecione um produto'}
+                {selectedProductInfo ? `${selectedProductInfo.rate}%` : 'Selecione um produto'}
             </div>
         </div>
       </div>
