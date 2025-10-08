@@ -56,6 +56,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -206,13 +207,16 @@ export default function ExpenseCategoriesPage() {
     setIsSubmitting(true)
     try {
         const costCenter = costCenters?.find(c => c.id === values.costCenterId);
-        const dataToSave = {
+        const dataToSave: Partial<ExpenseCategory> = {
             ...values,
-            costCenterName: values.costCenterId && values.costCenterId !== 'none' ? costCenter?.name : null
+            costCenterName: values.costCenterId && values.costCenterId !== 'none' ? costCenter?.name : undefined
         };
-        if (values.costCenterId === 'none') {
+
+        if (values.costCenterId === 'none' || !values.costCenterId) {
             dataToSave.costCenterId = undefined;
+            dataToSave.costCenterName = undefined;
         }
+
 
       if (id) {
         const docRef = doc(firestore, 'expense_categories', id)
