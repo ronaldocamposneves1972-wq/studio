@@ -243,14 +243,16 @@ function ExpenseDialog({
                                 onChange={field.onChange}
                                 placeholder="Pesquisar tipo..."
                                 searchPlaceholder="Buscar tipo de despesa..."
-                                notFoundMessage="Nenhum tipo encontrado."
+                                notFoundMessage={
+                                    <span>Nenhum tipo encontrado. <Link href="/dashboard/expense-categories" className='text-primary underline'>Cadastrar</Link></span>
+                                }
                             />
                         )}
                     />
                     {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="costCenterId">Centro de Custo</Label>
+                    <Label htmlFor="costCenterName">Centro de Custo</Label>
                     <Input
                         id="costCenterName"
                         value={costCenterName}
@@ -497,3 +499,5 @@ export default function AccountsPayablePage() {
     </>
   )
 }
+
+    
