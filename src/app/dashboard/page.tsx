@@ -155,13 +155,6 @@ export default function Dashboard() {
             subtext={`${inNegotiationCount} em negociação`}
             isLoading={isLoading}
         />
-        <KPICard
-            title="Comissões (Mês)"
-            icon={Activity}
-            value={`R$ ${commissionValue.toLocaleString('pt-BR')}`}
-            subtext="+19% em relação ao mês passado"
-            isLoading={isLoading}
-        />
       </div>
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
