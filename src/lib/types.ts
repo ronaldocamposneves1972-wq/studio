@@ -8,7 +8,7 @@ export type User = {
   role: 'Admin' | 'Gestor' | 'Atendente' | 'Financeiro';
 };
 
-export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado';
+export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado' | 'Ledger';
 
 export type DocumentStatus = 'pending' | 'validated' | 'rejected';
 
@@ -195,6 +195,7 @@ export type Transaction = {
   paymentDate?: string;
   accountId: string;
   accountName?: string;
+  category?: string;
 };
 
 export type SalesOrderItem = {

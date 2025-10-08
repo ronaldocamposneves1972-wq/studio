@@ -122,6 +122,8 @@ const getStatusVariant = (status: ClientStatus) => {
       return 'default';
     case 'Reprovado':
       return 'destructive';
+    case 'Ledger':
+        return 'default';
     case 'Em análise':
       return 'secondary';
     case 'Pendente':
@@ -721,40 +723,24 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                 itemCount: data.items.length,
             };
 
-            // 3. Create the accounts receivable transaction
-            const transactionCollection = collection(firestore, 'transactions');
-            const newTransactionRef = doc(transactionCollection);
-            const newTransactionData: Transaction = {
-                id: newTransactionRef.id,
-                description: `Recebimento - Pedido de Venda ${newSalesOrderRef.id.substring(0, 5)}`,
-                amount: data.totalValue,
-                type: 'income',
-                status: 'pending',
-                dueDate: data.dueDate,
-                accountId: '', // This should probably be selectable in the future
-            };
-            batch.set(newTransactionRef, newTransactionData);
-
-
-            // 4. Create the timeline event
+            // 3. Create the timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-salesorder`,
                 activity: `Novo pedido de venda (R$ ${data.totalValue.toLocaleString('pt-br')}) criado.`,
-                details: `Vencimento do recebimento em ${new Date(data.dueDate).toLocaleDateString('pt-br')}.`,
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
 
-            // 5. Update the client document
+            // 4. Update the client document
             batch.update(clientRef, {
                 salesOrders: arrayUnion(salesOrderSummary),
                 timeline: arrayUnion(timelineEvent),
             });
 
-            // 6. Commit all writes
+            // 5. Commit all writes
             await batch.commit();
 
-            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido e a conta a receber foram registrados com sucesso." });
+            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido foi registrado com sucesso." });
             setIsSalesOrderDialogOpen(false);
 
         } catch (error) {
@@ -797,6 +783,26 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                 description: 'Não foi possível remover o pedido de venda.'
             });
         }
+    };
+    
+    const handleSendToLedger = async () => {
+        if (!clientRef || !user) return;
+        
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}`,
+            activity: `Status alterado para "Ledger"`,
+            details: "Cliente enviado para a etapa final de pagamento.",
+            timestamp: new Date().toISOString(),
+            user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+        };
+
+        await updateDoc(clientRef, { status: 'Ledger', timeline: arrayUnion(timelineEvent) });
+        
+        toast({
+            title: "Cliente enviado para Ledger",
+            description: `${client?.name} agora está na esteira de pagamento.`
+        });
+        router.push('/dashboard/pipeline/ledger');
     };
 
 
@@ -1038,13 +1044,14 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                               </div>
                           </div>
                           <div className="flex items-center gap-2">
-                              <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status} disabled>
+                              <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status}>
                                   <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
                                   <SelectContent>
                                       <SelectItem value="Novo">Novo</SelectItem>
                                       <SelectItem value="Em análise">Em análise</SelectItem>
                                       <SelectItem value="Pendente">Pendente</SelectItem>
                                       <SelectItem value="Aprovado">Aprovado</SelectItem>
+                                      <SelectItem value="Ledger">Ledger</SelectItem>
                                       <SelectItem value="Reprovado">Reprovado</SelectItem>
                                   </SelectContent>
                               </Select>
@@ -1474,6 +1481,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                             </p>
                                         </div>
                                     ) : (
+                                        <>
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
@@ -1527,6 +1535,16 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                 ))}
                                             </TableBody>
                                         </Table>
+                                         <div className="text-center py-6 border-t mt-4">
+                                            <p className="text-muted-foreground mb-4">
+                                                Finalize a venda e mova o cliente para a etapa de pagamento.
+                                            </p>
+                                            <Button onClick={handleSendToLedger} disabled={client.status !== 'Aprovado' || salesOrders.length === 0}>
+                                                <Send className="mr-2 h-4 w-4" />
+                                                Enviar para Ledger
+                                            </Button>
+                                        </div>
+                                        </>
                                     )}
                                 </CardContent>
                             </Card>

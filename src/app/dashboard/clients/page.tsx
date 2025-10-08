@@ -70,6 +70,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
     case 'Aprovado':
+    case 'Ledger':
       return 'default';
     case 'Reprovado':
       return 'destructive';
