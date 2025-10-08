@@ -158,7 +158,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
-        <main className="flex-1 p-4 sm:px-6 sm:py-4 md:gap-8 overflow-auto">
+        <main className="flex flex-1 flex-col gap-4 p-4 sm:px-6 sm:py-4 md:gap-8">
           {children}
         </main>
       </div>

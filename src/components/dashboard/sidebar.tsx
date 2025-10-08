@@ -58,30 +58,12 @@ export const navItems = [
       { href: '/dashboard/clients', label: 'Clientes', icon: Users },
       { href: '/dashboard/analytics/production', label: 'Analítico de Produção', icon: LineChart },
       { href: '/dashboard/contracts/by-client', label: 'Contratos por Cliente', icon: Users },
-      { href: '/dashboard/promoter/debt', label: 'Dívida do Promotor', icon: DollarSign },
-      { href: '/dashboard/promoter/statement', label: 'Extrato Pgto Promotor', icon: FileText },
-      { href: '/dashboard/debts-discounts', label: 'Dívidas e Descontos', icon: DollarSign },
-      { href: '/dashboard/differences-returns', label: 'Diferenças e Devoluções', icon: DollarSign },
-      { href: '/dashboard/deferred-commission', label: 'Pgto Comissão Diferido', icon: DollarSign },
-      {
-        label: 'Comissão', icon: DollarSign, children: [
-          { href: '/dashboard/commission/current-table', label: 'Tabela Atual', icon: Scale },
-          { href: '/dashboard/commission/best-commission', label: 'Melhor Comissão', icon: DollarSign },
-        ]
-      },
-      { href: '/dashboard/pending-payments', label: 'Pendentes de Pagamento', icon: FileText },
       { href: '/dashboard/opportunity-panel', label: 'Painel de oportunidade', icon: Package },
-    ]
-  },
-  {
-    label: 'Acompanhamento', icon: TrendingUp, children: [
-      { href: '/dashboard/proposals', label: 'Propostas', icon: FileText },
     ]
   },
   {
     label: 'Formalização', icon: ClipboardCheck, children: [
       { href: '/dashboard/formalization/protocol', label: 'Protocolo', icon: ClipboardList },
-      { href: '/dashboard/formalization/pending-contracts', label: 'Contratos Pendentes', icon: FileText },
     ]
   },
   {
@@ -98,10 +80,8 @@ export const navItems = [
     label: 'Utilitários', icon: Briefcase, children: [
       { href: '/dashboard/utils/internal-mail', label: 'Correio Interno', icon: Mail },
       { href: '/dashboard/utils/docs-download', label: 'Download de Documentos', icon: Download },
-      { href: '/dashboard/utils/bank-login-requests', label: 'Solicitações de Login de Banco', icon: Landmark },
     ]
   },
-  { href: '/dashboard/charts', icon: GanttChart, label: 'Gráficos' },
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
