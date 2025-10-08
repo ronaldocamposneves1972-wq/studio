@@ -1447,8 +1447,10 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                 <TableRow>
                                                     <TableHead>ID Pedido</TableHead>
                                                     <TableHead>Data</TableHead>
+                                                    <TableHead>Vencimento</TableHead>
                                                     <TableHead>Itens</TableHead>
                                                     <TableHead className="text-right">Valor Total</TableHead>
+                                                    <TableHead className="text-right">Ações</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -1456,8 +1458,22 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                     <TableRow key={order.id}>
                                                         <TableCell className="font-mono">{order.id.substring(0, 8)}...</TableCell>
                                                         <TableCell>{new Date(order.createdAt).toLocaleDateString('pt-br')}</TableCell>
+                                                        <TableCell>{new Date(order.dueDate).toLocaleDateString('pt-br')}</TableCell>
                                                         <TableCell>{order.itemCount}</TableCell>
                                                         <TableCell className="text-right">R$ {order.totalValue.toLocaleString('pt-br', { minimumFractionDigits: 2 })}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    <DropdownMenuItem>
+                                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                                        Editar
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
@@ -1497,5 +1513,3 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
-
-  
