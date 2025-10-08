@@ -868,6 +868,15 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                         <div><p className="text-muted-foreground">Data de Criação</p><p>{new Date(viewingProposal.createdAt).toLocaleString('pt-br')}</p></div>
                         <div><p className="text-muted-foreground">Data de Aprovação</p><p>{viewingProposal.approvedAt ? new Date(viewingProposal.approvedAt).toLocaleString('pt-br') : '—'}</p></div>
                     </div>
+                     {viewingProposal.formalizationLink && (
+                         <div className="grid gap-2">
+                             <p className="text-muted-foreground">Link de Formalização</p>
+                             <div className="flex items-center gap-2">
+                                <Input value={viewingProposal.formalizationLink} readOnly className="bg-muted"/>
+                                <Button asChild variant="secondary"><a href={viewingProposal.formalizationLink} target="_blank" rel="noopener noreferrer">Abrir Link</a></Button>
+                             </div>
+                         </div>
+                    )}
                 </div>
             )}
         </DialogContent>
@@ -962,8 +971,8 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                      <Tabs defaultValue="quiz">
                       <TabsList className="mb-4">
                         <TabsTrigger value="quiz">Ficha Inicial</TabsTrigger>
-                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         <TabsTrigger value="documents">Documentos</TabsTrigger>
+                        <TabsTrigger value="proposals">Propostas</TabsTrigger>
                         {hasAcceptedProposal && <TabsTrigger value="payment_guides">Guias de Pagamento</TabsTrigger>}
                         <TabsTrigger value="history">Histórico</TabsTrigger>
                       </TabsList>
@@ -1353,3 +1362,5 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     
 
     
+
+      
