@@ -47,6 +47,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
 import { collection, query, where, doc } from "firebase/firestore"
 import type { Proposal, ProposalStatus } from "@/lib/types"
+import { useState } from "react"
 
 const getStatusVariant = (status: ProposalStatus) => {
   switch (status) {
@@ -67,11 +68,16 @@ export default function ProposalsPage() {
   const router = useRouter()
   const firestore = useFirestore()
   const { user } = useUser()
+  const [activeTab, setActiveTab] = useState<ProposalStatus | 'all'>('all')
+
 
   const proposalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null
-    return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid))
-  }, [firestore, user])
+    if (activeTab === 'all') {
+        return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid))
+    }
+    return query(collection(firestore, 'sales_proposals'), where('salesRepId', '==', user.uid), where('status', '==', activeTab))
+  }, [firestore, user, activeTab])
 
   const { data: proposals, isLoading } = useCollection<Proposal>(proposalsQuery)
 
@@ -92,7 +98,7 @@ export default function ProposalsPage() {
       return (
         <TableRow>
           <TableCell colSpan={5} className="h-24 text-center">
-            Nenhuma proposta encontrada para este vendedor.
+            Nenhuma proposta encontrada.
           </TableCell>
         </TableRow>
       )
@@ -129,35 +135,17 @@ export default function ProposalsPage() {
 
 
   return (
-    <Tabs defaultValue="all">
+    <Tabs defaultValue="all" onValueChange={(value) => setActiveTab(value as any)}>
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="aberta">Abertas</TabsTrigger>
-          <TabsTrigger value="finalizada">Finalizadas</TabsTrigger>
-          <TabsTrigger value="cancelada" className="hidden sm:flex">
+          <TabsTrigger value="Aberta">Abertas</TabsTrigger>
+          <TabsTrigger value="Finalizada">Finalizadas</TabsTrigger>
+          <TabsTrigger value="Cancelada" className="hidden sm:flex">
             Canceladas
           </TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Filtrar
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filtrar por Status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem checked>Aberta</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Em negociação</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Finalizada</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Cancelada</DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           <Button size="sm" variant="outline" className="h-8 gap-1">
             <File className="h-3.5 w-3.5" />
             <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
@@ -166,7 +154,7 @@ export default function ProposalsPage() {
           </Button>
         </div>
       </div>
-      <TabsContent value="all">
+      <TabsContent value={activeTab}>
         <Card>
           <CardHeader>
             <CardTitle>Minhas Propostas</CardTitle>
