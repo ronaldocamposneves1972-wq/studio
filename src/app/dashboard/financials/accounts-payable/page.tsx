@@ -73,6 +73,7 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
+import Link from "next/link"
 
 
 const getStatusVariant = (status: 'pending' | 'paid' | 'overdue') => {
@@ -96,7 +97,7 @@ const expenseSchema = z.object({
   dueDate: z.date({ required_error: "A data de vencimento é obrigatória." }),
   supplierId: z.string().optional(),
   costCenterId: z.string().optional(),
-  categoryId: z.string().optional(),
+  categoryId: z.string({ required_error: "A categoria é obrigatória." }),
 });
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
@@ -223,6 +224,27 @@ function ExpenseDialog({
                 />
                </div>
             </div>
+             <div className="grid gap-2">
+                <Label htmlFor="categoryId">Tipo de Despesa</Label>
+                 <Controller
+                    control={control}
+                    name="categoryId"
+                    render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className={errors.categoryId ? 'border-destructive' : ''}><SelectValue placeholder="Selecione o tipo de despesa" /></SelectTrigger>
+                        <SelectContent>
+                         {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                         {categories?.length === 0 && (
+                            <div className="p-4 text-sm text-center text-muted-foreground">
+                                Nenhum tipo encontrado. <Link href="/dashboard/expense-categories" className="text-primary underline">Cadastre um.</Link>
+                            </div>
+                         )}
+                        </SelectContent>
+                    </Select>
+                    )}
+                />
+                {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
+            </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -266,15 +288,15 @@ export default function AccountsPayablePage() {
   const costCentersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "cost_centers")) : null, [firestore]);
   const { data: costCenters } = useCollection<CostCenter>(costCentersQuery);
   
-  // You would create a similar query for expense categories
-  // For now, using a placeholder
-  const { data: categories } = useCollection<ExpenseCategory>(null);
+  const categoriesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, "expense_categories")) : null, [firestore]);
+  const { data: categories } = useCollection<ExpenseCategory>(categoriesQuery);
 
   const handleSaveExpense = async (data: ExpenseFormData) => {
     if (!firestore) return;
 
     const supplier = suppliers?.find(s => s.id === data.supplierId);
     const costCenter = costCenters?.find(c => c.id === data.costCenterId);
+    const category = categories?.find(c => c.id === data.categoryId);
     
     const newTransaction: Omit<Transaction, 'id'> = {
         description: data.description,
@@ -286,8 +308,8 @@ export default function AccountsPayablePage() {
         supplierName: supplier?.name,
         costCenterId: data.costCenterId,
         costCenterName: costCenter?.name,
-        // categoryId: data.categoryId,
-        // category: categories?.find(c => c.id === data.categoryId)?.name,
+        categoryId: data.categoryId,
+        category: category?.name,
         accountId: '', // This would be set upon payment
     }
 
