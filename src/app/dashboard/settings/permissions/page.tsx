@@ -27,10 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { collections } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-
 
 const roles = ['Admin', 'Gestor', 'Atendente', 'Financeiro', 'Anonimo'];
 
@@ -76,125 +75,133 @@ export default function PermissionsPage() {
     }
 
     const generateRules = () => {
-      let rulesString = `rules_version = '2';
+        let rulesString = `rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper Functions to check roles and ownership
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Safely gets the user's role, defaulting to 'Anonimo'
     function getUserRole() {
-      // Check if the user is signed in before trying to get their data
-      if (isSignedIn()) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      if (!isSignedIn()) {
+        return 'Anonimo';
       }
-      return 'Anonimo'; // Default role for non-signed-in users
+      // Assumes user document exists if they are signed in and need a role check
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isRole(role) {
-      // For anonymous users, check directly if the role is 'Anonimo'
-      if (!isSignedIn()) {
-        return role == 'Anonimo';
-      }
-      // For signed-in users, check their role from Firestore
       return getUserRole() == role;
     }
+
 `;
 
-    for (const collection of collections) {
-      let path = collection.includes('{') ? collection : `${collection}/{docId}`;
-      rulesString += `    match /${path} {\n`;
+        for (const collection of collections) {
+            let path = collection.includes('{') ? collection : `${collection}/{docId}`;
+            rulesString += `    match /${path} {\n`;
 
-      const permsByAction: Record<string, string[]> = {
-        get: [],
-        list: [],
-        create: [],
-        update: [],
-        delete: [],
-      };
+            const permsByAction: Record<string, string[]> = {
+                get: [],
+                list: [],
+                create: [],
+                update: [],
+                delete: [],
+            };
 
-      for (const role of roles) {
-        const rolePerms = permissions[role][collection];
-        const roleCheck = `isRole('${role}')`;
-        
-        if (rolePerms.create) permsByAction.create.push(roleCheck);
-        if (rolePerms.read) {
-          permsByAction.get.push(roleCheck);
-          permsByAction.list.push(roleCheck);
-        }
-        if (rolePerms.update) permsByAction.update.push(roleCheck);
-        if (rolePerms.delete) permsByAction.delete.push(roleCheck);
-      }
+            for (const role of roles) {
+                const rolePerms = permissions[role][collection];
+                const roleCheck = `isRole('${role}')`;
+                
+                if (rolePerms.create) permsByAction.create.push(roleCheck);
+                if (rolePerms.read) {
+                permsByAction.get.push(roleCheck);
+                permsByAction.list.push(roleCheck);
+                }
+                if (rolePerms.update) permsByAction.update.push(roleCheck);
+                if (rolePerms.delete) permsByAction.delete.push(roleCheck);
+            }
 
-      // Special owner-based rules for specific collections
-      if (collection === 'users/{userId}') {
-          permsByAction.get.push('isOwner(userId)');
-          permsByAction.update.push('isOwner(userId)');
-      }
-       if (collection === 'clients/{clientId}/documents/{documentId}') {
-          permsByAction.get.push(`
-            exists(/databases/$(database)/documents/clients/$(clientId)) &&
-            get(/databases/$(database)/documents/clients/$(clientId)).data.salesRepId == request.auth.uid
-          `);
-      }
+            // Special owner-based rules for specific collections
+            if (collection === 'users/{userId}') {
+                permsByAction.get.push('isOwner(userId)');
+                permsByAction.update.push('isOwner(userId)');
+            }
+            if (collection === 'clients/{clientId}/documents/{documentId}') {
+                permsByAction.get.push(`
+                    exists(/databases/$(database)/documents/clients/$(clientId)) &&
+                    get(/databases/$(database)/documents/clients/$(clientId)).data.salesRepId == request.auth.uid
+                `);
+            }
 
+            // Consolidate read/write rules where possible
+            const uniqueRead = [...new Set([...permsByAction.get, ...permsByAction.list])];
+            const uniqueWrite = [...new Set([...permsByAction.create, ...permsByAction.update, ...permsByAction.delete])];
 
-      // Consolidate read/write if possible
-      const allRead = [...new Set(permsByAction.get.concat(permsByAction.list))];
-      if (allRead.length > 0) {
-        rulesString += `      allow read: if ${allRead.join(' || ') || 'false'};\n`;
-      }
-      
-      const allWrite = [...new Set(permsByAction.create.concat(permsByAction.update, permsByAction.delete))];
-      if (allWrite.length > 0 && 
-          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.create.sort()) && 
-          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.update.sort()) && 
-          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.delete.sort())) {
-          rulesString += `      allow write: if ${allWrite.join(' || ') || 'false'};\n`;
-      } else {
-          if (permsByAction.create.length > 0) {
+            if (uniqueRead.length > 0) {
+                 rulesString += `      allow read: if ${uniqueRead.join(' || ') || 'false'};\n`;
+            }
+            
+            if (permsByAction.create.length > 0) {
               rulesString += `      allow create: if ${[...new Set(permsByAction.create)].join(' || ') || 'false'};\n`;
-          }
-          if (permsByAction.update.length > 0) {
-              rulesString += `      allow update: if ${[...new Set(permsByAction.update)].join(' || ') || 'false'};\n`;
-          }
-          if (permsByAction.delete.length > 0) {
-              rulesString += `      allow delete: if ${[...new Set(permsByAction.delete)].join(' || ') || 'false'};\n`;
-          }
-      }
+            }
+            if (permsByAction.update.length > 0) {
+                rulesString += `      allow update: if ${[...new Set(permsByAction.update)].join(' || ') || 'false'};\n`;
+            }
+            if (permsByAction.delete.length > 0) {
+                rulesString += `      allow delete: if ${[...new Set(permsByAction.delete)].join(' || ') || 'false'};\n`;
+            }
+            
+            if (uniqueRead.length === 0 && uniqueWrite.length === 0 && permsByAction.create.length === 0 && permsByAction.update.length === 0 && permsByAction.delete.length === 0) {
+                 rulesString += `      allow read, write: if false;\n`;
+            }
 
-      if (allRead.length === 0 && allWrite.length === 0 && permsByAction.create.length === 0 && permsByAction.update.length === 0 && permsByAction.delete.length === 0) {
-        rulesString += `      allow read, write: if false;\n`;
-      }
+            rulesString += `    }\n`;
+        }
 
-      rulesString += `    }\n`;
-    }
-
-    rulesString += `  }\n}\n`;
-    return rulesString;
-  };
+        rulesString += `  }\n}\n`;
+        return rulesString;
+    };
     
-    const handleSave = () => {
+    const handleSave = async () => {
         setIsSaving(true);
-        // This function will now be handled by the agent's file modification capabilities.
-        // The generated rules will be placed in the `firestore.rules` file in the response.
-        // We simulate a short delay for user feedback.
-        setTimeout(() => {
-            toast({
-                title: "Regras de Segurança Prontas para Aplicação",
-                description: "As novas regras foram geradas. A aplicação será feita pelo sistema.",
-            });
-            setIsSaving(false);
-        }, 1000);
-    }
+        const generatedRules = generateRules();
 
+        try {
+            const response = await fetch('/api/update-rules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rules: generatedRules }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Falha ao salvar as regras.');
+            }
+
+            toast({
+                title: "Regras de Segurança Salvas!",
+                description: "O arquivo firestore.rules foi atualizado com sucesso.",
+            });
+        } catch (error) {
+            console.error('Error saving Firestore rules:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao Salvar Regras',
+                description: errorMessage,
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    }
 
     return (
         <Card>
@@ -276,5 +283,3 @@ service cloud.firestore {
           </Card>
     )
 }
-
-    

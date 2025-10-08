@@ -1,332 +1,248 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech.
+ * @fileoverview Firestore Security Rules for ConsorciaTech application.
  *
  * Core Philosophy:
- * This ruleset employs a hybrid security model, primarily based on ownership and
- * explicit role-based access.  User-specific data is secured using path-based
- * ownership, while other collections are generally open for reading but require
- * authentication for write operations. The admin role is determined by the existence
- * of a document in the `/roles_admin/{userId}` collection.
+ * This ruleset enforces a combination of role-based and ownership-based access control.
+ * Admins have broad access, while regular users primarily interact with data they own or are explicitly granted access to.
+ * Authorization Independence is a key principle, achieved through data denormalization to avoid costly `get()` calls.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles; access is restricted to the owning user.
- * - /roles_admin/{userId}: Existence of document grants admin role to user.
- * - /clients/{clientId}: Stores client data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /clients/{clientId}/documents/{documentId}: Stores client documents; access is restricted to the specific client.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /consortiums/{consortiumId}: Stores consortium product data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /credit_products/{creditProductId}: Stores credit product data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /product_combos/{productComboId}: Stores product combo data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /sales_proposals/{salesProposalId}: Stores sales proposal data; read is open, write should be restricted (TODO: Implement restrictions).
- * - /sales_orders/{salesOrderId}: Stores sales order data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /commissions/{commissionId}: Stores commission data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /quizzes/{quizId}: Stores quiz data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /questions/{questionId}: Stores question data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /suppliers/{supplierId}: Stores supplier data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /cost_centers/{costCenterId}: Stores cost center data; generally open read, but write should be restricted (TODO: Implement restrictions).
- * - /expense_categories/{categoryId}: Stores expense category data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /users/{userId}: Stores user profiles. Accessible to the user themselves and admins.
+ * - /roles_admin/{userId}: Document existence grants admin role.
+ * - /clients/{clientId}: Stores client information.
+ * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, accessible to the client and admins.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
+ * - /consortiums/{consortiumId}: Stores consortium product data.
+ * - /credit_products/{creditProductId}: Stores credit product data.
+ * - /product_combos/{productComboId}: Stores product combo data.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data.  Includes clientId to authorize based on client.
+ * - /sales_orders/{salesOrderId}: Stores sales order data.
+ * - /commissions/{commissionId}: Stores commission data.
+ * - /quizzes/{quizId}: Stores quiz data.
+ * - /questions/{questionId}: Stores question data.
+ * - /suppliers/{supplierId}: Stores supplier data.
+ * - /cost_centers/{costCenterId}: Stores cost center data.
+ * - /expense_categories/{categoryId}: Stores expense category data.
  *
  * Key Security Decisions:
- * - `list` operation on `/users` is denied due to privacy concerns (as requested in the original error report). Listing users could expose sensitive information.
- * - Most collections are publicly readable (`allow get, list: if true;`) to facilitate data discovery and display.
- * - Write access is generally restricted and requires further refinement (marked with TODO comments).
- * - The existence of a document in `/roles_admin/{userId}` is checked to determine admin status instead of content inspection.
- *
- * Denormalization for Authorization:
- * - The `sales_proposals` collection denormalizes the `clientId` to enable simpler authorization rules that do not require additional `get()` calls.
+ * - Admin Role: Document existence in /roles_admin/{userId} grants admin privileges.
+ * - Ownership: Path-based ownership is enforced for user data and client documents.
+ * - Authorization Independence: Data is denormalized (e.g., clientId in sales_proposals) to avoid costly `get()` calls in rules.
+ * - No User Listing: Listing all users is not permitted for security reasons.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the request is made by an authenticated user.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Requires authentication for certain operations.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces user-based ownership.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    /**
-     * @description Checks if the authenticated user is an existing owner of the document.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces user-based ownership and verifies document existence for updates/deletes.
-     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
-   /**
-    * @description Checks if the authenticated user has admin privileges by checking for the existence of a document in /roles_admin/{userId}.
-    * @path N/A
-    * @allow N/A
-    * @deny N/A
-    * @principle Implements role-based access control using document existence.
-    */
-    function isAdmin() {
-        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-
     /**
-     * @description Security rules for user profiles.
+     * @description Controls access to user profiles.
      * @path /users/{userId}
-     * @allow (create) - If the user is creating their own profile (auth.uid == userId).
-     * @allow (get, update, delete) - If the user is the owner of the profile.
-     * @deny (create) - If the user is creating a profile for another user (auth.uid != userId).
-     * @deny (get, update, delete) - If the user is not the owner of the profile.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+     * @allow (read, write, list) if isOwner(userId) - Allows the user to read and write their own profile.
+     * @allow (read, write, list) if isAdmin() - Allows admins to read and write any user profile.
+     * @deny (create, update, delete) if !isOwner(userId) && !isAdmin() - Denies non-owners and non-admins from creating, updating, or deleting user profiles.
+     * @principle Enforces document ownership and admin override.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false; // CRITICAL: Preventing listing of users for privacy. See error report.
+      allow get, update, delete: if isExistingOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow list: if isAdmin();
     }
 
     /**
-     * @description Security rules for admin roles. Document existence determines admin status.
+     * @description Controls access to admin role documents.
      * @path /roles_admin/{userId}
-     * @allow (create) - If an admin is creating a new admin role (TODO: Implement admin check).
-     * @allow (get, update, delete) - If the user is an admin (TODO: Implement admin check).
-     * @deny (create, get, update, delete) - If the user is not an admin.
-     * @principle Implements role-based access control.
+     * @allow create: if isAdmin() - Allows admins to grant admin roles.
+     * @allow get, delete: if isAdmin() - Allows admins to check and revoke admin roles.
+     * @deny read, write, list, update: if true - Denies all other operations.
+     * @principle Existence of document grants admin role; managed by admins.
      */
     match /roles_admin/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
+      allow get, delete: if isAdmin();
       allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow list, update: if false;
     }
 
     /**
-     * @description Security rules for client data.
+     * @description Controls access to client documents.
      * @path /clients/{clientId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read client data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete client data.
+     * @principle Restricts write access to admins.
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only or self-creation with specific constraints
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for client documents.
+     * @description Controls access to client documents (files).
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list) - If the user is the owner of the client.
-     * @allow (create) - If the user is the owner of the client.
-     * @allow (update, delete) - If the user is the owner of the client and the document exists.
-     * @deny (get, list, create, update, delete) - If the user is not the owner of the client.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+     * @allow get, list: if isAdmin() - Allows admin to view all documents.
+     * @allow create: if isAdmin()
+     * @allow update: if isAdmin()
+     * @allow delete: if isAdmin()
+     * @principle Restricts access to a client's own documents and admin override.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Restrict further based on relationship to client.
-      allow update: if isSignedIn() && resource != null; // TODO: Restrict further based on relationship to client.
-      allow delete: if isSignedIn() && resource != null; // TODO: Restrict further based on relationship to client.
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for financial institution data.
+     * @description Controls access to financial institution documents.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read financial institution data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete financial institution data.
+     * @principle Restricts write access to admins.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for consortium product data.
+     * @description Controls access to consortium product documents.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read consortium product data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete consortium product data.
+     * @principle Restricts write access to admins.
      */
     match /consortiums/{consortiumId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for credit product data.
+     * @description Controls access to credit product documents.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read credit product data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete credit product data.
+     * @principle Restricts write access to admins.
      */
     match /credit_products/{creditProductId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for product combo data.
+     * @description Controls access to product combo documents.
      * @path /product_combos/{productComboId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read product combo data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete product combo data.
+     * @principle Restricts write access to admins.
      */
     match /product_combos/{productComboId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for sales proposal data.
+     * @description Controls access to sales proposal documents.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read sales proposal data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete sales proposal data.
+     * @principle Restricts write access to admins.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Restrict further to roles or specific users.
-      allow update: if isSignedIn() && resource != null; // TODO: Restrict further to roles or specific users.
-      allow delete: if isSignedIn() && resource != null; // TODO: Restrict further to roles or specific users.
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-   /**
-     * @description Security rules for sales order data.
+    /**
+     * @description Controls access to sales order documents.
      * @path /sales_orders/{salesOrderId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read sales order data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete sales order data.
+     * @principle Restricts write access to admins.
      */
     match /sales_orders/{salesOrderId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add create condition - likely admin-only
-      allow update: if isSignedIn() && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if isSignedIn() && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for commission data.
+     * @description Controls access to commission documents.
      * @path /commissions/{commissionId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read commission data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete commission data.
+     * @principle Restricts write access to admins.
      */
     match /commissions/{commissionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Add create condition - likely admin-only
-      allow update: if isSignedIn() && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if isSignedIn() && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for quiz data.
+     * @description Controls access to quiz documents.
      * @path /quizzes/{quizId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read quiz data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete quiz data.
+     * @principle Restricts write access to admins.
      */
     match /quizzes/{quizId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for question data.
+     * @description Controls access to question documents.
      * @path /questions/{questionId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read question data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete question data.
+     * @principle Restricts write access to admins.
      */
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
-
-   /**
-     * @description Security rules for supplier data.
-     * @path /suppliers/{supplierId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
-     */
-    match /suppliers/{supplierId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
-    }
-
     /**
-     * @description Security rules for cost center data.
+     * @description Controls access to supplier documents.
+     * @path /suppliers/{supplierId}
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read supplier data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete supplier data.
+     * @principle Restricts write access to admins.
+     */
+     match /suppliers/{supplierId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+     /**
+     * @description Controls access to cost center documents.
      * @path /cost_centers/{costCenterId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read cost center data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete cost center data.
+     * @principle Restricts write access to admins.
      */
     match /cost_centers/{costCenterId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
-
-   /**
-     * @description Security rules for expense category data.
+     /**
+     * @description Controls access to expense category documents.
      * @path /expense_categories/{categoryId}
-     * @allow (get, list) - Public read access.
-     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
-     * @deny (create, update, delete) - If the write conditions are not met.
+     * @allow get, list: if isSignedIn() - Allows any authenticated user to read expense category data.
+     * @allow create, update, delete: if isAdmin() - Only admins can create, update, or delete expense category data.
+     * @principle Restricts write access to admins.
      */
     match /expense_categories/{categoryId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; // TODO: Add create condition - likely admin-only
-      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
-      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
   }
 }
