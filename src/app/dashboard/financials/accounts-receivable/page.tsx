@@ -91,7 +91,7 @@ const getStatusVariant = (status: 'pending' | 'paid' | 'overdue') => {
 const markAsPaidSchema = z.object({
   paymentDate: z.date({
     required_error: "A data de pagamento é obrigatória.",
-  }),
+  }).max(new Date(), { message: "A data de compensação não pode ser uma data futura." }),
   accountId: z.string({
     required_error: "Selecione a conta creditada.",
   }),
@@ -170,6 +170,7 @@ function MarkAsPaidDialog({
                                   mode="single"
                                   selected={field.value}
                                   onSelect={field.onChange}
+                                  disabled={(date) => date > new Date()}
                                   initialFocus
                               />
                           </PopoverContent>
