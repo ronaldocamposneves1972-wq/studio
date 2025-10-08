@@ -1,80 +1,130 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for user data,
- *              while allowing public read access to product catalogs.
+ * @fileoverview Firestore Security Rules for ConsorciaTech application.
+ *
+ * Core Philosophy:
+ * This ruleset employs a hybrid security model. User-owned data (under /users/{userId}) is strictly controlled by the owning user.
+ * Other top-level collections such as clients, financial institutions, products and sales proposals, are publicly readable but writable only with appropriate authentication and authorization based on denormalized data.
+ * The admin role is determined by the existence of a document under /roles_admin/{userId}.
  *
  * Data Structure:
- * - /users/{userId}: Stores user-specific data, accessible only by the user.
- * - /roles_admin/{userId}: Used to grant admin role to users. The existence of a
- *     document under this path grants admin privileges to the corresponding user.
- * - /clients/{clientId}: Stores client data.
- * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, accessible only by the specific client.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
- * - /consortiums/{consortiumId}: Stores consortium product data.
- * - /credit_products/{creditProductId}: Stores credit product data.
- * - /product_combos/{productComboId}: Stores product combo data.
- * - /sales_proposals/{salesProposalId}: Stores sales proposal data.
- * - /sales_orders/{salesOrderId}: Stores sales order data.
- * - /commissions/{commissionId}: Stores commission data.
- * - /quizzes/{quizId}: Stores quiz data.
- * - /questions/{questionId}: Stores question data.
- * - /suppliers/{supplierId}: Stores supplier data.
- * - /cost_centers/{costCenterId}: Stores cost center data.
- * - /expense_categories/{categoryId}: Stores expense category data.
+ * - /users/{userId}: User profile information. Accessible only by the user.
+ * - /roles_admin/{userId}: Indicates admin role. Existence of document grants admin privileges.
+ * - /clients/{clientId}: Client information. Publicly readable.
+ * - /clients/{clientId}/documents/{documentId}: Documents uploaded by a specific client. Accessible only by the specific client.
+ * - /financial_institutions/{financialInstitutionId}: Financial institution data. Publicly readable.
+ * - /consortiums/{consortiumId}: Consortium product data. Publicly readable.
+ * - /credit_products/{creditProductId}: Credit product data. Publicly readable.
+ * - /product_combos/{productComboId}: Product combo data. Publicly readable.
+ * - /sales_proposals/{salesProposalId}: Sales proposal data. Publicly readable.
+ * - /sales_orders/{salesOrderId}: Sales order data. Publicly readable.
+ * - /commissions/{commissionId}: Commission data. Publicly readable.
+ * - /quizzes/{quizId}: Quiz data. Publicly readable.
+ * - /questions/{questionId}: Question data. Publicly readable.
+ * - /suppliers/{supplierId}: Supplier data. Publicly readable.
+ * - /cost_centers/{costCenterId}: Cost Center data. Publicly readable.
+ * - /expense_categories/{categoryId}: Expense Category data. Publicly readable.
  *
  * Key Security Decisions:
- * - User data is strictly controlled by the user's ID in the path (`/users/{userId}`).
- * - `list` operations are generally allowed only within a user's own data tree.
- * - Admin roles are determined by the existence of documents in `/roles_admin/{userId}`.
- * - Data required for authorization is denormalized to avoid costly `get()` calls.
+ * - Users can only access their own data under /users/{userId}.
+ * - Listing of users is disallowed to prevent enumeration.
+ * - Admin role is determined by document existence in /roles_admin/{userId}.
+ * - Public read access is granted to most top-level collections, with write access controlled by other factors (e.g., ownership).
+ * - The structure prioritizes authorization independence, avoiding complex queries in rules.
+ *
+ * Denormalization for Authorization:
+ * - The `clientId` is denormalized into the `sales_proposals` collection to allow easy authorization based on client ownership.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read and write their own user document.
-     * @path /users/{userId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get, list) if request.auth.uid == userId
-     * @deny (create, update, delete) if request.auth.uid != userId
-     * @deny (get, list) if request.auth.uid != userId
-     * @principle Enforces document ownership for all operations.
+     * @description Checks if the request is made by a signed-in user.
+     * @return {boolean} True if the user is signed in, false otherwise.
      */
-    match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && resource.data.id == userId;
-      allow delete: if isOwner(userId) && resource != null;
-    }
-
-     /**
-      * @description Allows checking admin role based on document existence.
-      * @path /roles_admin/{userId}
-      * @allow get: if true;
-      * @allow list: if false;
-      * @allow create: if true;
-      * @allow update: if false;
-      * @allow delete: if true;
-      * @principle Uses document existence to determine admin role.
-      */
-    match /roles_admin/{userId} {
-        allow get: if true; // Publicly readable for checking admin status
-        allow list: if false; // Prevent listing of admin roles
-        allow create: if true; // Any authenticated user can be made an admin
-        allow update: if false; // Prevent updates
-        allow delete: if true; // Admin role can be revoked
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Allows reading and writing client data. No ownership enforced
+     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user ID matches the authenticated user's ID, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user ID matches the provided user ID, and the resource exists.
+     * @param {string} userId The user ID to compare against.
+     * @return {boolean} True if the user ID matches the authenticated user's ID and resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the user is an admin.
+     * @return {boolean} True if the user has an admin role, false otherwise.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+
+    /**
+     * @description Defines custom claim on user if the user exists on /roles_admin/{userId}
+     * @return {boolean}
+     */
+    // allows admins to write anywhere.
+    match /{path=**} /users/{userId} {
+            allow read: if false;
+            allow write: if false;
+    }
+
+    /**
+     * @description Grants access to user-specific data.
+     * @path /users/{userId}
+     * @allow (get, list, create, update, delete) if the user is the owner.
+     * @deny (get, list, create, update, delete) if the user is not the owner.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Grants access to admin role documents based on user ID.
+     * @path /roles_admin/{userId}
+     * @allow create: if isSignedIn() && request.auth.uid == userId;
+     * @allow get: if isAdmin() || isOwner(userId);
+     * @allow update: if false;
+     * @allow delete: if isAdmin();
+     * @deny create: if !isSignedIn() || request.auth.uid != userId;
+     * @deny get: if !isAdmin() && !isOwner(userId);
+     * @deny update: if true;
+     * @deny delete: if !isAdmin();
+     * @principle Controls admin role assignment via document existence.
+     */
+    match /roles_admin/{userId} {
+      allow get: if isAdmin() || isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Grants public read access to client data, but restricts writes.
      * @path /clients/{clientId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access with restricted writes.
      */
     match /clients/{clientId} {
       allow get, list: if true;
@@ -82,30 +132,28 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows a client to read and write their own documents.
+     * @description Grants access to documents uploaded by a specific client.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create, update, delete) if request.auth.uid == clientId
-     * @allow (get, list) if request.auth.uid == clientId
-     * @deny (create, update, delete) if request.auth.uid != clientId
-     * @deny (get, list) if request.auth.uid != clientId
-     * @principle Enforces document ownership for all operations.
+     * @allow get, list: if isOwner(clientId);
+     * @allow create: if isSignedIn() && request.auth.uid == clientId;
+     * @allow update: if isExistingOwner(clientId);
+     * @allow delete: if isExistingOwner(clientId);
+     * @principle Enforces document ownership under a specific client.
      */
     match /clients/{clientId}/documents/{documentId} {
-        function isOwner(clientId) {
-            return request.auth.uid == clientId;
-        }
-        allow get, list: if isOwner(clientId);
-        allow create: if isOwner(clientId);
-        allow update: if isOwner(clientId) && resource != null;
-        allow delete: if isOwner(clientId) && resource != null;
+      allow get: if isOwner(clientId);
+      allow list: if isOwner(clientId);
+      allow create: if isSignedIn() && request.auth.uid == clientId;
+      allow update: if isExistingOwner(clientId);
+      allow delete: if isExistingOwner(clientId);
     }
 
     /**
-     * @description Allows reading and writing financial institution data. No ownership enforced
+     * @description Grants public read access to financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /financial_institutions/{financialInstitutionId} {
       allow get, list: if true;
@@ -113,11 +161,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing consortium product data. No ownership enforced
+     * @description Grants public read access to consortium product data.
      * @path /consortiums/{consortiumId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /consortiums/{consortiumId} {
       allow get, list: if true;
@@ -125,11 +173,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing credit product data. No ownership enforced
+     * @description Grants public read access to credit product data.
      * @path /credit_products/{creditProductId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /credit_products/{creditProductId} {
       allow get, list: if true;
@@ -137,11 +185,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing product combo data. No ownership enforced
+     * @description Grants public read access to product combo data.
      * @path /product_combos/{productComboId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /product_combos/{productComboId} {
       allow get, list: if true;
@@ -149,11 +197,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing sales proposal data. No ownership enforced
+     * @description Grants public read access to sales proposal data.
      * @path /sales_proposals/{salesProposalId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /sales_proposals/{salesProposalId} {
       allow get, list: if true;
@@ -161,11 +209,11 @@ service cloud.firestore {
     }
 
    /**
-     * @description Allows reading and writing sales order data. No ownership enforced
+     * @description Grants public read access to sales order data.
      * @path /sales_orders/{salesOrderId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /sales_orders/{salesOrderId} {
       allow get, list: if true;
@@ -173,11 +221,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing commission data. No ownership enforced
+     * @description Grants public read access to commission data.
      * @path /commissions/{commissionId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /commissions/{commissionId} {
       allow get, list: if true;
@@ -185,11 +233,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing quiz data. No ownership enforced
+     * @description Grants public read access to quiz data.
      * @path /quizzes/{quizId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /quizzes/{quizId} {
       allow get, list: if true;
@@ -197,11 +245,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing question data. No ownership enforced
+     * @description Grants public read access to question data.
      * @path /questions/{questionId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /questions/{questionId} {
       allow get, list: if true;
@@ -209,11 +257,11 @@ service cloud.firestore {
     }
 
      /**
-     * @description Allows reading and writing supplier data. No ownership enforced
+     * @description Grants public read access to supplier data.
      * @path /suppliers/{supplierId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /suppliers/{supplierId} {
       allow get, list: if true;
@@ -221,23 +269,23 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows reading and writing cost center data. No ownership enforced
+     * @description Grants public read access to cost center data.
      * @path /cost_centers/{costCenterId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /cost_centers/{costCenterId} {
       allow get, list: if true;
       allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /**
-     * @description Allows reading and writing expense category data. No ownership enforced
+   /**
+     * @description Grants public read access to expense category data.
      * @path /expense_categories/{categoryId}
      * @allow get, list: if true;
      * @allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-     * @principle Allows public read access but restricts writes.
+     * @principle Allows public read access.
      */
     match /expense_categories/{categoryId} {
       allow get, list: if true;
