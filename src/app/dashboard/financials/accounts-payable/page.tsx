@@ -241,8 +241,8 @@ function ExpenseDialog({
                                 items={categories?.map(c => ({ value: c.id, label: c.name })) || []}
                                 value={field.value}
                                 onChange={field.onChange}
-                                placeholder="Pesquisar tipo de despesa..."
-                                searchPlaceholder="Buscar tipo..."
+                                placeholder="Pesquisar tipo..."
+                                searchPlaceholder="Buscar tipo de despesa..."
                                 notFoundMessage="Nenhum tipo encontrado."
                             />
                         )}
@@ -256,7 +256,7 @@ function ExpenseDialog({
                         value={costCenterName}
                         readOnly
                         disabled
-                        placeholder="Selecione um tipo de despesa"
+                        placeholder="Automático"
                         className="bg-muted"
                     />
                </div>
@@ -497,5 +497,3 @@ export default function AccountsPayablePage() {
     </>
   )
 }
-
-    
