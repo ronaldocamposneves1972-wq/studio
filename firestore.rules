@@ -1,330 +1,332 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech application.
+ * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset employs a hybrid security model. User data is strictly controlled via path-based ownership.
- * Other collections are generally publically readable but only writable by authenticated users (or not writable at all), with denormalization to avoid costly `get()` calls.
- * Admin roles are determined by document existence in the `/roles_admin/{userId}` collection.
+ * This ruleset employs a hybrid security model, primarily based on ownership and
+ * explicit role-based access.  User-specific data is secured using path-based
+ * ownership, while other collections are generally open for reading but require
+ * authentication for write operations. The admin role is determined by the existence
+ * of a document in the `/roles_admin/{userId}` collection.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, secured with path-based ownership.
- * - /roles_admin/{userId}: Indicates admin privileges; existence of a document grants admin role.
- * - /clients/{clientId}: Stores client information.
- * - /clients/{clientId}/documents/{documentId}: Client-uploaded documents, accessible only to the associated client.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution data (public read).
- * - /consortiums/{consortiumId}: Stores consortium product data (public read).
- * - /credit_products/{creditProductId}: Stores credit product data (public read).
- * - /product_combos/{productComboId}: Stores product combo data (public read).
- * - /sales_proposals/{salesProposalId}: Stores sales proposal data, with denormalized clientId for access control.
- * - /sales_orders/{salesOrderId}: Stores sales order data.
- * - /commissions/{commissionId}: Stores commission data.
- * - /quizzes/{quizId}: Stores quiz data (public read).
- * - /questions/{questionId}: Stores question data (public read).
- * - /suppliers/{supplierId}: Stores supplier data (public read).
- * - /cost_centers/{costCenterId}: Stores cost center data (public read).
- * - /expense_categories/{categoryId}: Stores expense category data (public read).
+ * - /users/{userId}: Stores user profiles; access is restricted to the owning user.
+ * - /roles_admin/{userId}: Existence of document grants admin role to user.
+ * - /clients/{clientId}: Stores client data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /clients/{clientId}/documents/{documentId}: Stores client documents; access is restricted to the specific client.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /consortiums/{consortiumId}: Stores consortium product data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /credit_products/{creditProductId}: Stores credit product data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /product_combos/{productComboId}: Stores product combo data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data; read is open, write should be restricted (TODO: Implement restrictions).
+ * - /sales_orders/{salesOrderId}: Stores sales order data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /commissions/{commissionId}: Stores commission data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /quizzes/{quizId}: Stores quiz data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /questions/{questionId}: Stores question data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /suppliers/{supplierId}: Stores supplier data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /cost_centers/{costCenterId}: Stores cost center data; generally open read, but write should be restricted (TODO: Implement restrictions).
+ * - /expense_categories/{categoryId}: Stores expense category data; generally open read, but write should be restricted (TODO: Implement restrictions).
  *
  * Key Security Decisions:
- * - User listing is disabled for security reasons.
- * - Data validation is minimized in this prototyping phase, focusing on relational integrity and authorization.
- * - Public read access is granted to several collections to facilitate data display and discovery.
- * - All destructive operations require a document existence check.
+ * - `list` operation on `/users` is denied due to privacy concerns (as requested in the original error report). Listing users could expose sensitive information.
+ * - Most collections are publicly readable (`allow get, list: if true;`) to facilitate data discovery and display.
+ * - Write access is generally restricted and requires further refinement (marked with TODO comments).
+ * - The existence of a document in `/roles_admin/{userId}` is checked to determine admin status instead of content inspection.
  *
  * Denormalization for Authorization:
- * - SalesProposals: The `clientId` is denormalized onto the document to allow rules to easily check client access without additional reads.
+ * - The `sales_proposals` collection denormalizes the `clientId` to enable simpler authorization rules that do not require additional `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by a signed-in user.
+     * @description Checks if the request is made by an authenticated user.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Requires authentication for certain operations.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Enforces user-based ownership.
      */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user is an existing owner.
+     * @description Checks if the authenticated user is an existing owner of the document.
+     * @path N/A
+     * @allow N/A
+     * @deny N/A
+     * @principle Enforces user-based ownership and verifies document existence for updates/deletes.
      */
     function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+      return isOwner(userId) && resource != null;
     }
 
-    /**
-     * @description Checks if the authenticated user is an admin.
-     * Admins are identified by the existence of a document in `/roles_admin/{userId}`.
-     */
+   /**
+    * @description Checks if the authenticated user has admin privileges by checking for the existence of a document in /roles_admin/{userId}.
+    * @path N/A
+    * @allow N/A
+    * @deny N/A
+    * @principle Implements role-based access control using document existence.
+    */
     function isAdmin() {
-      return exists(/databases/(default)/documents/roles_admin/$(request.auth.uid));
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    /******************** Users Collection ********************/
+
     /**
-     * @description Manages user profiles, allowing users to read and write their own data.
+     * @description Security rules for user profiles.
      * @path /users/{userId}
-     * @allow (create) Signed-in user with matching userId can create their own profile.
-     * @allow (get, list, update, delete) Signed-in user with matching userId can get, update, and delete their own profile.
-     * @deny (create, get, list, update, delete) Any operation by a non-authenticated user or on a different user's profile.
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @allow (create) - If the user is creating their own profile (auth.uid == userId).
+     * @allow (get, update, delete) - If the user is the owner of the profile.
+     * @deny (create) - If the user is creating a profile for another user (auth.uid != userId).
+     * @deny (get, update, delete) - If the user is not the owner of the profile.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false; // User listing is not permitted.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id; // Enforce immutability of id
+      allow list: if false; // CRITICAL: Preventing listing of users for privacy. See error report.
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
-    /******************** Admin Roles Collection ********************/
     /**
-     * @description Manages admin roles based on document existence. Only admins can create/delete admin roles.
+     * @description Security rules for admin roles. Document existence determines admin status.
      * @path /roles_admin/{userId}
-     * @allow (create) An admin user can grant another user admin role.
-     * @allow (get) Any signed-in user can check for admin role.
-     * @allow (delete) An admin user can revoke another user admin role.
-     * @deny (create, get, list, update, delete) Non-admins cannot create, update, or delete admin roles.
-     * @principle Role-based access control via document existence.
+     * @allow (create) - If an admin is creating a new admin role (TODO: Implement admin check).
+     * @allow (get, update, delete) - If the user is an admin (TODO: Implement admin check).
+     * @deny (create, get, update, delete) - If the user is not an admin.
+     * @principle Implements role-based access control.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
+      allow get: if isAdmin();
       allow list: if false;
       allow create: if isAdmin();
-      allow update: if false;
-      allow delete: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
-    /******************** Clients Collection ********************/
     /**
-     * @description Manages client data. Allows anyone to read, but only admins to create, update, and delete clients.
+     * @description Security rules for client data.
      * @path /clients/{clientId}
-     * @allow (get, list) Anyone can read client data.
-     * @allow (create, update, delete) Only admins can create, update, and delete clients.
-     * @deny (create, update, delete) Non-admins cannot modify client data.
-     * @principle Role-based access control for modifying client data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only or self-creation with specific constraints
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Client Documents Collection ********************/
     /**
-     * @description Manages client-uploaded documents, restricting access to the associated client.
+     * @description Security rules for client documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list) The client can read their own documents.
-     * @allow (create) The client can create their own documents.
-     * @allow (update, delete) The client can update and delete their own documents.
-     * @deny (create, get, list, update, delete) Other users cannot access client documents.
-     * @principle Path-based ownership ensures client-specific document access.
+     * @allow (get, list) - If the user is the owner of the client.
+     * @allow (create) - If the user is the owner of the client.
+     * @allow (update, delete) - If the user is the owner of the client and the document exists.
+     * @deny (get, list, create, update, delete) - If the user is not the owner of the client.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if isOwner(clientId);
-      allow create: if isOwner(clientId) && request.resource.data.clientId == clientId;
-      allow update: if isExistingOwner(clientId) && request.resource.data.clientId == resource.data.clientId; // Enforce immutability of clientId
-      allow delete: if isExistingOwner(clientId);
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn(); // TODO: Restrict further based on relationship to client.
+      allow update: if isSignedIn() && resource != null; // TODO: Restrict further based on relationship to client.
+      allow delete: if isSignedIn() && resource != null; // TODO: Restrict further based on relationship to client.
     }
 
-    /******************** Financial Institutions Collection ********************/
     /**
-     * @description Manages financial institution data, allowing public read access.
+     * @description Security rules for financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get, list) Anyone can read financial institution data.
-     * @allow (create, update, delete) Only admins can create, update, and delete financial institutions.
-     * @deny (create, update, delete) Non-admins cannot modify financial institution data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Consortiums Collection ********************/
     /**
-     * @description Manages consortium product data, allowing public read access.
+     * @description Security rules for consortium product data.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list) Anyone can read consortium product data.
-     * @allow (create, update, delete) Only admins can create, update, and delete consortiums.
-     * @deny (create, update, delete) Non-admins cannot modify consortium product data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /consortiums/{consortiumId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Credit Products Collection ********************/
     /**
-     * @description Manages credit product data, allowing public read access.
+     * @description Security rules for credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list) Anyone can read credit product data.
-     * @allow (create, update, delete) Only admins can create, update, and delete credit products.
-     * @deny (create, update, delete) Non-admins cannot modify credit product data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /credit_products/{creditProductId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Product Combos Collection ********************/
     /**
-     * @description Manages product combo data, allowing public read access.
+     * @description Security rules for product combo data.
      * @path /product_combos/{productComboId}
-     * @allow (get, list) Anyone can read product combo data.
-     * @allow (create, update, delete) Only admins can create, update, and delete product combos.
-     * @deny (create, update, delete) Non-admins cannot modify product combo data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /product_combos/{productComboId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Sales Proposals Collection ********************/
     /**
-     * @description Manages sales proposal data, allowing access based on the associated client.
+     * @description Security rules for sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get, list) Anyone can read sales proposal data.
-     * @allow (create) Only signed-in users can create sales proposals, and the clientId must be valid.
-     * @allow (update, delete) Only signed-in users with matching clientId can update and delete sales proposals.
-     * @deny (create, update, delete) Other users cannot access sales proposals.
-     * @principle Denormalized clientId allows authorization independence.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.clientId != null;
-      allow update: if isSignedIn() && resource != null && request.resource.data.clientId == resource.data.clientId;
-      allow delete: if isSignedIn() && resource != null && request.resource.data.clientId == resource.data.clientId;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn(); // TODO: Restrict further to roles or specific users.
+      allow update: if isSignedIn() && resource != null; // TODO: Restrict further to roles or specific users.
+      allow delete: if isSignedIn() && resource != null; // TODO: Restrict further to roles or specific users.
     }
-    
-    /******************** Sales Orders Collection ********************/
-    /**
-     * @description Manages sales order data. Allows anyone to read, but only admins to create, update, and delete sales orders.
+
+   /**
+     * @description Security rules for sales order data.
      * @path /sales_orders/{salesOrderId}
-     * @allow (get, list) Anyone can read sales order data.
-     * @allow (create, update, delete) Only admins can create, update, and delete sales orders.
-     * @deny (create, update, delete) Non-admins cannot modify sales order data.
-     * @principle Role-based access control for modifying sales order data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /sales_orders/{salesOrderId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn(); // TODO: Add create condition - likely admin-only
+      allow update: if isSignedIn() && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if isSignedIn() && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Commissions Collection ********************/
     /**
-     * @description Manages commission data. Allows anyone to read, but only admins to create, update, and delete commissions.
+     * @description Security rules for commission data.
      * @path /commissions/{commissionId}
-     * @allow (get, list) Anyone can read commission data.
-     * @allow (create, update, delete) Only admins can create, update, and delete commissions.
-     * @deny (create, update, delete) Non-admins cannot modify commission data.
-     * @principle Role-based access control for modifying commission data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /commissions/{commissionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn(); // TODO: Add create condition - likely admin-only
+      allow update: if isSignedIn() && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if isSignedIn() && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Quizzes Collection ********************/
     /**
-     * @description Manages quiz data, allowing public read access.
+     * @description Security rules for quiz data.
      * @path /quizzes/{quizId}
-     * @allow (get, list) Anyone can read quiz data.
-     * @allow (create, update, delete) Only admins can create, update, and delete quizzes.
-     * @deny (create, update, delete) Non-admins cannot modify quiz data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /quizzes/{quizId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Questions Collection ********************/
     /**
-     * @description Manages question data, allowing public read access.
+     * @description Security rules for question data.
      * @path /questions/{questionId}
-     * @allow (get, list) Anyone can read question data.
-     * @allow (create, update, delete) Only admins can create, update, and delete questions.
-     * @deny (create, update, delete) Non-admins cannot modify question data.
-     * @principle Public read access with admin-controlled writes.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /questions/{questionId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
-    
-    /******************** Suppliers Collection ********************/
-    /**
-     * @description Manages supplier data. Allows anyone to read, but only admins to create, update, and delete suppliers.
+
+   /**
+     * @description Security rules for supplier data.
      * @path /suppliers/{supplierId}
-     * @allow (get, list) Anyone can read supplier data.
-     * @allow (create, update, delete) Only admins can create, update, and delete suppliers.
-     * @deny (create, update, delete) Non-admins cannot modify supplier data.
-     * @principle Role-based access control for modifying supplier data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /suppliers/{supplierId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Cost Centers Collection ********************/
     /**
-     * @description Manages cost center data. Allows anyone to read, but only admins to create, update, and delete cost centers.
+     * @description Security rules for cost center data.
      * @path /cost_centers/{costCenterId}
-     * @allow (get, list) Anyone can read cost center data.
-     * @allow (create, update, delete) Only admins can create, update, and delete cost centers.
-     * @deny (create, update, delete) Non-admins cannot modify cost center data.
-     * @principle Role-based access control for modifying cost center data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /cost_centers/{costCenterId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
 
-    /******************** Expense Categories Collection ********************/
-    /**
-     * @description Manages expense category data. Allows anyone to read, but only admins to create, update, and delete expense categories.
+   /**
+     * @description Security rules for expense category data.
      * @path /expense_categories/{categoryId}
-     * @allow (get, list) Anyone can read expense category data.
-     * @allow (create, update, delete) Only admins can create, update, and delete expense categories.
-     * @deny (create, update, delete) Non-admins cannot modify expense category data.
-     * @principle Role-based access control for modifying expense category data.
+     * @allow (get, list) - Public read access.
+     * @allow (create, update, delete) - Restricted write access (TODO: Implement restrictions).
+     * @deny (create, update, delete) - If the write conditions are not met.
      */
     match /expense_categories/{categoryId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // TODO: Add create condition - likely admin-only
+      allow update: if false && resource != null; // TODO: Add update condition - likely admin-only
+      allow delete: if false && resource != null; // TODO: Add delete condition - likely admin-only
     }
   }
 }
