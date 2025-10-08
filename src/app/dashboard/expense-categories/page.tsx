@@ -10,7 +10,7 @@ import {
   Loader2,
   Shapes,
 } from "lucide-react"
-import { useForm, Controller, useFieldArray } from 'react-hook-form'
+import { useForm, Controller, useFieldArray, useFormContext } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -194,16 +194,18 @@ function BatchExpenseCategoryDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: BatchExpenseCategoryFormData) => void;
+  onSave: (data: BatchExpenseCategoryFormData) => Promise<void>;
   costCenters: CostCenter[] | null;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { control, handleSubmit, formState: { errors } } = useForm<BatchExpenseCategoryFormData>({
+  const form = useForm<BatchExpenseCategoryFormData>({
     resolver: zodResolver(batchExpenseCategorySchema),
     defaultValues: {
       categories: [{ name: '', costCenterId: '' }],
     },
   });
+
+  const { control, handleSubmit, formState: { errors }, getValues, reset } = form;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -213,8 +215,18 @@ function BatchExpenseCategoryDialog({
   const handleFormSubmit = async (data: BatchExpenseCategoryFormData) => {
     setIsSubmitting(true);
     await onSave(data);
+    reset({ categories: [{ name: '', costCenterId: '' }] }); // Reset after save
     setIsSubmitting(false);
   };
+  
+  const handleAddRow = () => {
+    const categories = getValues('categories');
+    const lastCategory = categories[categories.length - 1];
+    append({
+      name: '', // Always start with a fresh name
+      costCenterId: lastCategory?.costCenterId || '', // Copy previous cost center
+    });
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -262,8 +274,8 @@ function BatchExpenseCategoryDialog({
                         )}
                       />
                     </TableCell>
-                    <TableCell className="p-1">
-                      <Button variant="ghost" size="icon" onClick={() => remove(index)}>
+                    <TableCell className="p-1 text-right">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -277,7 +289,7 @@ function BatchExpenseCategoryDialog({
               variant="outline"
               size="sm"
               className="mt-4"
-              onClick={() => append({ name: '', costCenterId: '' })}
+              onClick={handleAddRow}
             >
               <PlusCircle className="mr-2 h-4 w-4" />
               Adicionar Linha
@@ -391,7 +403,8 @@ export default function ExpenseCategoriesPage() {
         title: 'Sucesso!',
         description: `${data.categories.length} categorias foram adicionadas.`,
       });
-      setIsBatchDialogOpen(false);
+      // Do not close the dialog automatically, user might want to add more
+      // setIsBatchDialogOpen(false); 
     } catch (error) {
       console.error('Error saving batch categories:', error);
       toast({
