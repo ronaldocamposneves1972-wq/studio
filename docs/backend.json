@@ -500,6 +500,43 @@
         }
       },
       "required": ["id", "createdAt", "totalValue", "itemCount", "dueDate"]
+    },
+     "Supplier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Supplier",
+      "type": "object",
+      "description": "Represents a supplier of products or services.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the supplier."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the supplier."
+        },
+        "cnpjCpf": {
+            "type": "string",
+            "description": "CNPJ or CPF of the supplier."
+        },
+        "contactName": {
+            "type": "string",
+            "description": "Name of the contact person."
+        },
+        "phone": {
+            "type": "string",
+            "description": "Contact phone number."
+        },
+        "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Contact email address."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
     }
   },
   "auth": {
@@ -721,10 +758,26 @@
             }
           ]
         }
+      },
+       {
+        "path": "/suppliers/{supplierId}",
+        "definition": {
+          "entityName": "Supplier",
+          "schema": {
+            "$ref": "#/backend/entities/Supplier"
+          },
+          "description": "Stores supplier data.",
+          "params": [
+            {
+              "name": "supplierId",
+              "description": "The unique identifier of the supplier."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the ConsorciaTech application, focusing on authorization independence, clarity, and scalability. It addresses the 'Missing or insufficient permissions' error by structuring data with clear ownership and access control. The structure separates concerns into collections like `users`, `clients`, `financial_institutions`, `products` (split into `consortiums` and `credit_products`), `product_combos`, `sales_proposals`, `commissions`, `quizzes`, and `questions`. Importantly, to achieve Authorization Independence (CRITICAL), data is denormalized where needed to avoid `get()` calls in security rules.  For example, the `clientId` is denormalized within `sales_proposals` to grant access for the specific client. The structure supports required QAPs by using segregation and path-based ownership, providing secure `list` operations."
   }
 }
 
-  
+    

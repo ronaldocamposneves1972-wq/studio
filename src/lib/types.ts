@@ -187,6 +187,15 @@ export type Account = {
   type: 'checking' | 'savings' | 'digital' | 'cash';
 };
 
+export type Supplier = {
+  id: string;
+  name: string;
+  cnpjCpf?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+}
+
 export type Transaction = {
   id: string;
   description: string;
@@ -199,6 +208,8 @@ export type Transaction = {
   accountName?: string;
   clientId?: string;
   clientName?: string;
+  supplierId?: string;
+  supplierName?: string;
   category?: string;
 };
 
@@ -219,3 +230,5 @@ export type SalesOrder = {
   items: SalesOrderItem[];
   totalValue: number;
 }
+
+    
