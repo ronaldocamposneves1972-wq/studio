@@ -267,7 +267,7 @@ export default function EditProductPage() {
                  {errors.bankId && <p className="text-sm text-destructive">{errors.bankId.message}</p>}
             </div>
             
-            { (product.behavior === 'Fixo' || product.behavior === 'Variável') && 'value' in errors && (
+            { (product.behavior === 'Fixo' || product.behavior === 'Variável') && (
                 <div className="grid gap-2">
                     <Label htmlFor="value">Valor (R$)</Label>
                     <Input id="value" type="number" step="0.01" {...register("value")} placeholder="1000,00" disabled={isSubmitting} />
