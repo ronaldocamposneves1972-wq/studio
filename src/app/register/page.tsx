@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, useFirestore } from '@/firebase';
@@ -30,6 +30,49 @@ export default function RegisterPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+
+  const createAdminUser = async () => {
+    if (!firestore) return;
+    const adminId = "zt6xq8RcNGX1Ct8OwysKCGY8H7s2";
+    const adminEmail = "kaiqueguilhermepereiramiranda@gmail.com";
+    const adminRef = doc(firestore, 'users', adminId);
+
+    const allPermissions = {
+      clients: { create: true, read: true, update: true, delete: true },
+      products: { create: true, read: true, update: true, delete: true },
+      sales_proposals: { create: true, read: true, update: true, delete: true },
+      transactions: { create: true, read: true, update: true, delete: true },
+      users: { create: true, read: true, update: true, delete: true },
+      suppliers: { create: true, read: true, update: true, delete: true },
+      cost_centers: { create: true, read: true, update: true, delete: true },
+      expense_categories: { create: true, read: true, update: true, delete: true },
+      quizzes: { create: true, read: true, update: true, delete: true },
+      financial_institutions: { create: true, read: true, update: true, delete: true },
+      commissions: { create: true, read: true, update: true, delete: true },
+    };
+
+    try {
+      await setDoc(adminRef, {
+        id: adminId,
+        firstName: 'Kaique',
+        lastName: 'Miranda',
+        name: 'Kaique Miranda',
+        email: adminEmail,
+        role: 'Admin',
+        permissions: allPermissions
+      });
+      console.log('Admin user document created/updated successfully.');
+    } catch (error) {
+      console.error('Failed to create admin user document:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Automatically create the admin user document on component mount if firestore is available
+    if (firestore) {
+      createAdminUser();
+    }
+  }, [firestore]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,10 +103,8 @@ export default function RegisterPage() {
       );
       const user = userCredential.user;
 
-      // Define o papel padrão como 'Atendente' para todos os novos usuários.
       const userRole = 'Atendente';
 
-      // Cria um documento para o usuário no Firestore.
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         firstName,
