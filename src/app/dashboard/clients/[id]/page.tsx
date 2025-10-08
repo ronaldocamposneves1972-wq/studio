@@ -714,24 +714,27 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
 
         // Helper to add data if key doesn't exist
         const addData = (key: string, value: any) => {
-            if (!combinedData.hasOwnProperty(key) && value) {
-                combinedData[key] = value;
+            if (value) {
+                 combinedData[key] = value;
             }
         };
 
-        // 1. Add main client fields based on fieldOrder
+        // 1. Add main client fields based on fieldOrder, giving them priority
         fieldOrder.forEach(key => {
-            if (client[key as keyof Client]) {
-                addData(key, client[key as keyof Client]);
+            const clientKey = key as keyof Client;
+            if (client[clientKey]) {
+                addData(key, client[clientKey]);
             }
         });
 
-        // 2. Add answers, cleaning the key and checking for existence
+        // 2. Add answers from quiz, only if the field hasn't been filled by a main client field
         if (client.answers) {
             for (const answerKey in client.answers) {
                 // remove 'q-' prefix if it exists
                 const cleanKey = answerKey.startsWith('q-') ? answerKey.substring(2) : answerKey;
-                addData(cleanKey, client.answers[answerKey]);
+                if (!combinedData.hasOwnProperty(cleanKey)) {
+                   addData(cleanKey, client.answers[answerKey]);
+                }
             }
         }
         
@@ -1346,5 +1349,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
+
+    
 
     
