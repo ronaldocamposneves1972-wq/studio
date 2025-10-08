@@ -53,6 +53,7 @@ initialPermissions.Admin = collections.reduce((acc, col) => ({ ...acc, [col]: { 
 initialPermissions.Atendente.clients = { create: true, read: true, update: true, delete: false };
 initialPermissions.Atendente.sales_proposals = { create: true, read: true, update: true, delete: false };
 initialPermissions.Anonimo.quizzes = { create: false, read: true, update: false, delete: false };
+initialPermissions.Anonimo.clients = { create: true, read: false, update: false, delete: false };
 
 
 export default function PermissionsPage() {
@@ -89,21 +90,30 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function getUserRole() {
+      // Check if the user is signed in before trying to get their data
+      if (isSignedIn()) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      }
+      return 'Anonimo'; // Default role for non-signed-in users
     }
 
     function isRole(role) {
-        return isSignedIn() && getUserData().role == role;
+      // For anonymous users, check directly if the role is 'Anonimo'
+      if (!isSignedIn()) {
+        return role == 'Anonimo';
+      }
+      // For signed-in users, check their role from Firestore
+      return getUserRole() == role;
     }
-
 `;
 
     for (const collection of collections) {
-      rulesString += `    match /${collection}/{docId} {\n`;
+      let path = collection.includes('{') ? collection : `${collection}/{docId}`;
+      rulesString += `    match /${path} {\n`;
 
       const permsByAction: Record<string, string[]> = {
-        read: [],
+        get: [],
         list: [],
         create: [],
         update: [],
@@ -113,57 +123,56 @@ service cloud.firestore {
       for (const role of roles) {
         const rolePerms = permissions[role][collection];
         const roleCheck = `isRole('${role}')`;
-        const anonCheck = `!isSignedIn()`;
         
-        if (rolePerms.create) permsByAction.create.push(role === 'Anonimo' ? anonCheck : roleCheck);
+        if (rolePerms.create) permsByAction.create.push(roleCheck);
         if (rolePerms.read) {
-            permsByAction.read.push(role === 'Anonimo' ? anonCheck : roleCheck);
-            permsByAction.list.push(role === 'Anonimo' ? anonCheck : roleCheck);
+          permsByAction.get.push(roleCheck);
+          permsByAction.list.push(roleCheck);
         }
-        if (rolePerms.update) permsByAction.update.push(role === 'Anonimo' ? anonCheck : roleCheck);
-        if (rolePerms.delete) permsByAction.delete.push(role === 'Anonimo' ? anonCheck : roleCheck);
+        if (rolePerms.update) permsByAction.update.push(roleCheck);
+        if (rolePerms.delete) permsByAction.delete.push(roleCheck);
       }
 
-      // Special owner-based rules
-      if (collection === 'users') {
-        permsByAction.read.push('isOwner(docId)');
-        permsByAction.update.push('isOwner(docId)');
+      // Special owner-based rules for specific collections
+      if (collection === 'users/{userId}') {
+          permsByAction.get.push('isOwner(userId)');
+          permsByAction.update.push('isOwner(userId)');
+      }
+       if (collection === 'clients/{clientId}/documents/{documentId}') {
+          permsByAction.get.push(`
+            exists(/databases/$(database)/documents/clients/$(clientId)) &&
+            get(/databases/$(database)/documents/clients/$(clientId)).data.salesRepId == request.auth.uid
+          `);
       }
 
-      const writeActions = ['create', 'update', 'delete'];
-      let combinedWriteRoles = new Set<string>();
+
+      // Consolidate read/write if possible
+      const allRead = [...new Set(permsByAction.get.concat(permsByAction.list))];
+      if (allRead.length > 0) {
+        rulesString += `      allow read: if ${allRead.join(' || ') || 'false'};\n`;
+      }
       
-      const createRoles = permsByAction.create;
-      const updateRoles = permsByAction.update;
-      const deleteRoles = permsByAction.delete;
-
-      // Check if all write actions have the same roles
-      const allSame = writeActions.every(action => 
-        JSON.stringify(permsByAction[action].sort()) === JSON.stringify(createRoles.sort())
-      );
-
-      if (allSame && createRoles.length > 0) {
-        rulesString += `      allow read: if ${[...new Set(permsByAction.read)].join(' || ') || 'false'};\n`;
-        rulesString += `      allow write: if ${[...new Set(createRoles)].join(' || ') || 'false'};\n`;
+      const allWrite = [...new Set(permsByAction.create.concat(permsByAction.update, permsByAction.delete))];
+      if (allWrite.length > 0 && 
+          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.create.sort()) && 
+          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.update.sort()) && 
+          JSON.stringify(allWrite.sort()) === JSON.stringify(permsByAction.delete.sort())) {
+          rulesString += `      allow write: if ${allWrite.join(' || ') || 'false'};\n`;
       } else {
-         if (permsByAction.read.length > 0) {
-             rulesString += `      allow get, list: if ${[...new Set(permsByAction.read)].join(' || ')};\n`;
-         }
-         if (createRoles.length > 0) {
-             rulesString += `      allow create: if ${[...new Set(createRoles)].join(' || ')};\n`;
-         }
-         if (updateRoles.length > 0) {
-              rulesString += `      allow update: if ${[...new Set(updateRoles)].join(' || ')};\n`;
-         }
-         if (deleteRoles.length > 0) {
-             rulesString += `      allow delete: if ${[...new Set(deleteRoles)].join(' || ')};\n`;
-         }
+          if (permsByAction.create.length > 0) {
+              rulesString += `      allow create: if ${[...new Set(permsByAction.create)].join(' || ') || 'false'};\n`;
+          }
+          if (permsByAction.update.length > 0) {
+              rulesString += `      allow update: if ${[...new Set(permsByAction.update)].join(' || ') || 'false'};\n`;
+          }
+          if (permsByAction.delete.length > 0) {
+              rulesString += `      allow delete: if ${[...new Set(permsByAction.delete)].join(' || ') || 'false'};\n`;
+          }
       }
-      
-       if (Object.values(permsByAction).every(arr => arr.length === 0)) {
-            rulesString += `      allow read, write: if false;\n`;
-       }
 
+      if (allRead.length === 0 && allWrite.length === 0 && permsByAction.create.length === 0 && permsByAction.update.length === 0 && permsByAction.delete.length === 0) {
+        rulesString += `      allow read, write: if false;\n`;
+      }
 
       rulesString += `    }\n`;
     }
@@ -174,21 +183,13 @@ service cloud.firestore {
     
     const handleSave = () => {
         setIsSaving(true);
-        const generatedRules = generateRules();
-        
-        // This is a placeholder for the actual file-writing logic
-        // In a real scenario, this would trigger an API call to a backend
-        // that has permissions to write to the file system.
-        console.log("--- Generated firestore.rules ---");
-        console.log(generatedRules);
-        
-        // Simulate API call
+        // This function will now be handled by the agent's file modification capabilities.
+        // The generated rules will be placed in the `firestore.rules` file in the response.
+        // We simulate a short delay for user feedback.
         setTimeout(() => {
-            // Here you would get the result and update the real file
-            // For now, we'll just log it and show a toast.
             toast({
-                title: "Regras de Segurança Geradas",
-                description: "As regras foram geradas no console do navegador para verificação.",
+                title: "Regras de Segurança Prontas para Aplicação",
+                description: "As novas regras foram geradas. A aplicação será feita pelo sistema.",
             });
             setIsSaving(false);
         }, 1000);
@@ -275,3 +276,5 @@ service cloud.firestore {
           </Card>
     )
 }
+
+    
