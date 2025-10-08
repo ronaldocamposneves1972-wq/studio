@@ -12,19 +12,19 @@ admin.initializeApp();
 export const createUserDocument = functions.auth.user().onCreate((user) => {
   const { uid, email } = user;
 
-  // Reference to the new user document in the 'users' collection
-  const userDocRef = admin.firestore().collection("users").doc(uid);
-
-  // Data to be saved in the new document
-  const userData = {
+  // Data to be saved in the new document.
+  // We include a default 'Atendente' role and basic info.
+  const newUser = {
+    id: uid,
     email: email,
-    role: "User", // Default role for new users
+    role: "Atendente", // Default role for new users
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    id: uid, // Storing the UID in the document as well
+    name: email || 'Novo Usuário', // Default name to email until updated
   };
 
-  // Set the document in Firestore
-  return userDocRef.set(userData)
+  // Set the document in the 'users' collection.
+  // The path is 'users/{uid}'.
+  return admin.firestore().collection("users").doc(uid).set(newUser)
     .then(() => {
       console.log(`Successfully created user document for UID: ${uid}`);
       return null;

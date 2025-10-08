@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -53,11 +53,12 @@ export default function RegisterPage() {
     try {
       // Step 1: Create user in Firebase Auth.
       // The Cloud Function 'createUserDocument' will automatically handle creating the Firestore document.
-      await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Step 2: Update the user's profile display name in Firebase Auth
+      await updateProfile(userCredential.user, {
+        displayName: `${firstName} ${lastName}`.trim(),
+      });
 
       // The onAuthStateChanged listener in the layout will redirect to the dashboard.
       toast({
