@@ -137,3 +137,24 @@ export function calculateMonthlyRate(
   // Return the last calculated middle point if max iterations are reached
   return mid;
 }
+
+
+/**
+ * Adds a specified number of business days to a given date.
+ * @param date The starting date.
+ * @param days The number of business days to add.
+ * @returns A new Date object with the calculated future date.
+ */
+export function addBusinessDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  let addedDays = 0;
+  while (addedDays < days) {
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
+    // 0 = Sunday, 6 = Saturday
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      addedDays++;
+    }
+  }
+  return result;
+}

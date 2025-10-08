@@ -76,7 +76,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -85,7 +85,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, useCollection } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -102,7 +102,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import { cn, calculateMonthlyRate } from "@/lib/utils"
+import { cn, calculateMonthlyRate, addBusinessDays } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -552,6 +552,7 @@ export default function ClientDetailPage() {
             // 2. Create the summary to be denormalized into the client document
             const proposalSummary: ProposalSummary = {
                 id: newProposalRef.id,
+                productId: data.productId,
                 productName: data.productName,
                 bankName: data.bankName,
                 value: data.value,
@@ -601,58 +602,106 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     toast({ title: 'Processando aceitação...' });
     
     const batch = writeBatch(firestore);
-    const now = new Date().toISOString();
-
-    // 1. Update the client status to "Aprovado"
-    batch.update(clientRef, { status: 'Aprovado' });
-
-    // 2. Update all proposal summaries in the client document
-    const updatedProposals = client.proposals?.map(p => {
-        if (p.id === acceptedProposal.id) {
-            return { ...p, status: 'Finalizada' as ProposalStatus, approvedAt: now, formalizationLink: link };
-        }
-        if (p.status === 'Aberta' || p.status === 'Em negociação') {
-            return { ...p, status: 'Cancelada' as ProposalStatus };
-        }
-        return p;
-    });
-    batch.update(clientRef, { proposals: updatedProposals });
-
-    // 3. Update the full proposal documents in 'sales_proposals'
-    client.proposals?.forEach(p => {
-        const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
-        if (p.id === acceptedProposal.id) {
-            batch.update(proposalDocRef, { status: 'Finalizada', approvedAt: now, formalizationLink: link });
-        } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
-            batch.update(proposalDocRef, { status: 'Cancelada' });
-        }
-    });
-
-    // 4. Add a timeline event
-    const timelineEvent: TimelineEvent = {
-        id: `tl-${Date.now()}-accepted`,
-        activity: `Proposta "${acceptedProposal.productName}" aceita.`,
-        details: `Cliente movido para "Aprovado". Link de formalização adicionado.`,
-        timestamp: now,
-        user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
-    };
-    batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
+    const now = new Date();
+    const nowISO = now.toISOString();
 
     try {
+        // --- 1. Fetch the full product to get commission details ---
+        const productRef = doc(firestore, 'products', acceptedProposal.productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists() || productSnap.data()?.behavior !== 'Proposta') {
+            throw new Error("Produto da proposta não encontrado ou inválido.");
+        }
+        const productData = productSnap.data() as Product & { behavior: 'Proposta' };
+
+        // --- 2. Calculate Commission ---
+        let commissionableValue = 0;
+        if (productData.commissionBase === 'bruto' && acceptedProposal.installmentValue && acceptedProposal.installments) {
+            commissionableValue = acceptedProposal.installmentValue * acceptedProposal.installments;
+        } else { // Default to 'liquido'
+            commissionableValue = acceptedProposal.value;
+        }
+        const commissionAmount = commissionableValue * (productData.commissionRate / 100);
+
+        // --- 3. Calculate Due Date (2 business days from now) ---
+        const dueDate = addBusinessDays(now, 2);
+
+        // --- 4. Create Transaction (Contas a Receber) ---
+        const transactionCollection = collection(firestore, 'transactions');
+        const newTransactionRef = doc(transactionCollection);
+        const newTransactionData: Transaction = {
+            id: newTransactionRef.id,
+            description: `Comissão - ${client.name} - Prop. ${acceptedProposal.productName}`,
+            amount: commissionAmount,
+            type: 'income',
+            status: 'pending',
+            dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            clientId: client.id,
+            clientName: client.name,
+            category: 'Comissão',
+            accountId: '', // Needs to be assigned later
+        };
+        batch.set(newTransactionRef, newTransactionData);
+        
+        // --- 5. Update client and proposals status ---
+        batch.update(clientRef, { status: 'Aprovado' });
+
+        const updatedProposals = client.proposals?.map(p => {
+            if (p.id === acceptedProposal.id) {
+                return { ...p, status: 'Finalizada' as ProposalStatus, approvedAt: nowISO, formalizationLink: link };
+            }
+            if (p.status === 'Aberta' || p.status === 'Em negociação') {
+                return { ...p, status: 'Cancelada' as ProposalStatus };
+            }
+            return p;
+        });
+        batch.update(clientRef, { proposals: updatedProposals });
+
+        client.proposals?.forEach(p => {
+            const proposalDocRef = doc(firestore, 'sales_proposals', p.id);
+            if (p.id === acceptedProposal.id) {
+                batch.update(proposalDocRef, { status: 'Finalizada', approvedAt: nowISO, formalizationLink: link });
+            } else if (p.status === 'Aberta' || p.status === 'Em negociação') {
+                batch.update(proposalDocRef, { status: 'Cancelada' });
+            }
+        });
+
+        // --- 6. Add timeline events ---
+        const timelineEvents: TimelineEvent[] = [
+            {
+                id: `tl-${Date.now()}-accepted`,
+                activity: `Proposta "${acceptedProposal.productName}" aceita.`,
+                details: `Cliente movido para "Aprovado".`,
+                timestamp: nowISO,
+                user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+            },
+            {
+                id: `tl-${Date.now()}-commission`,
+                activity: `Comissão gerada (Contas a Receber).`,
+                details: `Valor: R$ ${commissionAmount.toLocaleString('pt-br', {minimumFractionDigits: 2})}. Vencimento: ${dueDate.toLocaleDateString('pt-br')}`,
+                timestamp: nowISO,
+                user: { name: 'Sistema' },
+            }
+        ];
+        batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
+
+        // --- 7. Commit batch ---
         await batch.commit();
+
         toast({
-            title: "Proposta Aceita!",
-            description: `O cliente ${client.name} foi marcado como Aprovado e movido para a esteira de Clearance.`
+            title: "Proposta Aceita e Comissão Gerada!",
+            description: `O cliente ${client.name} foi Aprovado. Uma conta a receber foi criada.`
         });
         setProposalToAccept(null);
         setFormalizationLink('');
         router.push('/dashboard/pipeline/clearance');
+
     } catch (error) {
         console.error("Error accepting proposal: ", error);
         toast({
             variant: 'destructive',
             title: 'Erro ao aceitar proposta',
-            description: 'Não foi possível completar a operação.'
+            description: error instanceof Error ? error.message : 'Não foi possível completar a operação.',
         });
     }
 };
@@ -935,7 +984,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             <AlertDialogHeader>
                 <AlertDialogTitle>Aceitar Proposta e Formalizar</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Para finalizar, confirme os detalhes e insira o link de formalização do contrato. Este campo é obrigatório.
+                    Para finalizar, confirme os detalhes e insira o link de formalização do contrato. Este campo é obrigatório. Uma "Conta a Receber" da comissão será gerada.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-4 py-2">

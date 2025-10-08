@@ -28,6 +28,7 @@ export type ClientDocument = {
 
 export type ProposalSummary = {
   id: string;
+  productId: string;
   productName: string;
   bankName?: string;
   value: number;
@@ -92,6 +93,7 @@ export type Proposal = {
   id: string;
   clientId: string;
   clientName: string;
+  productId: string;
   productName: string;
   bankName?: string;
   value: number;
@@ -195,6 +197,8 @@ export type Transaction = {
   paymentDate?: string;
   accountId: string;
   accountName?: string;
+  clientId?: string;
+  clientName?: string;
   category?: string;
 };
 
@@ -215,5 +219,3 @@ export type SalesOrder = {
   items: SalesOrderItem[];
   totalValue: number;
 }
-
-  
