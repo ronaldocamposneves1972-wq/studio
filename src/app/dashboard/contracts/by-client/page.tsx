@@ -88,7 +88,8 @@ export default function ContractsByClientPage() {
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Ações</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${contract.clientId}`)}>Ver Cliente</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => router.push(`/dashboard/proposals/${contract.id}`)}>Ver Proposta</DropdownMenuItem>
+                    {/* The page below does not exist yet */}
+                    {/* <DropdownMenuItem onSelect={() => router.push(`/dashboard/proposals/${contract.id}`)}>Ver Proposta</DropdownMenuItem> */}
                 </DropdownMenuContent>
             </DropdownMenu>
         </TableCell>
