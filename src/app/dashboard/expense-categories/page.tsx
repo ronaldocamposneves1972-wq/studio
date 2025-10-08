@@ -10,7 +10,7 @@ import {
   Loader2,
   Shapes,
 } from "lucide-react"
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -70,7 +70,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { collection, query, doc, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
 import type { ExpenseCategory, CostCenter } from "@/lib/types"
 import Link from "next/link"
 
@@ -177,9 +177,136 @@ function ExpenseCategoryDialog({
   )
 }
 
+const batchExpenseCategorySchema = z.object({
+  categories: z.array(z.object({
+    name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
+    costCenterId: z.string().optional(),
+  })).min(1, "Adicione pelo menos uma categoria.")
+});
+
+type BatchExpenseCategoryFormData = z.infer<typeof batchExpenseCategorySchema>;
+
+function BatchExpenseCategoryDialog({
+  open,
+  onOpenChange,
+  onSave,
+  costCenters,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: BatchExpenseCategoryFormData) => void;
+  costCenters: CostCenter[] | null;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { control, handleSubmit, formState: { errors } } = useForm<BatchExpenseCategoryFormData>({
+    resolver: zodResolver(batchExpenseCategorySchema),
+    defaultValues: {
+      categories: [{ name: '', costCenterId: '' }],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "categories",
+  });
+
+  const handleFormSubmit = async (data: BatchExpenseCategoryFormData) => {
+    setIsSubmitting(true);
+    await onSave(data);
+    setIsSubmitting(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Adicionar Despesas em Lote</DialogTitle>
+          <DialogDescription>
+            Adicione múltiplas despesas de uma vez.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(handleFormSubmit)}>
+          <div className="max-h-[60vh] overflow-y-auto p-1">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome da Despesa</TableHead>
+                  <TableHead>Centro de Custo</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fields.map((field, index) => (
+                  <TableRow key={field.id} className="align-top">
+                    <TableCell className="py-2">
+                       <Controller
+                        control={control}
+                        name={`categories.${index}.name`}
+                        render={({ field }) => <Input {...field} placeholder="Ex: Passagem Aérea" />}
+                      />
+                      {errors.categories?.[index]?.name && <p className="text-sm text-destructive mt-1">{errors.categories[index]?.name?.message}</p>}
+                    </TableCell>
+                    <TableCell className="py-2">
+                       <Controller
+                        control={control}
+                        name={`categories.${index}.costCenterId`}
+                        render={({ field }) => (
+                           <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione"/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {costCenters?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                           </Select>
+                        )}
+                      />
+                    </TableCell>
+                    <TableCell className="py-2">
+                      <Button variant="ghost" size="icon" onClick={() => remove(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+           <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => append({ name: '', costCenterId: '' })}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Adicionar Linha
+            </Button>
+            {errors.categories && typeof errors.categories.message === 'string' && (
+                <p className="text-sm text-destructive mt-2">{errors.categories.message}</p>
+            )}
+
+          <DialogFooter className="mt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Salvando...' : 'Salvar Lote'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export default function ExpenseCategoriesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null)
   const { toast } = useToast()
@@ -239,6 +366,43 @@ export default function ExpenseCategoriesPage() {
     }
   }
 
+  const handleSaveBatch = async (data: BatchExpenseCategoryFormData) => {
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Serviço de banco de dados indisponível.' });
+      return;
+    }
+
+    const batch = writeBatch(firestore);
+    const categoriesCollection = collection(firestore, 'expense_categories');
+    
+    data.categories.forEach(category => {
+      const docRef = doc(categoriesCollection);
+      const costCenter = costCenters?.find(c => c.id === category.costCenterId);
+      batch.set(docRef, {
+        name: category.name,
+        costCenterId: category.costCenterId || null,
+        costCenterName: costCenter?.name || null,
+      });
+    });
+
+    try {
+      await batch.commit();
+      toast({
+        title: 'Sucesso!',
+        description: `${data.categories.length} categorias foram adicionadas.`,
+      });
+      setIsBatchDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving batch categories:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar em lote',
+        description: 'Não foi possível salvar as categorias.',
+      });
+    }
+  };
+
+
   const handleDelete = async (id: string) => {
     if (!firestore) return
     try {
@@ -265,12 +429,20 @@ export default function ExpenseCategoriesPage() {
             Gerencie as categorias para suas contas a pagar.
           </p>
         </div>
-        <Button size="sm" className="h-8 gap-1" onClick={() => handleOpenDialog()}>
-          <PlusCircle className="h-3.5 w-3.5" />
-          <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-            Adicionar Categoria
-          </span>
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => setIsBatchDialogOpen(true)}>
+              <PlusCircle className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Adicionar em Lote
+              </span>
+            </Button>
+            <Button size="sm" className="h-8 gap-1" onClick={() => handleOpenDialog()}>
+              <PlusCircle className="h-3.5 w-3.5" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Adicionar Categoria
+              </span>
+            </Button>
+        </div>
       </div>
       <Card>
         <CardHeader>
@@ -370,6 +542,14 @@ export default function ExpenseCategoriesPage() {
         category={selectedCategory}
         costCenters={costCenters}
       />
+      <BatchExpenseCategoryDialog
+        open={isBatchDialogOpen}
+        onOpenChange={setIsBatchDialogOpen}
+        onSave={handleSaveBatch}
+        costCenters={costCenters}
+      />
     </>
   )
 }
+
+    
