@@ -82,6 +82,16 @@ export const navItems = [
     ]
   },
   {
+    label: 'Financeiro', icon: DollarSign, children: [
+      { href: '/dashboard/financials/transactions?type=payable', label: 'Contas a Pagar', icon: ClipboardList },
+      { href: '/dashboard/financials/transactions?type=receivable', label: 'Contas a Receber', icon: FileText },
+      { href: '/dashboard/financials/cash-flow', label: 'Fluxo de Caixa', icon: FileText },
+      { href: '/dashboard/financials/bank-reconciliation', label: 'Conciliação Bancária', icon: FileText },
+      { href: '/dashboard/financials/financial-planning', label: 'Planejamento Financeiro', icon: FileText },
+      { href: '/dashboard/financials/billing', label: 'Faturamento e Cobrança', icon: FileText },
+    ]
+  },
+  {
     label: 'Utilitários', icon: Briefcase, children: [
       { href: '/dashboard/utils/internal-mail', label: 'Correio Interno', icon: Mail },
       { href: '/dashboard/utils/docs-download', label: 'Download de Documentos', icon: Download },

@@ -60,6 +60,22 @@ export default function LandingPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="link">
+                        Financeiro <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/transactions?type=payable">Contas a Pagar</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/transactions?type=receivable">Contas a Receber</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/cash-flow">Fluxo de Caixa</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/bank-reconciliation">Conciliação Bancária</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/financial-planning">Planejamento Financeiro</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/dashboard/financials/billing">Faturamento e Cobrança</Link></DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="link">
@@ -111,6 +127,17 @@ export default function LandingPage() {
                         <Link href="#">Portabilidade</Link>
                         <Link href="#">Siape</Link>
                     </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="financeiro">
+                        <AccordionTrigger>Financeiro</AccordionTrigger>
+                        <AccordionContent className="grid gap-2 pl-4">
+                            <Link href="/dashboard/financials/transactions?type=payable">Contas a Pagar</Link>
+                            <Link href="/dashboard/financials/transactions?type=receivable">Contas a Receber</Link>
+                            <Link href="/dashboard/financials/cash-flow">Fluxo de Caixa</Link>
+                            <Link href="/dashboard/financials/bank-reconciliation">Conciliação Bancária</Link>
+                            <Link href="/dashboard/financials/financial-planning">Planejamento Financeiro</Link>
+                            <Link href="/dashboard/financials/billing">Faturamento e Cobrança</Link>
+                        </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="ajuda">
                     <AccordionTrigger>Ajuda</AccordionTrigger>
