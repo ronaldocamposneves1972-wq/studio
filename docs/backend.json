@@ -452,6 +452,11 @@
           "format": "date-time",
           "description": "Timestamp of when the order was created."
         },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Due date for the payment of this sales order."
+        },
         "items": {
           "type": "array",
           "items": {
@@ -463,7 +468,7 @@
           "description": "The total value of all items in the order."
         }
       },
-      "required": ["id", "clientId", "clientName", "salesRepId", "salesRepName", "createdAt", "items", "totalValue"]
+      "required": ["id", "clientId", "clientName", "salesRepId", "salesRepName", "createdAt", "dueDate", "items", "totalValue"]
     },
     "SalesOrderSummary": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -480,6 +485,11 @@
           "format": "date-time",
           "description": "Timestamp of when the order was created."
         },
+        "dueDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Due date for the payment of this sales order."
+        },
         "totalValue": {
           "type": "number",
           "description": "The total value of the order."
@@ -489,7 +499,7 @@
           "description": "Number of items in the order."
         }
       },
-      "required": ["id", "createdAt", "totalValue", "itemCount"]
+      "required": ["id", "createdAt", "totalValue", "itemCount", "dueDate"]
     }
   },
   "auth": {

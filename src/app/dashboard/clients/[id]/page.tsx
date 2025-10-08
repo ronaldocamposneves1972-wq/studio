@@ -76,7 +76,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -695,7 +695,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         const now = new Date().toISOString();
 
         try {
-            // 1. Create the main sales order document in 'sales_orders'
+            // 1. Create the main sales order document
             const salesOrderCollection = collection(firestore, 'sales_orders');
             const newSalesOrderRef = doc(salesOrderCollection);
 
@@ -706,6 +706,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                 salesRepId: user.uid,
                 salesRepName: user.displayName || user.email || 'Usuário',
                 createdAt: now,
+                dueDate: data.dueDate,
                 items: data.items,
                 totalValue: data.totalValue,
             };
@@ -715,28 +716,45 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             const salesOrderSummary: SalesOrderSummary = {
                 id: newSalesOrderRef.id,
                 createdAt: now,
+                dueDate: data.dueDate,
                 totalValue: data.totalValue,
                 itemCount: data.items.length,
             };
 
-            // 3. Create the timeline event
+            // 3. Create the accounts receivable transaction
+            const transactionCollection = collection(firestore, 'transactions');
+            const newTransactionRef = doc(transactionCollection);
+            const newTransactionData: Transaction = {
+                id: newTransactionRef.id,
+                description: `Recebimento - Pedido de Venda ${newSalesOrderRef.id.substring(0, 5)}`,
+                amount: data.totalValue,
+                type: 'income',
+                status: 'pending',
+                dueDate: data.dueDate,
+                accountId: '', // This should probably be selectable in the future
+            };
+            batch.set(newTransactionRef, newTransactionData);
+
+
+            // 4. Create the timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-salesorder`,
                 activity: `Novo pedido de venda (R$ ${data.totalValue.toLocaleString('pt-br')}) criado.`,
+                details: `Vencimento do recebimento em ${new Date(data.dueDate).toLocaleDateString('pt-br')}.`,
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
 
-            // 4. Update the client document
+            // 5. Update the client document
             batch.update(clientRef, {
                 salesOrders: arrayUnion(salesOrderSummary),
                 timeline: arrayUnion(timelineEvent),
             });
 
-            // 5. Commit all writes
+            // 6. Commit all writes
             await batch.commit();
 
-            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido de venda foi registrado com sucesso." });
+            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido e a conta a receber foram registrados com sucesso." });
             setIsSalesOrderDialogOpen(false);
 
         } catch (error) {

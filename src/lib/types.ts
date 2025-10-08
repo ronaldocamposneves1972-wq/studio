@@ -42,6 +42,7 @@ export type ProposalSummary = {
 export type SalesOrderSummary = {
   id: string;
   createdAt: string;
+  dueDate: string;
   totalValue: number;
   itemCount: number;
 }
@@ -209,6 +210,7 @@ export type SalesOrder = {
   salesRepId: string;
   salesRepName: string;
   createdAt: string;
+  dueDate: string;
   items: SalesOrderItem[];
   totalValue: number;
 }
