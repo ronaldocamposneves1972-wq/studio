@@ -376,6 +376,7 @@ export default function ExpenseCategoriesPage() {
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null)
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const { toast } = useToast()
   const firestore = useFirestore()
 
@@ -486,6 +487,52 @@ export default function ExpenseCategoriesPage() {
     }
   }
 
+  const handleDeleteSelected = async () => {
+    if (!firestore || selectedRows.length === 0) return;
+
+    const batch = writeBatch(firestore);
+    selectedRows.forEach(categoryId => {
+        const categoryRef = doc(firestore, 'expense_categories', categoryId);
+        batch.delete(categoryRef);
+    });
+
+    try {
+        await batch.commit();
+        toast({
+            title: `${selectedRows.length} categoria(s) excluída(s)!`,
+            description: "As categorias selecionadas foram removidas.",
+        });
+        setSelectedRows([]);
+    } catch (error) {
+        console.error("Error deleting multiple categories:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao excluir",
+            description: "Não foi possível excluir as categorias selecionadas.",
+        });
+    }
+  }
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedRows(categories?.map(c => c.id) || []);
+    } else {
+      setSelectedRows([]);
+    }
+  }
+
+  const handleSelectRow = (categoryId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedRows(prev => [...prev, categoryId]);
+    } else {
+      setSelectedRows(prev => prev.filter(id => id !== categoryId));
+    }
+  }
+
+  const numSelected = selectedRows.length;
+  const allSelected = numSelected > 0 && categories ? numSelected === categories.length : false;
+  const someSelected = numSelected > 0 && !allSelected;
+
 
   return (
     <>
@@ -517,12 +564,46 @@ export default function ExpenseCategoriesPage() {
           <CardTitle>Lista de Categorias</CardTitle>
           <CardDescription>
             Adicione, edite ou remova suas categorias de despesa.
+             {numSelected > 0 && (
+                <div className="mt-4 flex items-center gap-4 bg-muted/50 p-2 rounded-md">
+                    <span className="text-sm font-medium">{numSelected} selecionado(s)</span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-7 gap-1">
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Excluir
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir categorias selecionadas?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta ação não pode ser desfeita. {numSelected} categoria(s) serão permanentemente excluídas.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive hover:bg-destructive/90">
+                                    Sim, excluir
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Selecionar todas as linhas"
+                  />
+                </TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Centro de Custo Padrão</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -531,6 +612,7 @@ export default function ExpenseCategoriesPage() {
             <TableBody>
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-5"/></TableCell>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -538,11 +620,18 @@ export default function ExpenseCategoriesPage() {
               ))}
               {!isLoading && categories?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">Nenhuma categoria encontrada.</TableCell>
+                  <TableCell colSpan={4} className="h-24 text-center">Nenhuma categoria encontrada.</TableCell>
                 </TableRow>
               )}
               {categories?.map((category) => (
-                <TableRow key={category.id}>
+                <TableRow key={category.id} data-state={selectedRows.includes(category.id) && "selected"}>
+                  <TableCell>
+                      <Checkbox
+                          checked={selectedRows.includes(category.id)}
+                          onCheckedChange={(checked) => handleSelectRow(category.id, !!checked)}
+                          aria-label={`Selecionar categoria ${category.name}`}
+                      />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-3">
                         <Shapes className="h-5 w-5 text-muted-foreground"/>
