@@ -1,12 +1,11 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -27,7 +26,6 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth();
-  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -42,41 +40,34 @@ export default function RegisterPage() {
       return;
     }
     setIsLoading(true);
-    if (!auth || !firestore) {
+    if (!auth) {
        toast({
         variant: 'destructive',
         title: 'Erro de Serviço',
-        description: 'Serviços de autenticação ou banco de dados não estão disponíveis.',
+        description: 'Serviços de autenticação não disponíveis.',
       });
       setIsLoading(false);
       return;
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(
+      // Step 1: Create user in Firebase Auth.
+      // The Cloud Function 'createUserDocument' will automatically handle creating the Firestore document.
+      await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-      const user = userCredential.user;
 
-      const userRole = 'Atendente';
-
-      await setDoc(doc(firestore, 'users', user.uid), {
-        id: user.uid,
-        firstName,
-        lastName,
-        name: `${firstName} ${lastName}`,
-        email: user.email,
-        role: userRole,
-      });
-
+      // The onAuthStateChanged listener in the layout will redirect to the dashboard.
       toast({
         title: 'Cadastro realizado com sucesso!',
         description: 'Você será redirecionado para o dashboard.',
       });
       router.push('/dashboard');
+
     } catch (error: any) {
+      console.error("Registration error:", error);
       toast({
         variant: 'destructive',
         title: 'Erro de Cadastro',
@@ -85,7 +76,8 @@ export default function RegisterPage() {
             ? 'Este e-mail já está em uso.'
             : 'Ocorreu um erro ao criar a conta.',
       });
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
