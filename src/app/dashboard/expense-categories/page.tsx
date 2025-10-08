@@ -56,7 +56,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -238,7 +237,7 @@ function BatchExpenseCategoryDialog({
               <TableBody>
                 {fields.map((field, index) => (
                   <TableRow key={field.id} className="align-top">
-                    <TableCell className="py-2">
+                    <TableCell className="p-1">
                        <Controller
                         control={control}
                         name={`categories.${index}.name`}
@@ -246,7 +245,7 @@ function BatchExpenseCategoryDialog({
                       />
                       {errors.categories?.[index]?.name && <p className="text-sm text-destructive mt-1">{errors.categories[index]?.name?.message}</p>}
                     </TableCell>
-                    <TableCell className="py-2">
+                    <TableCell className="p-1">
                        <Controller
                         control={control}
                         name={`categories.${index}.costCenterId`}
@@ -262,7 +261,7 @@ function BatchExpenseCategoryDialog({
                         )}
                       />
                     </TableCell>
-                    <TableCell className="py-2">
+                    <TableCell className="p-1">
                       <Button variant="ghost" size="icon" onClick={() => remove(index)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -551,5 +550,3 @@ export default function ExpenseCategoriesPage() {
     </>
   )
 }
-
-    
