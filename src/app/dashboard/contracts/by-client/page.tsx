@@ -1,10 +1,11 @@
+
 'use client'
 
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, query, where, orderBy } from "firebase/firestore"
-import type { Proposal } from "@/lib/types"
+import type { Client, Proposal, ProposalSummary } from "@/lib/types"
 
 import {
   Card,
@@ -33,16 +34,25 @@ export default function ContractsByClientPage() {
   const firestore = useFirestore()
   const router = useRouter()
 
-  const contractsQuery = useMemoFirebase(() => {
+  const clientsWithFinalizedProposalsQuery = useMemoFirebase(() => {
     if (!firestore) return null
     return query(
-        collection(firestore, 'sales_proposals'), 
-        where('status', '==', 'Finalizada'),
-        orderBy('approvedAt', 'desc')
+        collection(firestore, 'clients'), 
+        where('proposals', '!=', null)
     )
   }, [firestore])
 
-  const { data: contracts, isLoading } = useCollection<Proposal>(contractsQuery)
+  const { data: clients, isLoading } = useCollection<Client>(clientsWithFinalizedProposalsQuery);
+
+  const contracts = useMemo(() => {
+    if (!clients) return [];
+    return clients.flatMap(client => 
+      (client.proposals || [])
+        .filter(p => p.status === 'Finalizada')
+        .map(p => ({ ...p, clientName: client.name, clientId: client.id }))
+    ).sort((a, b) => new Date(b.approvedAt || 0).getTime() - new Date(a.approvedAt || 0).getTime());
+  }, [clients]);
+
 
   const renderContent = () => {
     if (isLoading) {
@@ -77,7 +87,6 @@ export default function ContractsByClientPage() {
         </TableCell>
         <TableCell>R$ {contract.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
         <TableCell>{contract.approvedAt ? new Date(contract.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>
-        <TableCell>{contract.salesRepName}</TableCell>
         <TableCell className="text-right">
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -130,7 +139,6 @@ export default function ContractsByClientPage() {
                 <TableHead>Produto/Banco</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Data de Finalização</TableHead>
-                <TableHead>Atendente</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
