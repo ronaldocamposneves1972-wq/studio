@@ -49,5 +49,3 @@ export const useUser = (): UserAuthHookResult => {
 
   return { user, isUserLoading, userError };
 };
-
-    
