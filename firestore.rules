@@ -2,80 +2,75 @@
  * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset enforces a hybrid security model. Most collections are accessible to any authenticated user.
- * The /users/{userId} collection is strictly controlled, with each user only able to access their own document.
+ * This ruleset allows authenticated users to read and write to all collections.
  *
  * Data Structure:
- * - /users/{userId}: Stores user-specific data; access restricted to the user themselves.
- * - Top-level collections (clients, financial_institutions, etc.): Accessible to all authenticated users.
+ * The Firestore database is organized into collections for users, clients,
+ * financial institutions, products (consortiums and credit_products),
+ * product combos, sales proposals, commissions, quizzes, questions,
+ * suppliers, cost centers, and expense categories.
  *
  * Key Security Decisions:
- * - User listing is implicitly disallowed by the rules structure.
- * - Data shape validation is relaxed during the prototyping phase.
+ * This is a PROTOTYPING ruleset, so granular access control based on roles or
+ * ownership has not been implemented. All authenticated users have full
+ * read/write access to all collections.
  *
- * Authorization Independence:
- * - Some documents contain denormalized fields (e.g., clientId in sales_proposals) to avoid costly `get()` calls
- *   and simplify authorization logic.
+ * Denormalization for Authorization:
+ * The data model includes denormalized fields (e.g., `clientId` in
+ * `sales_proposals`) to support authorization without the need for `get()`
+ * calls in the security rules.  Since all authenticated users can read/write,
+ * this isn't strictly necessary but maintains consistency with the production
+ * intent of the data model.
+ *
+ * Structural Segregation:
+ * N/A - This ruleset does not implement any structural segregation.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
     /**
-     * @description Controls access to user documents. Only the authenticated user can read/write their own document.
+     * @description Allows any authenticated user to read and write user data.
      * @path /users/{userId}
-     * @allow (create) User with ID matching auth.uid can create their own document.
-     * @allow (get, update, delete) Authenticated user can read/write their own document.
-     * @deny (create) User attempts to create a document with an ID that does not match their auth.uid.
-     * @deny (get, update, delete) User attempts to read/write another user's document.
-     * @principle Enforces strict user-ownership for user data.
+     * @allow (create) - An authenticated user can create a user document.
+     * @allow (read) - An authenticated user can read a user document.
+     * @allow (update) - An authenticated user can update a user document.
+     * @allow (delete) - An authenticated user can delete a user document.
+     * @deny (create) - An unauthenticated user cannot create a user document.
+     * @deny (read) - An unauthenticated user cannot read a user document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description  Controls access to admin role documents. Admin role based on document existence.
+     * @description Allows any authenticated user to read and write to admin roles.
      * @path /roles_admin/{userId}
-     * @allow get: if isSignedIn();
-     * @allow list: if false;
-     * @allow create: if isSignedIn();
-     * @allow update: if isSignedIn();
-     * @allow delete: if isSignedIn();
-     * @deny  None.
-     * @principle Admin role is determined by the existence of a document.
+     * @allow (create) - An authenticated user can create a admin role document.
+     * @allow (read) - An authenticated user can read a admin role document.
+     * @allow (update) - An authenticated user can update a admin role document.
+     * @allow (delete) - An authenticated user can delete a admin role document.
+     * @deny (create) - An unauthenticated user cannot create a admin role document.
+     * @deny (read) - An unauthenticated user cannot read a admin role document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to client documents. Any authenticated user can read/write client data.
+     * @description Allows any authenticated user to read and write client data.
      * @path /clients/{clientId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage client data.
+     * @allow (create) - An authenticated user can create a client document.
+     * @allow (read) - An authenticated user can read a client document.
+     * @allow (update) - An authenticated user can update a client document.
+     * @allow (delete) - An authenticated user can delete a client document.
+     * @deny (create) - An unauthenticated user cannot create a client document.
+     * @deny (read) - An unauthenticated user cannot read a client document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /clients/{clientId} {
       allow get, list: if isSignedIn();
@@ -83,12 +78,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to client documents.  Path-based ownership under client.
+     * @description Allows any authenticated user to read and write client documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny  None.
-     * @principle Path-based ownership under client, allows any authenticated user to read/write to.
+     * @allow (create) - An authenticated user can create a client document.
+     * @allow (read) - An authenticated user can read a client document.
+     * @allow (update) - An authenticated user can update a client document.
+     * @allow (delete) - An authenticated user can delete a client document.
+     * @deny (create) - An unauthenticated user cannot create a client document.
+     * @deny (read) - An unauthenticated user cannot read a client document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /clients/{clientId}/documents/{documentId} {
       allow get, list: if isSignedIn();
@@ -96,12 +94,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to financial institution documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage financial institution data.
+     * @allow (create) - An authenticated user can create a financial institution document.
+     * @allow (read) - An authenticated user can read a financial institution document.
+     * @allow (update) - An authenticated user can update a financial institution document.
+     * @allow (delete) - An authenticated user can delete a financial institution document.
+     * @deny (create) - An unauthenticated user cannot create a financial institution document.
+     * @deny (read) - An unauthenticated user cannot read a financial institution document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /financial_institutions/{financialInstitutionId} {
       allow get, list: if isSignedIn();
@@ -109,12 +110,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to consortium documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write consortium data.
      * @path /consortiums/{consortiumId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage consortium data.
+     * @allow (create) - An authenticated user can create a consortium document.
+     * @allow (read) - An authenticated user can read a consortium document.
+     * @allow (update) - An authenticated user can update a consortium document.
+     * @allow (delete) - An authenticated user can delete a consortium document.
+     * @deny (create) - An unauthenticated user cannot create a consortium document.
+     * @deny (read) - An unauthenticated user cannot read a consortium document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /consortiums/{consortiumId} {
       allow get, list: if isSignedIn();
@@ -122,12 +126,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to credit product documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage credit product data.
+     * @allow (create) - An authenticated user can create a credit product document.
+     * @allow (read) - An authenticated user can read a credit product document.
+     * @allow (update) - An authenticated user can update a credit product document.
+     * @allow (delete) - An authenticated user can delete a credit product document.
+     * @deny (create) - An unauthenticated user cannot create a credit product document.
+     * @deny (read) - An unauthenticated user cannot read a credit product document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /credit_products/{creditProductId} {
       allow get, list: if isSignedIn();
@@ -135,12 +142,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to product combo documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write product combo data.
      * @path /product_combos/{productComboId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage product combo data.
+     * @allow (create) - An authenticated user can create a product combo document.
+     * @allow (read) - An authenticated user can read a product combo document.
+     * @allow (update) - An authenticated user can update a product combo document.
+     * @allow (delete) - An authenticated user can delete a product combo document.
+     * @deny (create) - An unauthenticated user cannot create a product combo document.
+     * @deny (read) - An unauthenticated user cannot read a product combo document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /product_combos/{productComboId} {
       allow get, list: if isSignedIn();
@@ -148,38 +158,47 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to sales proposal documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage sales proposal data.
+     * @allow (create) - An authenticated user can create a sales proposal document.
+     * @allow (read) - An authenticated user can read a sales proposal document.
+     * @allow (update) - An authenticated user can update a sales proposal document.
+     * @allow (delete) - An authenticated user can delete a sales proposal document.
+     * @deny (create) - An unauthenticated user cannot create a sales proposal document.
+     * @deny (read) - An unauthenticated user cannot read a sales proposal document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /sales_proposals/{salesProposalId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Controls access to sales order documents. Any authenticated user can read/write.
-     * @path /sales_orders/{salesOrderId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage sales order data.
-     */
+     /**
+      * @description Allows any authenticated user to read and write sales order data.
+      * @path /sales_orders/{salesOrderId}
+      * @allow (create) - An authenticated user can create a sales order document.
+      * @allow (read) - An authenticated user can read a sales order document.
+      * @allow (update) - An authenticated user can update a sales order document.
+      * @allow (delete) - An authenticated user can delete a sales order document.
+      * @deny (create) - An unauthenticated user cannot create a sales order document.
+      * @deny (read) - An unauthenticated user cannot read a sales order document.
+      * @principle Allows authenticated users full access during prototyping.
+      */
     match /sales_orders/{salesOrderId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to commission documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write commission data.
      * @path /commissions/{commissionId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage commission data.
+     * @allow (create) - An authenticated user can create a commission document.
+     * @allow (read) - An authenticated user can read a commission document.
+     * @allow (update) - An authenticated user can update a commission document.
+     * @allow (delete) - An authenticated user can delete a commission document.
+     * @deny (create) - An unauthenticated user cannot create a commission document.
+     * @deny (read) - An unauthenticated user cannot read a commission document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /commissions/{commissionId} {
       allow get, list: if isSignedIn();
@@ -187,12 +206,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to quiz documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write quiz data.
      * @path /quizzes/{quizId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage quiz data.
+     * @allow (create) - An authenticated user can create a quiz document.
+     * @allow (read) - An authenticated user can read a quiz document.
+     * @allow (update) - An authenticated user can update a quiz document.
+     * @allow (delete) - An authenticated user can delete a quiz document.
+     * @deny (create) - An unauthenticated user cannot create a quiz document.
+     * @deny (read) - An unauthenticated user cannot read a quiz document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /quizzes/{quizId} {
       allow get, list: if isSignedIn();
@@ -200,12 +222,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to question documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write question data.
      * @path /questions/{questionId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage question data.
+     * @allow (create) - An authenticated user can create a question document.
+     * @allow (read) - An authenticated user can read a question document.
+     * @allow (update) - An authenticated user can update a question document.
+     * @allow (delete) - An authenticated user can delete a question document.
+     * @deny (create) - An unauthenticated user cannot create a question document.
+     * @deny (read) - An unauthenticated user cannot read a question document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /questions/{questionId} {
       allow get, list: if isSignedIn();
@@ -213,12 +238,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to supplier documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write supplier data.
      * @path /suppliers/{supplierId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage supplier data.
+     * @allow (create) - An authenticated user can create a supplier document.
+     * @allow (read) - An authenticated user can read a supplier document.
+     * @allow (update) - An authenticated user can update a supplier document.
+     * @allow (delete) - An authenticated user can delete a supplier document.
+     * @deny (create) - An unauthenticated user cannot create a supplier document.
+     * @deny (read) - An unauthenticated user cannot read a supplier document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /suppliers/{supplierId} {
       allow get, list: if isSignedIn();
@@ -226,12 +254,15 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to cost center documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write cost center data.
      * @path /cost_centers/{costCenterId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage cost center data.
+     * @allow (create) - An authenticated user can create a cost center document.
+     * @allow (read) - An authenticated user can read a cost center document.
+     * @allow (update) - An authenticated user can update a cost center document.
+     * @allow (delete) - An authenticated user can delete a cost center document.
+     * @deny (create) - An unauthenticated user cannot create a cost center document.
+     * @deny (read) - An unauthenticated user cannot read a cost center document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /cost_centers/{costCenterId} {
       allow get, list: if isSignedIn();
@@ -239,16 +270,24 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to expense category documents. Any authenticated user can read/write.
+     * @description Allows any authenticated user to read and write expense category data.
      * @path /expense_categories/{categoryId}
-     * @allow get, list: if isSignedIn();
-     * @allow create, update, delete: if isSignedIn();
-     * @deny None.
-     * @principle Allows any authenticated user to manage expense category data.
+     * @allow (create) - An authenticated user can create an expense category document.
+     * @allow (read) - An authenticated user can read an expense category document.
+     * @allow (update) - An authenticated user can update an expense category document.
+     * @allow (delete) - An authenticated user can delete an expense category document.
+     * @deny (create) - An unauthenticated user cannot create an expense category document.
+     * @deny (read) - An unauthenticated user cannot read an expense category document.
+     * @principle Allows authenticated users full access during prototyping.
      */
     match /expense_categories/{categoryId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
+
+  }
+
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
