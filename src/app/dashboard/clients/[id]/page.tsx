@@ -695,7 +695,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             'cpf': 'CPF',
             'birthDate': 'Data de Nascimento',
             'motherName': 'Nome da Mãe',
-            'profession': 'Profissão',
+            'trabalho': 'Profissão',
             'cep': 'CEP',
             'address': 'Endereço',
             'address-number': 'Número',
@@ -706,7 +706,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
         };
 
         const fieldOrder = [
-            'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'profession',
+            'name', 'cpf', 'birthDate', 'phone', 'email', 'motherName', 'trabalho',
             'cep', 'address', 'address-number', 'complement', 'neighborhood', 'city', 'state'
         ];
         
