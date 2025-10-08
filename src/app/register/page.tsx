@@ -4,8 +4,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -26,6 +27,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -40,11 +42,11 @@ export default function RegisterPage() {
       return;
     }
     setIsLoading(true);
-    if (!auth) {
+    if (!auth || !firestore) {
        toast({
         variant: 'destructive',
         title: 'Erro de Serviço',
-        description: 'Serviços de autenticação não disponíveis.',
+        description: 'Serviços de autenticação ou banco de dados não disponíveis.',
       });
       setIsLoading(false);
       return;
@@ -52,15 +54,37 @@ export default function RegisterPage() {
 
     try {
       // Step 1: Create user in Firebase Auth.
-      // The Cloud Function 'createUserDocument' will automatically handle creating the Firestore document.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+      const user = userCredential.user;
+      const displayName = `${firstName} ${lastName}`.trim();
+
       // Step 2: Update the user's profile display name in Firebase Auth
-      await updateProfile(userCredential.user, {
-        displayName: `${firstName} ${lastName}`.trim(),
+      await updateProfile(user, { displayName });
+
+      // Step 3: Create the user document in Firestore.
+      const userDocRef = doc(firestore, 'users', user.uid);
+      await setDoc(userDocRef, {
+        id: user.uid,
+        email: user.email,
+        name: displayName,
+        role: 'Admin', // Assign 'Admin' role to all new users as requested
+        createdAt: serverTimestamp(),
+        permissions: { // Grant full permissions
+          clients: { create: true, read: true, update: true, delete: true },
+          products: { create: true, read: true, update: true, delete: true },
+          sales_proposals: { create: true, read: true, update: true, delete: true },
+          transactions: { create: true, read: true, update: true, delete: true },
+          users: { create: true, read: true, update: true, delete: true },
+          suppliers: { create: true, read: true, update: true, delete: true },
+          cost_centers: { create: true, read: true, update: true, delete: true },
+          expense_categories: { create: true, read: true, update: true, delete: true },
+          quizzes: { create: true, read: true, update: true, delete: true },
+          financial_institutions: { create: true, read: true, update: true, delete: true },
+          commissions: { create: true, read: true, update: true, delete: true },
+        }
       });
 
-      // The onAuthStateChanged listener in the layout will redirect to the dashboard.
+
       toast({
         title: 'Cadastro realizado com sucesso!',
         description: 'Você será redirecionado para o dashboard.',
