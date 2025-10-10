@@ -4,8 +4,8 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useCollection, updateDocumentNonBlocking, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, query, where, limit, getDoc, arrayUnion } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { doc, collection, query, where, limit, getDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
@@ -99,17 +99,19 @@ export default function StandaloneQuizPage() {
     setIsSubmitting(true);
     toast({ title: 'Enviando respostas e arquivos...', description: 'Por favor, aguarde.' });
     
-    try {
-        if (!firestore || !clientId) {
-            throw new Error("Firestore ou ID do cliente não disponível");
-        }
+    if (!firestore || !clientId) {
+        toast({ variant: 'destructive', title: 'Erro de Configuração', description: 'Serviço de banco de dados não encontrado.' });
+        setIsSubmitting(false);
+        return;
+    }
 
-        const clientRef = doc(firestore, 'clients', clientId);
+    const clientRef = doc(firestore, 'clients', clientId);
+
+    try {
         const fileUploadPromises: Promise<any>[] = [];
         const nonFileAnswers: Record<string, any> = {};
         const fileAnswerKeys: string[] = [];
 
-        // Separate files from other answers and prepare upload promises
         for (const key in answers) {
             const value = answers[key];
             if (value instanceof FileList && value.length > 0) {
@@ -123,7 +125,6 @@ export default function StandaloneQuizPage() {
             }
         }
         
-        // Execute all file uploads in parallel
         const uploadResults = await Promise.all(fileUploadPromises);
 
         const now = new Date().toISOString();
@@ -156,9 +157,7 @@ export default function StandaloneQuizPage() {
                 user: { name: "Cliente" }
             });
         }
-
-
-        // Now, update Firestore with all data at once
+        
         const clientSnap = await getDoc(clientRef);
         if (!clientSnap.exists()) {
             throw new Error("Documento do cliente não encontrado.");
@@ -178,16 +177,30 @@ export default function StandaloneQuizPage() {
             updatePayload.timeline = arrayUnion(...(clientData.timeline || []), ...timelineEvents);
         }
 
-        updateDocumentNonBlocking(clientRef, updatePayload);
-
-        toast({
-            title: 'Respostas recebidas!',
-            description: 'Seus dados e arquivos foram enviados com sucesso.',
-        });
-        setIsSubmitted(true);
+        await updateDoc(clientRef, updatePayload)
+            .then(() => {
+                toast({
+                    title: 'Respostas recebidas!',
+                    description: 'Seus dados e arquivos foram enviados com sucesso.',
+                });
+                setIsSubmitted(true);
+            })
+            .catch((error) => {
+                // This replaces the generic try/catch for permission errors on update
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: clientRef.path,
+                    operation: 'update',
+                    requestResourceData: updatePayload
+                }));
+                 toast({
+                    variant: 'destructive',
+                    title: 'Falha na Permissão',
+                    description: 'Não foi possível salvar seus dados. Verifique as permissões.',
+                });
+            });
 
     } catch (error) {
-        console.error("Erro ao enviar o quiz:", error);
+        // This catch block now handles errors from getDoc, file uploads, etc.
         const errorMessage = error instanceof Error ? error.message : 'Não foi possível enviar suas respostas. Tente novamente.';
         toast({
             variant: 'destructive',
