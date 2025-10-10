@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   PlusCircle,
   MoreHorizontal,
@@ -99,9 +99,13 @@ function TemplateDialog({
     defaultValues: template || { name: '', text: '', apiUrl: '', sessionName: 'default' },
   })
 
-  useState(() => {
-    reset(template || { name: '', text: '', apiUrl: '', sessionName: 'default' })
-  })
+  useEffect(() => {
+    if (template) {
+      reset(template);
+    } else {
+      reset({ name: '', text: '', apiUrl: '', sessionName: 'default' });
+    }
+  }, [template, reset]);
 
   const handleFormSubmit = (values: TemplateFormValues) => {
       onSave(values, template?.id);
