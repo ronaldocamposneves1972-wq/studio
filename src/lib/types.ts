@@ -220,12 +220,15 @@ export type ExpenseCategory = {
     costCenterName?: string;
 }
 
+export type WhatsappMessageStage = "Cadastro (Quiz)" | "Documentação" | "Valor" | "Clearance" | "Ledger" | "Manual";
+
 export type WhatsappMessageTemplate = {
   id: string;
   name: string;
   text: string;
   apiUrl: string;
   sessionName: string;
+  stage: WhatsappMessageStage;
 };
 
 
@@ -278,5 +281,6 @@ export const collections = [
   'expense_categories',
   'quizzes',
   'financial_institutions',
-  'commissions'
+  'commissions',
+  'whatsapp_templates'
 ] as const;

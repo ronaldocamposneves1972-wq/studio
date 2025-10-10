@@ -634,6 +634,11 @@
         "sessionName": {
             "type": "string",
             "description": "The session name required by the WhatsApp API."
+        },
+        "stage": {
+          "type": "string",
+          "description": "The pipeline stage that triggers this message.",
+          "enum": ["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Manual"]
         }
       },
       "required": [
@@ -641,7 +646,8 @@
         "name",
         "text",
         "apiUrl",
-        "sessionName"
+        "sessionName",
+        "stage"
       ]
     }
   },

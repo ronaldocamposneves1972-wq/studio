@@ -10,7 +10,7 @@ import {
   Loader2,
   MessageCircle,
 } from "lucide-react"
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -60,18 +60,29 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 import type { WhatsappMessageTemplate } from "@/lib/types"
+import { Badge } from "@/components/ui/badge"
 
 const templateSchema = z.object({
   name: z.string().min(3, { message: "O nome interno é obrigatório." }),
   text: z.string().min(10, { message: "O texto da mensagem é obrigatório." }),
   apiUrl: z.string().url({ message: "A URL da API deve ser válida." }),
   sessionName: z.string().min(1, { message: "O nome da sessão é obrigatório." }),
+  stage: z.enum(["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Manual"], {
+    required_error: "Selecione uma etapa."
+  }),
 })
 
 type TemplateFormValues = z.infer<typeof templateSchema>
@@ -92,18 +103,19 @@ function TemplateDialog({
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
-    defaultValues: template || { name: '', text: '', apiUrl: '', sessionName: 'default' },
+    defaultValues: template || { name: '', text: '', apiUrl: '', sessionName: 'default', stage: 'Manual' },
   })
 
   useEffect(() => {
     if (template) {
       reset(template);
     } else {
-      reset({ name: '', text: '', apiUrl: '', sessionName: 'default' });
+      reset({ name: '', text: '', apiUrl: '', sessionName: 'default', stage: 'Manual' });
     }
   }, [template, reset]);
 
@@ -121,10 +133,35 @@ function TemplateDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Nome Interno</Label>
-              <Input id="name" {...register('name')} placeholder="Ex: Boas-vindas Cadastro" />
-              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name">Nome Interno</Label>
+                    <Input id="name" {...register('name')} placeholder="Ex: Boas-vindas Cadastro" />
+                    {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="stage">Etapa da Esteira</Label>
+                    <Controller
+                        control={control}
+                        name="stage"
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value} defaultValue="Manual">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione a etapa" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Cadastro (Quiz)">Cadastro (Quiz)</SelectItem>
+                                    <SelectItem value="Documentação">Documentação</SelectItem>
+                                    <SelectItem value="Valor">Valor</SelectItem>
+                                    <SelectItem value="Clearance">Clearance</SelectItem>
+                                    <SelectItem value="Ledger">Ledger</SelectItem>
+                                    <SelectItem value="Manual">Manual</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                     {errors.stage && <p className="text-sm text-destructive">{errors.stage.message}</p>}
+                </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="text">Texto da Mensagem</Label>
@@ -178,7 +215,7 @@ export default function WhatsappSettingsPage() {
     if (!firestore) return
     setIsSubmitting(true)
     try {
-      const dataToSave = { ...values }; // Convert Proxy to a plain object
+      const dataToSave = { ...values };
       if (id) {
         await updateDoc(doc(firestore, 'whatsapp_templates', id), dataToSave)
         toast({ title: 'Modelo atualizado com sucesso!' })
@@ -228,6 +265,7 @@ export default function WhatsappSettingsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome Interno</TableHead>
+                <TableHead>Etapa</TableHead>
                 <TableHead>Mensagem</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -236,19 +274,23 @@ export default function WhatsappSettingsPage() {
               {isLoading && Array.from({ length: 2 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-64" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-52" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))}
               {!isLoading && templates?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">Nenhum modelo encontrado.</TableCell>
+                  <TableCell colSpan={4} className="h-24 text-center">Nenhum modelo encontrado.</TableCell>
                 </TableRow>
               )}
               {templates?.map((template) => (
                 <TableRow key={template.id}>
                   <TableCell className="font-medium">{template.name}</TableCell>
-                  <TableCell className="text-muted-foreground truncate max-w-sm">{template.text}</TableCell>
+                  <TableCell>
+                      <Badge variant={template.stage === 'Manual' ? 'outline' : 'secondary'}>{template.stage}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground truncate max-w-md">{template.text}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
