@@ -110,12 +110,10 @@ export default function StandaloneQuizPage() {
     try {
         const fileUploadPromises: Promise<any>[] = [];
         const nonFileAnswers: Record<string, any> = {};
-        const fileAnswerKeys: string[] = [];
 
         for (const key in answers) {
             const value = answers[key];
             if (value instanceof FileList && value.length > 0) {
-                 fileAnswerKeys.push(key);
                  for (let i = 0; i < value.length; i++) {
                     const file = value[i];
                     fileUploadPromises.push(uploadFileToCloudinary(file, clientId));
@@ -177,7 +175,10 @@ export default function StandaloneQuizPage() {
             updatePayload.timeline = arrayUnion(...(clientData.timeline || []), ...timelineEvents);
         }
 
-        await updateDoc(clientRef, updatePayload)
+        // CORRECTED ERROR HANDLING:
+        // No outer try...catch for the updateDoc call.
+        // Chain .then() and .catch() directly to the Firestore operation.
+        updateDoc(clientRef, updatePayload)
             .then(() => {
                 toast({
                     title: 'Respostas recebidas!',
@@ -186,28 +187,26 @@ export default function StandaloneQuizPage() {
                 setIsSubmitted(true);
             })
             .catch((error) => {
-                // This replaces the generic try/catch for permission errors on update
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                // This is the correct place to create and emit the contextual error.
+                const permissionError = new FirestorePermissionError({
                     path: clientRef.path,
                     operation: 'update',
                     requestResourceData: updatePayload
-                }));
-                 toast({
-                    variant: 'destructive',
-                    title: 'Falha na Permissão',
-                    description: 'Não foi possível salvar seus dados. Verifique as permissões.',
                 });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsSubmitting(false);
             });
 
     } catch (error) {
-        // This catch block now handles errors from getDoc, file uploads, etc.
-        const errorMessage = error instanceof Error ? error.message : 'Não foi possível enviar suas respostas. Tente novamente.';
+        // This outer catch now only handles errors from file uploads or getDoc.
+        const errorMessage = error instanceof Error ? error.message : 'Não foi possível processar o envio. Tente novamente.';
         toast({
             variant: 'destructive',
             title: 'Ops! Algo deu errado.',
             description: errorMessage,
         });
-    } finally {
         setIsSubmitting(false);
     }
 };
