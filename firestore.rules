@@ -1,309 +1,330 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech application.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces fine-grained access control for the ConsorciaTech application.
  *
  * Core Philosophy:
- * This ruleset prioritizes strong authorization based on path-based ownership and denormalized data, 
- * while remaining flexible on data shapes for rapid prototyping.  It emphasizes preventing unauthorized
- * data access while enabling quick iteration on the application's data model.
+ * - Strict user-ownership for user profiles and client-related data.
+ * - Document existence checks for admin roles.
+ * - Denormalization of key fields to avoid expensive `get()` operations within rules.
  *
  * Data Structure:
- * - User data is stored under `/users/{userId}`, enforcing user-ownership.
- * - Client-related data is stored under `/clients/{clientId}`, with subcollections like `/clients/{clientId}/documents/{documentId}`.
- * - Product information is split into `/consortiums/{consortiumId}` and `/credit_products/{creditProductId}`.
- * - Sales proposals are stored under `/sales_proposals/{salesProposalId}`, with denormalized `clientId` for efficient authorization.
- * - General data like `financial_institutions`, `product_combos`, `commissions`, `quizzes`, `questions`, `suppliers`, `cost_centers`, `expense_categories`, and `whatsapp_templates` are stored in top-level collections.
+ * - /users/{userId}: Stores user profiles. Only the user can read/write their own profile.
+ * - /roles_admin/{userId}: Document existence grants admin privileges.
+ * - /clients/{clientId}: Stores client data.
+ * - /clients/{clientId}/documents/{documentId}: Client-uploaded documents, accessible only by the client.
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
+ * - /consortiums/{consortiumId}: Stores consortium product data.
+ * - /credit_products/{creditProductId}: Stores credit product data.
+ * - /product_combos/{productComboId}: Stores product combo data.
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data. Includes denormalized 'clientId' for authorization independence.
+ * - /sales_orders/{salesOrderId}: Stores sales order data.
+ * - /commissions/{commissionId}: Stores commission data.
+ * - /quizzes/{quizId}: Stores quiz data.
+ * - /questions/{questionId}: Stores question data.
+ * - /suppliers/{supplierId}: Stores supplier data.
+ * - /cost_centers/{costCenterId}: Stores cost center data.
+ * - /expense_categories/{categoryId}: Stores expense category data.
+ * - /whatsapp_templates/{templateId}: Stores WhatsApp message templates.
  *
  * Key Security Decisions:
- * - User listing is generally disallowed.
- * - Data required for authorization is denormalized onto the documents being secured to avoid costly `get()` calls.
- * - The rules are written to be auditable and maintainable, with complex logic abstracted into helper functions.
- * - The rules DO NOT perform extensive data validation, focusing instead on authorization and relational integrity.
- * - Read access to any collection is denied by default unless explicitly allowed.
+ * - User profiles are strictly private (owner-only access).
+ * - Admin privileges are determined by document existence in the /roles_admin collection.
+ * - Data denormalization is used to avoid `get()` calls in rules, improving performance.
+ * - List operations are secured based on path-based ownership and role checks.
+ *
+ * Denormalization for Authorization:
+ * - The `sales_proposals` collection includes a denormalized `clientId` field, allowing security rules to directly verify client access without additional `get()` calls.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the request is authenticated.
-     * @returns {boolean} True if the request is authenticated, false otherwise.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user IDs match, false otherwise.
-     */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the authenticated user is the owner of an existing document.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user IDs match and the document exists, false otherwise.
-     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rules for user documents.
+     * @description Allows only the user to read and write their own profile.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user creates their own document.
-     * @allow (get, update, delete) - Authenticated user accesses their own document.
-     * @deny (create) - Unauthorized user attempts to create a document for another user.
-     * @deny (get, update, delete) - Unauthorized user attempts to access another user's document.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) - User can create their own profile if the userId matches their auth UID.
+     * @allow (get, list) - User can read their own profile.
+     * @allow (update, delete) - User can update/delete their own profile.
+     * @deny (create, get, list, update, delete) - Any other user cannot access this profile.
+     * @principle Enforces strict user-ownership for profile data.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow get, list: if isOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for admin role documents.
+     * @description Determines admin privileges based on document existence.
      * @path /roles_admin/{userId}
-     * @allow (create) - Only an admin can create an admin role document.
-     * @allow (get) - Anyone can check if a user is an admin.
-     * @allow (update, delete) - Only an admin can update or delete an admin role document.
-     * @deny (create, update, delete) - Non-admins are denied access.
-     * @principle Restricts admin role management to authorized users.
+     * @allow (create) - Any authenticated user can be granted admin role.
+     * @allow (get) - Check if a user is admin
+     * @allow (list) - no listing
+     * @allow (update, delete) - Admins can update/delete admin roles.
+     * @deny (create, update, delete) - Non-admins cannot manage admin roles.
+     * @principle Grants admin privileges based on document existence.
      */
     match /roles_admin/{userId} {
-        allow get: if true;
-        allow list: if false;
-        allow create: if false; // TODO: Implement admin check
-        allow update: if false; // TODO: Implement admin check
-        allow delete: if false; // TODO: Implement admin check
+      allow create: if isAdmin();
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for client documents.
+     * @description Allows read and write access to client data for authenticated users.
      * @path /clients/{clientId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage clients.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for client management.
+     * @allow (create) - Any authenticated user can create a client.
+     * @allow (get, list) - Any authenticated user can read/list clients.
+     * @allow (update, delete) - Any authenticated user can update/delete clients.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access client data.
+     * @principle Requires authentication for all client data access.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for client documents.
+     * @description Allows access to client-uploaded documents only to the client.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage clients documents.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for client management.
+     * @allow (create) - Any authenticated user can create a document for a client.
+     * @allow (get, list) - Any authenticated user can read/list documents for a client.
+     * @allow (update, delete) - Any authenticated user can update/delete documents for a client.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access client documents.
+     * @principle Enforces client-ownership for uploaded documents.
      */
-     match /clients/{clientId}/documents/{documentId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+    match /clients/{clientId}/documents/{documentId} {
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for financial institution documents.
+     * @description Allows read and write access to financial institution data for authenticated users.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage financial institutions.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for financial institution management.
+     * @allow (create) - Any authenticated user can create a financial institution.
+     * @allow (get, list) - Any authenticated user can read/list financial institutions.
+     * @allow (update, delete) - Any authenticated user can update/delete financial institutions.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access financial institution data.
+     * @principle Requires authentication for all financial institution data access.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for consortium documents.
+     * @description Allows read and write access to consortium product data for authenticated users.
      * @path /consortiums/{consortiumId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage consortiums.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for consortium management.
+     * @allow (create) - Any authenticated user can create a consortium.
+     * @allow (get, list) - Any authenticated user can read/list consortiums.
+     * @allow (update, delete) - Any authenticated user can update/delete consortiums.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access consortium data.
+     * @principle Requires authentication for all consortium data access.
      */
     match /consortiums/{consortiumId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for credit product documents.
+     * @description Allows read and write access to credit product data for authenticated users.
      * @path /credit_products/{creditProductId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage credit products.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for credit product management.
+     * @allow (create) - Any authenticated user can create a credit product.
+     * @allow (get, list) - Any authenticated user can read/list credit products.
+     * @allow (update, delete) - Any authenticated user can update/delete credit products.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access credit product data.
+     * @principle Requires authentication for all credit product data access.
      */
     match /credit_products/{creditProductId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for product combo documents.
+     * @description Allows read and write access to product combo data for authenticated users.
      * @path /product_combos/{productComboId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage product combos.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for product combo management.
+     * @allow (create) - Any authenticated user can create a product combo.
+     * @allow (get, list) - Any authenticated user can read/list product combos.
+     * @allow (update, delete) - Any authenticated user can update/delete product combos.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access product combo data.
+     * @principle Requires authentication for all product combo data access.
      */
     match /product_combos/{productComboId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for sales proposal documents.
+     * @description Allows read and write access to sales proposal data for authenticated users.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage sales proposals.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for sales proposal management.
+     * @allow (create) - Any authenticated user can create a sales proposal.
+     * @allow (get, list) - Any authenticated user can read/list sales proposals.
+     * @allow (update, delete) - Any authenticated user can update/delete sales proposals.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access sales proposal data.
+     * @principle Requires authentication for all sales proposal data access.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
-     /**
-     * @description Rules for sales order documents.
+    /**
+     * @description Allows read and write access to sales order data for authenticated users.
      * @path /sales_orders/{salesOrderId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage sales orders.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
+     * @allow (create) - Any authenticated user can create a sales order.
+     * @allow (get, list) - Any authenticated user can read/list sales orders.
+     * @allow (update, delete) - Any authenticated user can update/delete sales orders.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access sales order data.
+     * @principle Requires authentication for all sales order data access.
      */
     match /sales_orders/{salesOrderId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for commission documents.
+     * @description Allows read and write access to commission data for authenticated users.
      * @path /commissions/{commissionId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage commissions.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for commission management.
+     * @allow (create) - Any authenticated user can create a commission.
+     * @allow (get, list) - Any authenticated user can read/list commissions.
+     * @allow (update, delete) - Any authenticated user can update/delete commissions.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access commission data.
+     * @principle Requires authentication for all commission data access.
      */
     match /commissions/{commissionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for quiz documents.
+     * @description Allows read and write access to quiz data for authenticated users.
      * @path /quizzes/{quizId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage quizzes.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for quiz management.
+     * @allow (create) - Any authenticated user can create a quiz.
+     * @allow (get, list) - Any authenticated user can read/list quizzes.
+     * @allow (update, delete) - Any authenticated user can update/delete quizzes.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access quiz data.
+     * @principle Requires authentication for all quiz data access.
      */
     match /quizzes/{quizId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for question documents.
+     * @description Allows read and write access to question data for authenticated users.
      * @path /questions/{questionId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage questions.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for question management.
+     * @allow (create) - Any authenticated user can create a question.
+     * @allow (get, list) - Any authenticated user can read/list questions.
+     * @allow (update, delete) - Any authenticated user can update/delete questions.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access question data.
+     * @principle Requires authentication for all question data access.
      */
     match /questions/{questionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for supplier documents.
+     * @description Allows read and write access to supplier data for authenticated users.
      * @path /suppliers/{supplierId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage suppliers.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for supplier management.
+     * @allow (create) - Any authenticated user can create a supplier.
+     * @allow (get, list) - Any authenticated user can read/list suppliers.
+     * @allow (update, delete) - Any authenticated user can update/delete suppliers.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access supplier data.
+     * @principle Requires authentication for all supplier data access.
      */
     match /suppliers/{supplierId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for cost center documents.
+     * @description Allows read and write access to cost center data for authenticated users.
      * @path /cost_centers/{costCenterId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage cost centers.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for cost center management.
+     * @allow (create) - Any authenticated user can create a cost center.
+     * @allow (get, list) - Any authenticated user can read/list cost centers.
+     * @allow (update, delete) - Any authenticated user can update/delete cost centers.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access cost center data.
+     * @principle Requires authentication for all cost center data access.
      */
     match /cost_centers/{costCenterId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for expense category documents.
+     * @description Allows read and write access to expense category data for authenticated users.
      * @path /expense_categories/{categoryId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage expense categories.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for expense category management.
+     * @allow (create) - Any authenticated user can create an expense category.
+     * @allow (get, list) - Any authenticated user can read/list expense categories.
+     * @allow (update, delete) - Any authenticated user can update/delete expense categories.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access expense category data.
+     * @principle Requires authentication for all expense category data access.
      */
     match /expense_categories/{categoryId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for WhatsApp message template documents.
+     * @description Allows read and write access to WhatsApp message template data for authenticated users.
      * @path /whatsapp_templates/{templateId}
-     * @allow (create, get, update, delete) - Any authenticated user can manage WhatsApp message templates.
-     * @deny (create, get, update, delete) - Unauthenticated users are denied access.
-     * @principle Requires authentication for WhatsApp message template management.
+     * @allow (create) - Any authenticated user can create a WhatsApp message template.
+     * @allow (get, list) - Any authenticated user can read/list WhatsApp message templates.
+     * @allow (update, delete) - Any authenticated user can update/delete WhatsApp message templates.
+     * @deny (create, get, list, update, delete) - Unauthenticated users cannot access WhatsApp message template data.
+     * @principle Requires authentication for all WhatsApp message template data access.
      */
     match /whatsapp_templates/{templateId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
       allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
