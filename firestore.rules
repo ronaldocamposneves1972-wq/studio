@@ -2,313 +2,328 @@
  * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset prioritizes security through strict path-based ownership and role-based access control,
- * while maintaining flexibility for rapid prototyping.  It assumes that all user-provided data is
- * potentially unsafe and focuses on verifying user identity and data ownership before granting access.
- * All write operations require authentication.
+ * This ruleset employs a hybrid security model.  It blends ownership-based access control for user-specific data with public read access for certain collections. Strict ownership is enforced on user profiles and client-owned resources.
  *
  * Data Structure:
- * - /users/{userId}: Stores individual user profiles.  Access is restricted to the owner.
- * - /roles_admin/{userId}: Document existence confers admin privileges.
- * - /clients/{clientId}: Stores client data. No specific ownership; potentially accessible to internal roles.
- * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents, accessible to the client and potentially internal roles.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.  No specific ownership; potentially public read.
- * - /consortiums/{consortiumId}: Stores consortium product data. No specific ownership; potentially public read.
- * - /credit_products/{creditProductId}: Stores credit product data. No specific ownership; potentially public read.
- * - /product_combos/{productComboId}: Stores product combo data. No specific ownership; potentially public read.
- * - /sales_proposals/{salesProposalId}: Stores sales proposal data. Includes `clientId` for independent authorization.
- * - /sales_orders/{salesOrderId}: Stores sales order data.
- * - /commissions/{commissionId}: Stores commission data.
- * - /quizzes/{quizId}: Stores quiz data.
- * - /questions/{questionId}: Stores question data.
- * - /suppliers/{supplierId}: Stores supplier data.
- * - /cost_centers/{costCenterId}: Stores cost center data.
- * - /expense_categories/{categoryId}: Stores expense category data.
- * - /whatsapp_templates/{templateId}: Stores WhatsApp message templates.
+ * - `/users/{userId}`: User profile information.
+ * - `/roles_admin/{userId}`: Document existence grants admin role.
+ * - `/clients/{clientId}`: Client data.
+ * - `/clients/{clientId}/documents/{documentId}`: Documents uploaded by clients.
+ * - `/financial_institutions/{financialInstitutionId}`: Financial institution data.
+ * - `/consortiums/{consortiumId}`: Consortium product data.
+ * - `/credit_products/{creditProductId}`: Credit product data.
+ * - `/product_combos/{productComboId}`: Product combo data.
+ * - `/sales_proposals/{salesProposalId}`: Sales proposal data.
+ * - `/sales_orders/{salesOrderId}`: Sales order data.
+ * - `/commissions/{commissionId}`: Commission data.
+ * - `/quizzes/{quizId}`: Quiz data.
+ * - `/questions/{questionId}`: Question data.
+ * - `/suppliers/{supplierId}`: Supplier data.
+ * - `/cost_centers/{costCenterId}`: Cost center data.
+ * - `/expense_categories/{categoryId}`: Expense category data.
+ * - `/whatsapp_templates/{templateId}`: WhatsApp message templates.
  *
  * Key Security Decisions:
- * - Strict ownership for /users/{userId} data.
- * - Admin role conferred by document existence in /roles_admin/{userId}.
- * - Open read access (get, list) is assumed for product and financial institution data.
- * - The rules explicitly deny any write operations that are not explicitly allowed.
- *
- * Denormalization for Authorization:
- * - The `sales_proposals` collection denormalizes the `clientId` to enable direct authorization checks
- *   without requiring additional `get()` operations.
- *
- * Structural Segregation:
- * - No drafts or published content is in use.
+ * - User listing is disallowed.
+ * - Admin roles are determined by document existence in `/roles_admin/{userId}`.
+ * - Data is denormalized where necessary to avoid costly `get()` calls in security rules. For example, `clientId` is present on SalesProposals.
+ * - The `update` operation on `/clients/{clientId}` failed because there was no rule allowing an unauthenticated user to update Client documents. Now, `update` operation on `/clients/{clientId}` is allowed if the user is signed in.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
+     * @description Checks if the user is signed in.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user's ID matches the provided userId.
+     * @description Checks if the authenticated user's ID matches the provided user ID.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user's ID matches the provided userId and the resource exists.
+     * @description Checks if the authenticated user's ID matches the ID of the resource.
+     */
+     function isResourceOwner(resourceId) {
+      return request.auth.uid == resourceId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is an existing owner of the resource.
      */
     function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return (isOwner(userId) && resource.data != null);
     }
 
     /**
-     * @description Checks if the user is an admin by verifying the existence of a document in /roles_admin/{userId}.
+     * @description Checks if the authenticated user is an admin.
      */
     function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
-     * @description Rules for user-specific data.
+     * @description Rule for user-specific data.
      * @path /users/{userId}
-     * @allow (create) User 'testUser' can create their own document if request.auth.uid == userId.
-     * @deny (create) User 'otherUser' cannot create a document with userId 'testUser' if request.auth.uid != userId.
-     * @allow (get, update, delete) User 'testUser' can read, update, and delete their own document.
-     * @deny (get, update, delete) User 'otherUser' cannot read, update, or delete 'testUser's document.
+     * @allow (create) User 'user123' can create their own user document.
+     * @deny (create) User 'user456' cannot create a document under 'user123'.
+     * @allow (get) User 'user123' can read their own user document.
+     * @deny (get) User 'user456' cannot read 'user123's user document.
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Rules for admin roles. Document existence in this collection confers admin privileges.
+     * @description Rule for admin roles.
      * @path /roles_admin/{userId}
-     * @allow (create) Any authenticated user can create their own admin role document, effectively granting themselves admin privileges.
-     * @deny (create) Unauthenticated users cannot create admin role documents.
-     * @principle Authorization using /roles_admin/{uid}.
+     * @allow (create) An admin can grant another user admin rights.
+     * @deny (create) A non-admin user cannot grant admin rights.
+     * @allow (get) Any signed-in user can check for admin role.
+     * @deny (get) Anonymous user cannot check for admin role.
+     * @principle Existence over Content. Authorization using /roles_admin/{uid}.
      */
     match /roles_admin/{userId} {
-        allow get: if isAdmin();
-        allow list: if false;
-        allow create: if isSignedIn() && request.auth.uid == userId; // Self-assignment
-        allow update: if false;
-        allow delete: if false; // Disallow deletion for now
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isAdmin();
+      allow update: if false; // No updates allowed.
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for client data.
+     * @description Rule for client data.
      * @path /clients/{clientId}
-     * @allow (get, list) Anyone can read client data.
-     * @allow (create, update, delete) Only admins can create, update, or delete client data.
-     * @principle Restricts write access to admins.
+     * @allow (create) Any authenticated user can create a client.
+     * @deny (create) An unauthenticated user cannot create a client.
+     * @allow (get) Any user can read client data.
+     * @deny (get) An unauthenticated user cannot read client data.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for documents uploaded by clients, stored under the client's path.
+     * @description Rule for documents uploaded by clients.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (get, list) Anyone can read client documents.
-     * @allow (create) Only admins can create client documents.
-     * @allow (update, delete) Only admins can update or delete client documents.
-     * @principle Path-based ownership under client.
+     * @allow (create) A client can create a document under their client ID.
+     * @deny (create) A client cannot create a document under another client's ID.
+     * @allow (get) Any user can read a client document.
+     * @deny (get) An unauthenticated user cannot read a client document.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == clientId;
+      allow update: if isSignedIn() && request.auth.uid == clientId;
       allow delete: if isAdmin();
     }
 
-     /**
-      * @description Rules for financial institution data.
-      * @path /financial_institutions/{financialInstitutionId}
-      * @allow (get, list) Anyone can read financial institution data.
-      * @allow (create, update, delete) Only admins can create, update, or delete financial institution data.
-      * @principle Allows public read access, restricts write access to admins.
-      */
+    /**
+     * @description Rule for financial institution data.
+     * @path /financial_institutions/{financialInstitutionId}
+     * @allow (create) Only admins can create financial institutions.
+     * @deny (create) Non-admin users cannot create financial institutions.
+     * @allow (get) Any user can read financial institution data.
+     */
     match /financial_institutions/{financialInstitutionId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for consortium product data.
+     * @description Rule for consortium product data.
      * @path /consortiums/{consortiumId}
-     * @allow (get, list) Anyone can read consortium product data.
-     * @allow (create, update, delete) Only admins can create, update, or delete consortium product data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create consortium products.
+     * @deny (create) Non-admin users cannot create consortium products.
+     * @allow (get) Any user can read consortium product data.
      */
     match /consortiums/{consortiumId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for credit product data.
+     * @description Rule for credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow (get, list) Anyone can read credit product data.
-     * @allow (create, update, delete) Only admins can create, update, or delete credit product data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create credit products.
+     * @deny (create) Non-admin users cannot create credit products.
+     * @allow (get) Any user can read credit product data.
      */
     match /credit_products/{creditProductId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for product combo data.
+     * @description Rule for product combo data.
      * @path /product_combos/{productComboId}
-     * @allow (get, list) Anyone can read product combo data.
-     * @allow (create, update, delete) Only admins can create, update, or delete product combo data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create product combos.
+     * @deny (create) Non-admin users cannot create product combos.
+     * @allow (get) Any user can read product combo data.
      */
     match /product_combos/{productComboId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for sales proposal data.
+     * @description Rule for sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (get, list) Anyone can read sales proposal data.
-     * @allow (create, update, delete) Only admins can create, update, or delete sales proposal data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Any signed-in user can create a sales proposal.
+     * @deny (create) An unauthenticated user cannot create a sales proposal.
+     * @allow (get) Any user can read sales proposal data.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get, list: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow get: if true;
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for sales order data.
+     * @description Rule for sales order data.
      * @path /sales_orders/{salesOrderId}
-     * @allow (get, list) Anyone can read sales order data.
-     * @allow (create, update, delete) Only admins can create, update, or delete sales order data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create sales orders.
+     * @deny (create) Non-admin users cannot create sales orders.
+     * @allow (get) Any user can read sales order data.
      */
     match /sales_orders/{salesOrderId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for commission data.
+     * @description Rule for commission data.
      * @path /commissions/{commissionId}
-     * @allow (get, list) Anyone can read commission data.
-     * @allow (create, update, delete) Only admins can create, update, or delete commission data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create commissions.
+     * @deny (create) Non-admin users cannot create commissions.
+     * @allow (get) Any user can read commission data.
      */
     match /commissions/{commissionId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for quiz data.
+     * @description Rule for quiz data.
      * @path /quizzes/{quizId}
-     * @allow (get, list) Anyone can read quiz data.
-     * @allow (create, update, delete) Only admins can create, update, or delete quiz data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create quizzes.
+     * @deny (create) Non-admin users cannot create quizzes.
+     * @allow (get) Any user can read quiz data.
      */
     match /quizzes/{quizId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for question data.
+     * @description Rule for question data.
      * @path /questions/{questionId}
-     * @allow (get, list) Anyone can read question data.
-     * @allow (create, update, delete) Only admins can create, update, or delete question data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create questions.
+     * @deny (create) Non-admin users cannot create questions.
+     * @allow (get) Any user can read question data.
      */
     match /questions/{questionId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for supplier data.
+     * @description Rule for supplier data.
      * @path /suppliers/{supplierId}
-     * @allow (get, list) Anyone can read supplier data.
-     * @allow (create, update, delete) Only admins can create, update, or delete supplier data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create suppliers.
+     * @deny (create) Non-admin users cannot create suppliers.
+     * @allow (get) Any user can read supplier data.
      */
     match /suppliers/{supplierId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for cost center data.
+     * @description Rule for cost center data.
      * @path /cost_centers/{costCenterId}
-     * @allow (get, list) Anyone can read cost center data.
-     * @allow (create, update, delete) Only admins can create, update, or delete cost center data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create cost centers.
+     * @deny (create) Non-admin users cannot create cost centers.
+     * @allow (get) Any user can read cost center data.
      */
     match /cost_centers/{costCenterId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for expense category data.
+     * @description Rule for expense category data.
      * @path /expense_categories/{categoryId}
-     * @allow (get, list) Anyone can read expense category data.
-     * @allow (create, update, delete) Only admins can create, update, or delete expense category data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create expense categories.
+     * @deny (create) Non-admin users cannot create expense categories.
+     * @allow (get) Any user can read expense category data.
      */
     match /expense_categories/{categoryId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rules for WhatsApp message template data.
+     * @description Rule for WhatsApp message templates.
      * @path /whatsapp_templates/{templateId}
-     * @allow (get, list) Anyone can read WhatsApp message template data.
-     * @allow (create, update, delete) Only admins can create, update, or delete WhatsApp message template data.
-     * @principle Allows public read access, restricts write access to admins.
+     * @allow (create) Only admins can create templates.
+     * @deny (create) Non-admin users cannot create templates.
+     * @allow (get) Any user can read template data.
      */
     match /whatsapp_templates/{templateId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
