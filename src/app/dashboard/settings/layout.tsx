@@ -9,6 +9,7 @@ import {
   Webhook,
   FileQuestion,
   Shield,
+  MessageCircle,
 } from "lucide-react"
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 const navLinks = [
   { href: "/dashboard/settings/users", label: "Usuários", icon: Users },
   { href: "/dashboard/settings/quizzes", label: "Quizzes", icon: FileQuestion },
+  { href: "/dashboard/settings/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/dashboard/settings/integrations", label: "Integrações", icon: KeyRound },
   { href: "/dashboard/settings/notifications", label: "Notificações", icon: Bell },
   { href: "/dashboard/settings/branding", label: "Marca", icon: Palette },

@@ -187,6 +187,7 @@ export type Quiz = {
     ownerId?: string;
     questions: QuizQuestion[];
     createdAt?: string;
+    whatsappTemplateId?: string;
 };
 
 export type Account = {
@@ -218,6 +219,14 @@ export type ExpenseCategory = {
     costCenterId?: string;
     costCenterName?: string;
 }
+
+export type WhatsappMessageTemplate = {
+  id: string;
+  name: string;
+  text: string;
+  apiUrl: string;
+  sessionName: string;
+};
 
 
 export type Transaction = {

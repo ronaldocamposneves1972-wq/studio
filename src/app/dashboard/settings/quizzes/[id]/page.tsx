@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { useFieldArray, useForm } from "react-hook-form"
+import { useFieldArray, useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ChevronLeft, PlusCircle, Trash2, ArrowUp, ArrowDown } from "lucide-react"
@@ -30,8 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { useFirestore, useUser, useDoc, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
-import type { Quiz } from "@/lib/types"
+import { useFirestore, useUser, useDoc, updateDocumentNonBlocking, useMemoFirebase, useCollection } from "@/firebase"
+import type { Quiz, WhatsappMessageTemplate } from "@/lib/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import {
@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { collection, query } from "firebase/firestore"
 
 const questionSchema = z.object({
   id: z.string().min(1, "ID da pergunta é obrigatório"),
@@ -59,6 +60,7 @@ const quizSchema = z.object({
       required_error: "A página do quiz é obrigatória."
   }),
   questions: z.array(questionSchema).min(1, "O quiz deve ter pelo menos uma pergunta"),
+  whatsappTemplateId: z.string().optional(),
 })
 
 type QuizFormData = z.infer<typeof quizSchema>
@@ -79,12 +81,18 @@ export default function EditQuizPage() {
 
   const { data: quiz, isLoading: isLoadingQuiz } = useDoc<Quiz>(quizDocRef)
 
+  const templatesQuery = useMemoFirebase(() => {
+      return firestore ? query(collection(firestore, 'whatsapp_templates')) : null
+  }, [firestore]);
+  const { data: templates, isLoading: isLoadingTemplates } = useCollection<WhatsappMessageTemplate>(templatesQuery);
+
   const form = useForm<QuizFormData>({
     resolver: zodResolver(quizSchema),
     defaultValues: {
       name: "",
       slug: "landing_page",
       questions: [],
+      whatsappTemplateId: ""
     }
   })
 
@@ -97,6 +105,7 @@ export default function EditQuizPage() {
           ...q,
           options: q.options?.join(", ") || "",
         })),
+        whatsappTemplateId: quiz.whatsappTemplateId || "",
       })
     }
   }, [quiz, form])
@@ -137,7 +146,7 @@ export default function EditQuizPage() {
     setIsSubmitting(false)
   }
 
-  if (isUserLoading || isLoadingQuiz) {
+  if (isUserLoading || isLoadingQuiz || isLoadingTemplates) {
     return (
         <div className="grid flex-1 auto-rows-max gap-4">
              <div className="flex items-center gap-4">
@@ -255,6 +264,31 @@ export default function EditQuizPage() {
                       </FormItem>
                     )}
                   />
+                </div>
+                 <div className="grid gap-2">
+                     <FormField
+                        control={form.control}
+                        name="whatsappTemplateId"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Mensagem de WhatsApp (Opcional)</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Nenhuma" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="">Nenhuma</SelectItem>
+                                    {templates?.map(template => (
+                                        <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                             <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                 </div>
 
 

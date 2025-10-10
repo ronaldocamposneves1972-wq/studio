@@ -6,7 +6,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, query, limit, where, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, query, limit, where, arrayUnion, getDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
@@ -14,9 +14,44 @@ import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import type { Quiz, TimelineEvent } from '@/lib/types';
+import type { Quiz, TimelineEvent, WhatsappMessageTemplate } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
+
+async function sendWhatsappMessage(template: WhatsappMessageTemplate, clientName: string, clientPhone: string) {
+    const phone = clientPhone.replace(/\D/g, '');
+    if (phone.length < 10) {
+        console.error("Número de telefone inválido para envio via WhatsApp:", clientPhone);
+        return;
+    }
+
+    const payload = {
+        chatId: `55${phone}@c.us`,
+        reply_to: null,
+        text: template.text.replace('{clientName}', clientName),
+        linkPreview: true,
+        linkPreviewHighQuality: false,
+        session: template.sessionName,
+    };
+
+    try {
+        const response = await fetch(template.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Falha ao enviar mensagem do WhatsApp. Status: ${response.status}. Body: ${errorBody}`);
+        }
+        console.log("Mensagem do WhatsApp enviada com sucesso.");
+    } catch (error) {
+        console.error("Erro ao enviar mensagem do WhatsApp:", error);
+        // We log the error but don't block the user flow
+    }
+}
+
 
 function CadastroContent() {
   const searchParams = useSearchParams();
@@ -138,6 +173,17 @@ function CadastroContent() {
             description: 'Obrigado por se cadastrar. Em breve nossa equipe entrará em contato.',
         });
         setIsSubmitted(true);
+        
+        // --- Send WhatsApp Message ---
+        if (quiz?.whatsappTemplateId) {
+            const templateRef = doc(firestore, 'whatsapp_templates', quiz.whatsappTemplateId);
+            const templateSnap = await getDoc(templateRef);
+            if (templateSnap.exists() && newClient.name && newClient.phone) {
+                const template = templateSnap.data() as WhatsappMessageTemplate;
+                await sendWhatsappMessage(template, newClient.name, newClient.phone);
+            }
+        }
+
     } catch(error) {
          toast({
             variant: 'destructive',
