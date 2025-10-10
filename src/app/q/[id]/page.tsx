@@ -106,6 +106,7 @@ export default function StandaloneQuizPage() {
     }
 
     const clientRef = doc(firestore, 'clients', clientId);
+    let updatePayload: Record<string, any> = {};
 
     try {
         const fileUploadPromises: Promise<any>[] = [];
@@ -162,7 +163,7 @@ export default function StandaloneQuizPage() {
         }
         const clientData = clientSnap.data() as Client;
         
-        const updatePayload: Record<string, any> = {
+        updatePayload = {
             answers: { ...clientData.answers, ...nonFileAnswers },
             status: 'Em análise',
         };
@@ -175,38 +176,35 @@ export default function StandaloneQuizPage() {
             updatePayload.timeline = arrayUnion(...(clientData.timeline || []), ...timelineEvents);
         }
 
-        // CORRECTED ERROR HANDLING:
-        // No outer try...catch for the updateDoc call.
-        // Chain .then() and .catch() directly to the Firestore operation.
-        updateDoc(clientRef, updatePayload)
-            .then(() => {
-                toast({
-                    title: 'Respostas recebidas!',
-                    description: 'Seus dados e arquivos foram enviados com sucesso.',
-                });
-                setIsSubmitted(true);
-            })
-            .catch((error) => {
-                // This is the correct place to create and emit the contextual error.
-                const permissionError = new FirestorePermissionError({
-                    path: clientRef.path,
-                    operation: 'update',
-                    requestResourceData: updatePayload
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                setIsSubmitting(false);
-            });
+        await updateDoc(clientRef, updatePayload);
+        
+        toast({
+            title: 'Respostas recebidas!',
+            description: 'Seus dados e arquivos foram enviados com sucesso.',
+        });
+        setIsSubmitted(true);
+        setIsSubmitting(false);
 
     } catch (error) {
-        // This outer catch now only handles errors from file uploads or getDoc.
-        const errorMessage = error instanceof Error ? error.message : 'Não foi possível processar o envio. Tente novamente.';
-        toast({
-            variant: 'destructive',
-            title: 'Ops! Algo deu errado.',
-            description: errorMessage,
-        });
+        // This is now the ONLY place where errors are caught.
+        
+        // If the error is a Firestore permission error, create and emit the contextual error.
+        if (error instanceof Error && error.message.includes('permission')) {
+             const permissionError = new FirestorePermissionError({
+                path: clientRef.path,
+                operation: 'update',
+                requestResourceData: updatePayload, // Send the data we tried to write
+             });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+             // For any other type of error (e.g., file upload, getDoc failure), show a toast.
+            const errorMessage = error instanceof Error ? error.message : 'Não foi possível processar o envio. Tente novamente.';
+            toast({
+                variant: 'destructive',
+                title: 'Ops! Algo deu errado.',
+                description: errorMessage,
+            });
+        }
         setIsSubmitting(false);
     }
 };
