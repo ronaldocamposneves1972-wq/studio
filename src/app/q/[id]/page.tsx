@@ -187,7 +187,7 @@ export default function StandaloneQuizPage() {
         setIsSubmitted(true);
 
     } catch (error) {
-        console.error(error);
+        console.error("Erro ao enviar o quiz:", error);
         const errorMessage = error instanceof Error ? error.message : 'Não foi possível enviar suas respostas. Tente novamente.';
         toast({
             variant: 'destructive',
