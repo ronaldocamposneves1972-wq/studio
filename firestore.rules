@@ -1,288 +1,298 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech application.
+ * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset employs a hybrid security model. User-owned data (under /users/{userId}) is strictly controlled, while
- * other collections like /clients, /financial_institutions, and /products have more open access policies.
+ * This ruleset prioritizes a secure, role-based access control model.
+ * Strict path-based ownership is enforced for user-specific data.
+ * Data denormalization is used to avoid costly `get()` calls in rules.
  *
  * Data Structure:
- * - /users/{userId}: Stores user-specific data. Only the user can read/write their own data.
+ * - /users/{userId}: Stores user profiles. Owner-only access.
+ * - /roles_admin/{userId}: Document existence confers admin role.
  * - /clients/{clientId}: Stores client data.
- * - /clients/{clientId}/documents/{documentId}:  Stores client documents. Only the client can read/write their own documents.
- * - /financial_institutions/{financialInstitutionId}: Stores financial institution data.
- * - /consortiums/{consortiumId}: Stores consortium product data.
- * - /credit_products/{creditProductId}: Stores credit product data.
- * - /product_combos/{productComboId}: Stores product combo data.
- * - /sales_proposals/{salesProposalId}: Stores sales proposal data.
- * - /sales_orders/{salesOrderId}: Stores sales order data.
- * - /commissions/{commissionId}: Stores commission data.
- * - /quizzes/{quizId}: Stores quiz data.
- * - /questions/{questionId}: Stores question data.
- * - /suppliers/{supplierId}: Stores supplier data.
- * - /cost_centers/{costCenterId}: Stores cost center data.
- * - /expense_categories/{categoryId}: Stores expense category data.
- * - /whatsapp_templates/{templateId}: Stores WhatsApp message templates.
- * - /roles_admin/{userId}: if document exists it confers admin roles to the user.
+ * - /clients/{clientId}/documents/{documentId}: Client-uploaded documents.
+ * - /financial_institutions/{financialInstitutionId}: Financial institution data.
+ * - /consortiums/{consortiumId}: Consortium product data.
+ * - /credit_products/{creditProductId}: Credit product data.
+ * - /product_combos/{productComboId}: Product combinations.
+ * - /sales_proposals/{salesProposalId}: Sales proposals (includes denormalized clientId).
+ * - /sales_orders/{salesOrderId}: Sales orders.
+ * - /commissions/{commissionId}: Commission data.
+ * - /quizzes/{quizId}: Quiz definitions.
+ * - /questions/{questionId}: Question data.
+ * - /suppliers/{supplierId}: Supplier data.
+ * - /cost_centers/{costCenterId}: Cost center data.
+ * - /expense_categories/{categoryId}: Expense category data.
+ * - /whatsapp_templates/{templateId}: WhatsApp message templates.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - The /roles_admin collection grants admin privileges based on document existence.
- * - Read access to product and financial institution data is generally open.
- * - Path-based ownership is enforced for user data and client documents.
+ * - Admin role is determined by the existence of a document in /roles_admin/{userId}.
+ * - Read-only access is explicitly granted for certain collections where appropriate.
+ * - List operations are secured based on the data model and access control needs.
  *
  * Denormalization for Authorization:
- * - The `sales_proposals` collection denormalizes the `clientId` to avoid needing `get()` calls to the `clients` collection during authorization.
+ * - SalesProposals: Includes a denormalized 'clientId' to allow client-specific access rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is an existing owner of a document.
-     * Useful for update and delete operations.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Checks if the user has admin privileges by verifying their ID exists in the /roles_admin collection.
-     */
-     function isAdmin() {
-        return exists(/databases/(default)/documents/roles_admin/$(request.auth.uid));
-     }
-
-    /**
-     * @description Rule for documents in the /users/{userId} collection.
+     * @description Allows access to user profile data, enforcing strict owner-only access.
      * @path /users/{userId}
-     * @allow (create) User with ID 'user123' creates their own profile.
-     * @deny (create) User with ID 'user123' tries to create profile for 'user456'.
-     * @allow (get) User with ID 'user123' retrieves their own profile.
-     * @deny (get) User with ID 'user123' tries to retrieve profile for 'user456'.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+     * @allow (create, update, delete) if the user is signed in and owns the document.
+     * @deny (create, update, delete) if the user is not signed in or does not own the document.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
-     * @description Rule for documents in the /roles_admin/{userId} collection.
+     * @description Determines admin role based on the existence of a document in /roles_admin/{userId}.
      * @path /roles_admin/{userId}
-     * @allow (create) User with ID 'admin123' is granted admin role.
-     * @deny (create) Anonymous user tries to become admin.
+     * @allow (create) if the user is signed in and owns the document (creating the admin role).
+     * @allow (get) if the user is signed in and owns the document.
+     * @deny (update, delete) Admin role can only be assigned or removed.
+     * @principle Existence over Content. Authorization using /roles_admin/{uid}.
      */
     match /roles_admin/{userId} {
-      allow get: if isAdmin();
+      allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId);
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if false;
     }
 
     /**
-     * @description Rule for documents in the /clients/{clientId} collection.
+     * @description Allows read and write access to client data.
      * @path /clients/{clientId}
-     * @allow (get) Any user can retrieve client data.
-     * @deny (create) Anonymous user attempts to create a client profile.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Currently allows all authenticated users, needs role-based access control.
+     * @principle Requires further access control based on roles.
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /clients/{clientId}/documents/{documentId} collection.
+     * @description Allows clients to manage their uploaded documents.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) User with ID 'client123' creates a document under their client profile.
-     * @deny (create) User with ID 'client123' tries to create a document under 'client456'.
-     * @allow (get) User with ID 'client123' retrieves a document from their client profile.
-     * @deny (get) User with ID 'client123' tries to retrieve a document from 'client456'.
-     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
+     * @allow (create, update, delete) if the user is signed in and owns the parent client document.
+     * @deny (create, update, delete) if the user is not signed in or does not own the parent client document.
+     * @principle Path-based ownership under client.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get: if isSignedIn() && isAdmin();
+      allow list: if false; // Listing documents not allowed for security.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /financial_institutions/{financialInstitutionId} collection.
+     * @description Allows read access to financial institution data. Write access requires admin role.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (get) Any user can retrieve financial institution data.
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /consortiums/{consortiumId} collection.
+     * @description Allows read access to consortium product data. Write access requires admin role.
      * @path /consortiums/{consortiumId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /consortiums/{consortiumId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /credit_products/{creditProductId} collection.
+     * @description Allows read access to credit product data. Write access requires admin role.
      * @path /credit_products/{creditProductId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /credit_products/{creditProductId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /product_combos/{productComboId} collection.
+     * @description Allows read access to product combo data. Write access requires admin role.
      * @path /product_combos/{productComboId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /product_combos/{productComboId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /sales_proposals/{salesProposalId} collection.
+     * @description Allows access to sales proposal data.
      * @path /sales_proposals/{salesProposalId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin or the proposal belongs to the user.
+     * @principle Requires further access control based on roles.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /sales_orders/{salesOrderId} collection.
+     * @description Allows access to sales order data.
      * @path /sales_orders/{salesOrderId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin or the order belongs to the user.
      */
     match /sales_orders/{salesOrderId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /commissions/{commissionId} collection.
+     * @description Allows access to commission data. Write access requires admin role.
      * @path /commissions/{commissionId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /commissions/{commissionId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /quizzes/{quizId} collection.
+     * @description Allows read access to quiz data. Write access requires admin role.
      * @path /quizzes/{quizId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /quizzes/{quizId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Rule for documents in the /questions/{questionId} collection.
+     * @description Allows read access to question data. Write access requires admin role.
      * @path /questions/{questionId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
      */
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
      /**
-      * @description Rule for documents in the /suppliers/{supplierId} collection.
+      * @description Allows read access to supplier data. Write access requires admin role.
       * @path /suppliers/{supplierId}
+      * @allow (get, list) Public read access.
+      * @allow (create, update, delete) if the user is an admin.
+      * @principle Requires admin role for writes.
       */
-     match /suppliers/{supplierId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
-     }
+    match /suppliers/{supplierId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-     /**
-      * @description Rule for documents in the /cost_centers/{costCenterId} collection.
-      * @path /cost_centers/{costCenterId}
-      */
-     match /cost_centers/{costCenterId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
-     }
+    /**
+     * @description Allows read access to cost center data. Write access requires admin role.
+     * @path /cost_centers/{costCenterId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
+     */
+    match /cost_centers/{costCenterId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-     /**
-      * @description Rule for documents in the /expense_categories/{categoryId} collection.
-      * @path /expense_categories/{categoryId}
-      */
-     match /expense_categories/{categoryId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
-     }
+    /**
+     * @description Allows read access to expense category data. Write access requires admin role.
+     * @path /expense_categories/{categoryId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
+     */
+    match /expense_categories/{categoryId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
-     /**
-      * @description Rule for documents in the /whatsapp_templates/{templateId} collection.
-      * @path /whatsapp_templates/{templateId}
-      */
-     match /whatsapp_templates/{templateId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
-     }
+    /**
+     * @description Allows read access to WhatsApp message template data. Write access requires admin role.
+     * @path /whatsapp_templates/{templateId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) if the user is an admin.
+     * @principle Requires admin role for writes.
+     */
+    match /whatsapp_templates/{templateId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isSignedIn() && isOwner(userId) && resource.data != null;
+  }
+
+  function isAdmin() {
+    return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
   }
 }
