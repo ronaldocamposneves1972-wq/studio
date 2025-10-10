@@ -1,27 +1,37 @@
 /**
- * @fileoverview Firestore Security Rules for ConsorciaTech Application
+ * @fileoverview Firestore Security Rules for ConsorciaTech.
  *
  * Core Philosophy:
- * This ruleset prioritizes security through strict path-based ownership and authorization independence.
- * It denormalizes data (e.g., client IDs in sales proposals) to avoid costly and complex `get()` operations in rules.
+ * This ruleset prioritizes strong authorization and secure access control. It uses a combination of
+ * path-based ownership (e.g., /users/{userId}), existence checks (e.g., /roles_admin/{userId}),
+ * and data denormalization to enforce granular permissions. All write operations are strictly controlled.
  *
  * Data Structure:
- * The data is organized into top-level collections like `users`, `clients`, `financial_institutions`, `consortiums`,
- * `credit_products`, `product_combos`, `sales_proposals`, `commissions`, `quizzes`, `questions`, `suppliers`, `cost_centers`, `expense_categories`, and `whatsapp_templates`.
- * User-specific data is stored under `/users/{userId}`.
+ * - /users/{userId}: Stores user profiles; accessible only by the user themselves.
+ * - /roles_admin/{userId}: Document existence grants admin privileges to the user.
+ * - /clients/{clientId}: Stores client information; write access is currently open (TODO: restrict in future iterations).
+ * - /clients/{clientId}/documents/{documentId}: Stores client-uploaded documents; write access is currently open (TODO: restrict in future iterations).
+ * - /financial_institutions/{financialInstitutionId}: Stores financial institution data; write access is currently open (TODO: restrict in future iterations).
+ * - /consortiums/{consortiumId}: Stores consortium product data; write access is currently open (TODO: restrict in future iterations).
+ * - /credit_products/{creditProductId}: Stores credit product data; write access is currently open (TODO: restrict in future iterations).
+ * - /product_combos/{productComboId}: Stores product combo data; write access is currently open (TODO: restrict in future iterations).
+ * - /sales_proposals/{salesProposalId}: Stores sales proposal data; write access is currently open (TODO: restrict in future iterations).
+ * - /sales_orders/{salesOrderId}: Stores sales order data; write access is currently open (TODO: restrict in future iterations).
+ * - /commissions/{commissionId}: Stores commission data; write access is currently open (TODO: restrict in future iterations).
+ * - /quizzes/{quizId}: Stores quiz data; write access is currently open (TODO: restrict in future iterations).
+ * - /questions/{questionId}: Stores question data; write access is currently open (TODO: restrict in future iterations).
+ * - /suppliers/{supplierId}: Stores supplier data; write access is currently open (TODO: restrict in future iterations).
+ * - /cost_centers/{costCenterId}: Stores cost center data; write access is currently open (TODO: restrict in future iterations).
+ * - /expense_categories/{categoryId}: Stores expense category data; write access is currently open (TODO: restrict in future iterations).
+ * - /whatsapp_templates/{templateId}: Stores WhatsApp message templates; write access is currently open (TODO: restrict in future iterations).
  *
  * Key Security Decisions:
- * - Listing all users is disallowed.
- * - Public read access is not granted to any collections containing private user data.
- * - All write operations are protected by authorization checks.
- * - The `roles_admin` collection determines admin status based on document existence.
+ * - No user listing: The rules explicitly prevent listing of users for privacy reasons.
+ * - Admin role via document existence: Admin privileges are granted based on the existence of a document in /roles_admin/{userId}.
+ * - Flexible data shapes (prototyping): The rules focus on authorization and relational integrity, not strict schema validation, to allow for rapid prototyping.
  *
  * Denormalization for Authorization:
- * - The `sales_proposals` collection includes the `clientId` field to enable direct authorization checks
- *   without needing to `get()` the associated client document.
- *
- * Structural Segregation:
- * - Private user data is stored under `/users/{userId}`, while potentially public data resides in top-level collections.
+ * - SalesProposal documents denormalize the clientId to enable direct authorization without additional reads.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -29,289 +39,248 @@ service cloud.firestore {
 
     /**
      * @description Checks if the user is signed in.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Fundamental check for authentication.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces path-based ownership.
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against.
+     * @returns {boolean} True if the UID matches, false otherwise.
      */
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the authenticated user ID matches the provided user ID and the resource exists.
-     * @path N/A
-     * @allow N/A
-     * @deny N/A
-     * @principle Enforces path-based ownership and resource existence for updates and deletes.
+     * @description Checks if the authenticated user is an existing owner (signed in and document exists).
+     * @param {string} userId - The user ID to compare against.
+     * @returns {boolean} True if the UID matches and resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Allows a user to only create their own user document.
+     * @description Checks if the user has admin privileges based on document existence in /roles_admin/{userId}.
+     * @returns {boolean} True if the admin document exists, false otherwise.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user123' creates document /users/user123
-     * @deny (create) - User with UID 'user123' attempts to create document /users/user456
-     * @principle Enforces path-based ownership for user creation.
+     * @allow (create) - User can create their own profile if the userId matches their auth UID.
+     * @allow (get, list, update, delete) - Only the user themselves can access their profile.
+     * @deny (create) - If the userId does not match the auth UID.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if false; // Prevent listing all users.
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Admin role based on document existence in /roles_admin/{userId}.
+     * @description Rules for admin roles. Document existence determines admin role.
      * @path /roles_admin/{userId}
-     * @allow (create) - User with UID 'admin123' creates document /roles_admin/admin123
-     * @deny (create) - User with UID 'user123' attempts to create document /roles_admin/admin123
-     * @principle Admin role is determined by the existence of a document with their UID.
+     * @allow (create) - Any authenticated user can request admin role (for review).
+     * @allow (get) - Any authenticated user can check if they are an admin.
+     * @allow (update, delete) - Only an existing admin can modify admin roles.
+     * @deny (list) - No listing of admin roles.
+     * @principle Authorization based on document existence.
      */
     match /roles_admin/{userId} {
-      allow get: if true;
+      allow get: if isSignedIn();
       allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow create: if false; //TODO: discuss and implement the intended strategy, e.g. manual review
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Manages client data.
+     * @description Rules for client data.
      * @path /clients/{clientId}
-     * @allow (create) - Any authenticated user can create a client profile.
-     * @deny (update) - Unauthenticated user attempts to update a client profile.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages documents uploaded by clients, enforcing ownership.
+     * @description Rules for documents uploaded by clients.
      * @path /clients/{clientId}/documents/{documentId}
-     * @allow (create) - User with UID 'user123' creates document /clients/client456/documents/doc789
-     * @deny (update) - User with UID 'user123' attempts to update document /clients/client456/documents/doc789
-     * @principle Enforces client-based ownership for document management.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /clients/{clientId}/documents/{documentId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();  // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages financial institution data.
+     * @description Rules for financial institution data.
      * @path /financial_institutions/{financialInstitutionId}
-     * @allow (create) - Any authenticated user can create a financial institution.
-     * @deny (update) - Unauthenticated user attempts to update a financial institution.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /financial_institutions/{financialInstitutionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();  // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages consortium product data.
+     * @description Rules for consortium product data.
      * @path /consortiums/{consortiumId}
-     * @allow (create) - Any authenticated user can create a consortium product.
-     * @deny (update) - Unauthenticated user attempts to update a consortium product.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /consortiums/{consortiumId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages credit product data.
+     * @description Rules for credit product data.
      * @path /credit_products/{creditProductId}
-     * @allow (create) - Any authenticated user can create a credit product.
-     * @deny (update) - Unauthenticated user attempts to update a credit product.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /credit_products/{creditProductId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages product combo data.
+     * @description Rules for product combo data.
      * @path /product_combos/{productComboId}
-     * @allow (create) - Any authenticated user can create a product combo.
-     * @deny (update) - Unauthenticated user attempts to update a product combo.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /product_combos/{productComboId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages sales proposal data, enforcing client-based authorization.
+     * @description Rules for sales proposal data.
      * @path /sales_proposals/{salesProposalId}
-     * @allow (create) - User creates a sales proposal with their UID matching the 'clientId'.
-     * @deny (update) - User attempts to update a sales proposal where their UID doesn't match the 'clientId'.
-     * @principle Enforces client-based ownership using the denormalized 'clientId' field.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /sales_proposals/{salesProposalId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();  // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
-    /**
-     * @description Manages sales order data.
+   /**
+     * @description Rules for sales order data.
      * @path /sales_orders/{salesOrderId}
-     * @allow (create) - Any authenticated user can create a sales order.
-     * @deny (update) - Unauthenticated user attempts to update a sales order.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /sales_orders/{salesOrderId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages commission data.
+     * @description Rules for commission data.
      * @path /commissions/{commissionId}
-     * @allow (create) - Any authenticated user can create a commission.
-     * @deny (update) - Unauthenticated user attempts to update a commission.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /commissions/{commissionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages quiz data.
+     * @description Rules for quiz data.
      * @path /quizzes/{quizId}
-     * @allow (create) - Any authenticated user can create a quiz.
-     * @deny (update) - Unauthenticated user attempts to update a quiz.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /quizzes/{quizId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages question data.
+     * @description Rules for question data.
      * @path /questions/{questionId}
-     * @allow (create) - Any authenticated user can create a question.
-     * @deny (update) - Unauthenticated user attempts to update a question.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();  // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages supplier data.
+     * @description Rules for supplier data.
      * @path /suppliers/{supplierId}
-     * @allow (create) - Any authenticated user can create a supplier.
-     * @deny (update) - Unauthenticated user attempts to update a supplier.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /suppliers/{supplierId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
-    }
-
-     /**
-      * @description Manages cost center data.
-      * @path /cost_centers/{costCenterId}
-      * @allow (create) - Any authenticated user can create a cost center.
-      * @deny (update) - Unauthenticated user attempts to update a cost center.
-      * @principle Requires authentication for all operations.
-      */
-    match /cost_centers/{costCenterId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Manages expense category data.
+     * @description Rules for cost center data.
+     * @path /cost_centers/{costCenterId}
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
+     */
+    match /cost_centers/{costCenterId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    /**
+     * @description Rules for expense category data.
      * @path /expense_categories/{categoryId}
-     * @allow (create) - Any authenticated user can create an expense category.
-     * @deny (update) - Unauthenticated user attempts to update an expense category.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /expense_categories/{categoryId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
+
     /**
-     * @description Manages WhatsApp message templates.
+     * @description Rules for WhatsApp message templates.
      * @path /whatsapp_templates/{templateId}
-     * @allow (create) - Any authenticated user can create a WhatsApp message template.
-     * @deny (update) - Unauthenticated user attempts to update a WhatsApp message template.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) - Public read access for prototyping.
+     * @allow (create, update, delete) - Currently open for prototyping; TODO: Implement proper access control.
+     * @principle Open access for prototyping.
      */
     match /whatsapp_templates/{templateId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
   }
 }
