@@ -98,8 +98,7 @@ export function useCollection<T = any>(
           operation: 'list',
           path,
         });
-
-        console.error("useCollection Firestore Error:", contextualError);
+        
         setError(contextualError);
         setData(null); // Clear data on error
         setIsLoading(false);
