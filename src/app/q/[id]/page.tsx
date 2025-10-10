@@ -12,9 +12,10 @@ import { AppLogo } from '@/components/logo';
 import { CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Quiz, Client, ClientDocument, TimelineEvent } from '@/lib/types';
+import type { Quiz, Client, ClientDocument, TimelineEvent, WhatsappMessageTemplate } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
+import { sendWhatsappMessage } from '@/lib/whatsapp';
 
 
 export default function StandaloneQuizPage() {
@@ -183,28 +184,36 @@ export default function StandaloneQuizPage() {
             description: 'Seus dados e arquivos foram enviados com sucesso.',
         });
         setIsSubmitted(true);
-        setIsSubmitting(false);
+
+         // --- Send WhatsApp Message ---
+        if (quiz?.whatsappTemplateId && clientData.name && clientData.phone) {
+            const templateRef = doc(firestore, 'whatsapp_templates', quiz.whatsappTemplateId);
+            const templateSnap = await getDoc(templateRef);
+            if (templateSnap.exists()) {
+                const template = templateSnap.data() as WhatsappMessageTemplate;
+                await sendWhatsappMessage(template, { clientName: clientData.name }, clientData.phone);
+            }
+        }
 
     } catch (error) {
-        // This is now the ONLY place where errors are caught.
-        
-        // If the error is a Firestore permission error, create and emit the contextual error.
+        const errorMessage = error instanceof Error ? error.message : 'Não foi possível processar o envio. Tente novamente.';
+        console.error("Quiz Submission Error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Ops! Algo deu errado.',
+            description: errorMessage,
+        });
+
+        // Specific handling for permission errors to leverage the debugging system.
         if (error instanceof Error && error.message.includes('permission')) {
              const permissionError = new FirestorePermissionError({
                 path: clientRef.path,
                 operation: 'update',
-                requestResourceData: updatePayload, // Send the data we tried to write
+                requestResourceData: updatePayload,
              });
             errorEmitter.emit('permission-error', permissionError);
-        } else {
-             // For any other type of error (e.g., file upload, getDoc failure), show a toast.
-            const errorMessage = error instanceof Error ? error.message : 'Não foi possível processar o envio. Tente novamente.';
-            toast({
-                variant: 'destructive',
-                title: 'Ops! Algo deu errado.',
-                description: errorMessage,
-            });
         }
+    } finally {
         setIsSubmitting(false);
     }
 };
