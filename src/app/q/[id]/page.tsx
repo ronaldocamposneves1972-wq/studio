@@ -2,9 +2,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useDoc } from '@/firebase';
 import { doc, collection, query, where, limit, getDoc, arrayUnion, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,13 @@ export default function StandaloneQuizPage() {
 
   const { data: quizzes, isLoading: isLoadingQuiz } = useCollection<Quiz>(quizQuery);
   const quiz = quizzes?.[0];
+
+  const clientRef = useMemoFirebase(() => {
+    if (!firestore || !clientId) return null;
+    return doc(firestore, 'clients', clientId);
+  }, [firestore, clientId]);
+
+  const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
 
   const uploadFileToCloudinary = async (file: File, clientId: string) => {
     const formData = new FormData();
@@ -185,13 +192,16 @@ export default function StandaloneQuizPage() {
         });
         setIsSubmitted(true);
 
-         // --- Send WhatsApp Message ---
         if (quiz?.whatsappTemplateId && clientData.name && clientData.phone) {
             const templateRef = doc(firestore, 'whatsapp_templates', quiz.whatsappTemplateId);
             const templateSnap = await getDoc(templateRef);
             if (templateSnap.exists()) {
                 const template = templateSnap.data() as WhatsappMessageTemplate;
-                await sendWhatsappMessage(template, { clientName: clientData.name }, clientData.phone);
+                await sendWhatsappMessage(template, { clientName: clientData.name, quizLink: window.location.href }, clientData.phone);
+                 toast({
+                    title: "Notificação enviada!",
+                    description: "Uma confirmação foi enviada para o seu WhatsApp."
+                });
             }
         }
 
@@ -219,7 +229,7 @@ export default function StandaloneQuizPage() {
 };
   
   const renderContent = () => {
-    if (isLoadingQuiz) {
+    if (isLoadingQuiz || isLoadingClient) {
       return (
           <div className="space-y-4 animate-pulse">
             <Skeleton className="h-4 w-full" />
@@ -237,12 +247,12 @@ export default function StandaloneQuizPage() {
       );
     }
 
-    if (isSubmitted) {
+    if (isSubmitted || (client && client.documents && client.documents.length > 0)) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4 text-center">
             <CheckCircle className="h-16 w-16 text-green-500" />
             <h3 className="text-2xl font-bold">Obrigado!</h3>
-            <p className="text-muted-foreground">Seus dados foram enviados com sucesso.</p>
+            <p className="text-muted-foreground">Seus dados e documentos já foram enviados. Nossa equipe entrará em contato em breve.</p>
         </div>
       );
     }
