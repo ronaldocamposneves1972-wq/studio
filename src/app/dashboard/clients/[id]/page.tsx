@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import Image from "next/image"
@@ -76,7 +75,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product, WhatsappMessageTemplate } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -85,7 +84,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, useCollection } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc, getDocs } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -114,6 +113,7 @@ import {
 } from "@/components/ui/dialog"
 import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
+import { sendWhatsappMessage } from "@/lib/whatsapp"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -487,24 +487,61 @@ export default function ClientDetailPage() {
     };
 
     const handleInitiateDocumentation = async () => {
-        if (!clientRef || !user) return;
-        
+    if (!clientRef || !user || !firestore || !client) return;
+
+    try {
+        const now = new Date().toISOString();
+
         const timelineEvent: TimelineEvent = {
             id: `tl-${Date.now()}`,
             activity: `Status alterado para "Em análise"`,
             details: "Iniciada a coleta de documentos.",
-            timestamp: new Date().toISOString(),
+            timestamp: now,
             user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
         };
 
+        // Update client status
         await updateDoc(clientRef, { status: 'Em análise', timeline: arrayUnion(timelineEvent) });
-        
+
         toast({
             title: "Cliente movido para Documentação",
-            description: `${client?.name} agora está na etapa de coleta de documentos.`
+            description: `${client.name} agora está na etapa de coleta de documentos.`
         });
+
+        // --- Send WhatsApp Message ---
+        const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Documentação'));
+        const templatesSnap = await getDocs(templatesQuery);
+        
+        if (!templatesSnap.empty) {
+            const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+            const placeholders = {
+                clientName: client.name,
+                quizLink: quizLink
+            };
+            await sendWhatsappMessage(template, placeholders, client.phone);
+            toast({
+                title: "Notificação enviada!",
+                description: "O link de documentação foi enviado ao cliente via WhatsApp."
+            });
+        } else {
+             toast({
+                variant: 'destructive',
+                title: "Template não encontrado",
+                description: "Nenhum modelo de WhatsApp encontrado para a etapa 'Documentação'."
+            });
+        }
+        
         router.push('/dashboard/pipeline/Documentacao');
-    };
+
+    } catch (error) {
+        console.error("Error initiating documentation:", error);
+        toast({
+            variant: 'destructive',
+            title: "Erro",
+            description: "Não foi possível iniciar a etapa de documentação.",
+        });
+    }
+};
 
     const handleSendToCreditAnalysis = async () => {
         if (!clientRef || !user || !client) return;
