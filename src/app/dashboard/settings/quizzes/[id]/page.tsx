@@ -128,12 +128,16 @@ export default function EditQuizPage() {
 
     setIsSubmitting(true)
 
-    const quizData = {
+    const quizData: Partial<Quiz> = {
       ...data,
       questions: data.questions.map(q => ({
         ...q,
         options: q.options ? q.options.split(',').map(opt => opt.trim()) : [],
       })),
+    };
+
+    if (data.whatsappTemplateId === 'none' || !data.whatsappTemplateId) {
+        quizData.whatsappTemplateId = undefined;
     }
 
     updateDocumentNonBlocking(quizDocRef, quizData);
@@ -279,7 +283,7 @@ export default function EditQuizPage() {
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="">Nenhuma</SelectItem>
+                                    <SelectItem value="none">Nenhuma</SelectItem>
                                     {templates?.map(template => (
                                         <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
                                     ))}
