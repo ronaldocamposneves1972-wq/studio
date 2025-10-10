@@ -103,6 +103,10 @@ function TemplateDialog({
     reset(template || { name: '', text: '', apiUrl: '', sessionName: 'default' })
   })
 
+  const handleFormSubmit = (values: TemplateFormValues) => {
+      onSave(values, template?.id);
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[625px]">
@@ -112,7 +116,7 @@ function TemplateDialog({
             Crie ou edite modelos de mensagem para enviar via WhatsApp. Use {'{clientName}'} para personalizar.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Nome Interno</Label>
               <Input id="name" {...register('name')} placeholder="Ex: Boas-vindas Cadastro" />
@@ -170,11 +174,12 @@ export default function WhatsappSettingsPage() {
     if (!firestore) return
     setIsSubmitting(true)
     try {
+      const dataToSave = { ...values }; // Convert Proxy to a plain object
       if (id) {
-        await updateDoc(doc(firestore, 'whatsapp_templates', id), values)
+        await updateDoc(doc(firestore, 'whatsapp_templates', id), dataToSave)
         toast({ title: 'Modelo atualizado com sucesso!' })
       } else {
-        await addDoc(collection(firestore, 'whatsapp_templates'), values)
+        await addDoc(collection(firestore, 'whatsapp_templates'), dataToSave)
         toast({ title: 'Modelo criado com sucesso!' })
       }
       setIsDialogOpen(false)
