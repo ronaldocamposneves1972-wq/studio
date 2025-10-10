@@ -229,6 +229,7 @@ export type WhatsappMessageTemplate = {
   apiUrl: string;
   sessionName: string;
   stage: WhatsappMessageStage;
+  placeholders?: string[];
 };
 
 

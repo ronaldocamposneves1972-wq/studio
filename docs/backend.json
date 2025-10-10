@@ -625,7 +625,7 @@
         },
         "text": {
           "type": "string",
-          "description": "The body of the message. Can include placeholders like {clientName}."
+          "description": "The body of the message. Can include placeholders like {clientName} or {quizLink}."
         },
         "apiUrl": {
           "type": "string",
@@ -639,6 +639,13 @@
           "type": "string",
           "description": "The pipeline stage that triggers this message.",
           "enum": ["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Manual"]
+        },
+        "placeholders": {
+          "type": "array",
+          "description": "Array of available placeholders for this template (e.g., 'clientName', 'quizLink').",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

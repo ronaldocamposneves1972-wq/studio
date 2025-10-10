@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState, useEffect } from "react"
@@ -122,6 +123,8 @@ function TemplateDialog({
   const handleFormSubmit = (values: TemplateFormValues) => {
       onSave(values, template?.id);
   }
+  
+  const availablePlaceholders = ['clientName', 'quizLink'];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,7 +132,7 @@ function TemplateDialog({
         <DialogHeader>
           <DialogTitle>{template ? 'Editar' : 'Novo'} Modelo de Mensagem</DialogTitle>
           <DialogDescription>
-            Crie ou edite modelos de mensagem para enviar via WhatsApp. Use {'{clientName}'} para personalizar.
+            Crie ou edite modelos de mensagem para enviar via WhatsApp.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -166,6 +169,9 @@ function TemplateDialog({
             <div className="grid gap-2">
               <Label htmlFor="text">Texto da Mensagem</Label>
               <Textarea id="text" {...register('text')} placeholder="Olá {clientName}, obrigado por se cadastrar!" rows={4} />
+              <p className="text-xs text-muted-foreground">
+                Placeholders disponíveis: {availablePlaceholders.map(p => `{${p}}`).join(', ')}
+              </p>
               {errors.text && <p className="text-sm text-destructive">{errors.text.message}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">

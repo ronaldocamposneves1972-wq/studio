@@ -17,40 +17,7 @@ import Link from 'next/link';
 import type { Quiz, TimelineEvent, WhatsappMessageTemplate } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
-
-async function sendWhatsappMessage(template: WhatsappMessageTemplate, clientName: string, clientPhone: string) {
-    const phone = clientPhone.replace(/\D/g, '');
-    if (phone.length < 10) {
-        console.error("Número de telefone inválido para envio via WhatsApp:", clientPhone);
-        return;
-    }
-
-    const payload = {
-        chatId: `55${phone}@c.us`,
-        reply_to: null,
-        text: template.text.replace('{clientName}', clientName),
-        linkPreview: true,
-        linkPreviewHighQuality: false,
-        session: template.sessionName,
-    };
-
-    try {
-        const response = await fetch(template.apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`Falha ao enviar mensagem do WhatsApp. Status: ${response.status}. Body: ${errorBody}`);
-        }
-        console.log("Mensagem do WhatsApp enviada com sucesso.");
-    } catch (error) {
-        console.error("Erro ao enviar mensagem do WhatsApp:", error);
-        // We log the error but don't block the user flow
-    }
-}
+import { sendWhatsappMessage } from '@/lib/whatsapp';
 
 
 function CadastroContent() {
@@ -175,12 +142,12 @@ function CadastroContent() {
         setIsSubmitted(true);
         
         // --- Send WhatsApp Message ---
-        if (quiz?.whatsappTemplateId) {
+        if (quiz?.whatsappTemplateId && newClient.name && newClient.phone) {
             const templateRef = doc(firestore, 'whatsapp_templates', quiz.whatsappTemplateId);
             const templateSnap = await getDoc(templateRef);
-            if (templateSnap.exists() && newClient.name && newClient.phone) {
+            if (templateSnap.exists()) {
                 const template = templateSnap.data() as WhatsappMessageTemplate;
-                await sendWhatsappMessage(template, newClient.name, newClient.phone);
+                await sendWhatsappMessage(template, { clientName: newClient.name }, newClient.phone);
             }
         }
 
