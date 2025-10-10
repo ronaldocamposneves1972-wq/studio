@@ -152,6 +152,7 @@ function CadastroContent() {
         }
 
     } catch(error) {
+         console.log("Erro ao enviar cadastro:", error);
          toast({
             variant: 'destructive',
             title: 'Ops! Algo deu errado.',
