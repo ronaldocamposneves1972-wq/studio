@@ -8,7 +8,7 @@ import DashboardHeader from '@/components/dashboard/header';
 import DashboardSidebar from '@/components/dashboard/sidebar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { initiateEmailSignIn } from '@/firebase';
 import { useAuth } from '@/firebase';
 import { AppLogo } from '@/components/logo';
 import { cn } from '@/lib/utils';
@@ -40,7 +40,7 @@ function LoginPage() {
         return;
     }
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      initiateEmailSignIn(auth, email, password);
       // The user state change will be detected by DashboardLayout, which will handle the UI update.
     } catch (error: any) {
       toast({
@@ -105,7 +105,7 @@ function LoginPage() {
       </div>
       <div className="hidden bg-muted lg:block h-screen overflow-hidden">
         <Image
-          src="https://picsum.photos/seed/portal-login/1800/1200"
+          src="https://ik.imagekit.io/bpsmw0nyu/1200.jpg"
           alt="Image"
           width={1800}
           height={1200}
