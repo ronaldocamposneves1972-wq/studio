@@ -277,16 +277,50 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-4 mt-12">
-              {productCards.map((card, index) => (
-                <Link href={card.href} key={index} className="grid gap-2 group">
-                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <card.icon className="h-8 w-8" />
-                  </div>
-                  <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{card.title}</h3>
-                  <p className="text-sm leading-snug text-muted-foreground">{card.description}</p>
-                </Link>
-              ))}
+            <div className="mt-12">
+              <div className="md:hidden">
+                <Carousel
+                  opts={{
+                    align: "start",
+                  }}
+                  className="w-full"
+                >
+                  <CarouselContent>
+                    {productCards.map((card, index) => (
+                      <CarouselItem key={index} className="basis-4/5">
+                        <Link href={card.href} className="block group">
+                          <Card className="h-full">
+                            <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
+                              <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                <card.icon className="h-8 w-8" />
+                              </div>
+                              <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{card.title}</h3>
+                              <p className="text-sm leading-snug text-muted-foreground">{card.description}</p>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="ml-14" />
+                  <CarouselNext className="mr-14" />
+                </Carousel>
+              </div>
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                 {productCards.map((card, index) => (
+                    <Link href={card.href} key={index} className="block group">
+                      <Card className="h-full hover:border-primary/50 hover:shadow-lg transition-all">
+                        <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
+                            <div className="flex items-center justify-center h-20 w-20 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                <card.icon className="h-10 w-10" />
+                            </div>
+                            <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
+                            <p className="text-sm leading-snug text-muted-foreground">{card.description}</p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+              </div>
             </div>
           </div>
         </section>
