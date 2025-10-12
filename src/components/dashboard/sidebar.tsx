@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings,
@@ -28,6 +29,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 
 export const navItems = [
@@ -176,6 +179,14 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
 
 
 export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean }) {
+  const firestore = useFirestore();
+
+  const brandingDocRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+
   return (
     <aside className={cn(
       "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-background transition-all",
@@ -183,8 +194,12 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
     )}>
       <div className={cn("flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6", isCollapsed ? 'justify-center' : 'justify-start')}>
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-          <AppLogo className="h-6 w-6" />
-          {!isCollapsed && <span>ConsorciaTech</span>}
+           {brandingSettings?.logoUrl ? (
+             <Image src={brandingSettings.logoUrl} alt="Logo" width={24} height={24} />
+           ) : (
+             <AppLogo className="h-6 w-6" />
+           )}
+          {!isCollapsed && <span>{brandingSettings?.appName || 'ConsorciaTech'}</span>}
         </Link>
       </div>
       <nav className="flex-1 overflow-auto py-2">

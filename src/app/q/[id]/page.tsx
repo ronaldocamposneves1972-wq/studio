@@ -16,7 +16,7 @@ import type { Quiz, Client, ClientDocument, TimelineEvent, WhatsappMessageTempla
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
-
+import Image from 'next/image';
 
 export default function StandaloneQuizPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -276,12 +276,23 @@ export default function StandaloneQuizPage() {
     );
   }
 
+  const brandingDocRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+  const appName = brandingSettings?.appName || 'ConsorciaTech';
+  const logoUrl = brandingSettings?.logoUrl;
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/40 text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background">
         <div className="flex items-center gap-2">
-          <AppLogo className="h-8 w-auto" />
-          <span className="text-xl font-semibold">ConsorciaTech</span>
+            {logoUrl ? (
+                <Image src={logoUrl} alt={appName} width={32} height={32} />
+            ) : (
+                <AppLogo className="h-8 w-auto" />
+            )}
+            <span className="text-xl font-semibold">{appName}</span>
         </div>
       </header>
       <main className="flex-1 flex items-center justify-center p-4">

@@ -17,11 +17,15 @@ cloudinary.config({
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get('file') as File;
-  const clientId = formData.get('clientId') as string;
+  const clientId = formData.get('clientId') as string | null;
+  const folder = formData.get('folder') as string | null; // e.g., 'branding'
 
-  if (!file || !clientId) {
-    return NextResponse.json({ error: 'Arquivo ou ID do cliente ausente.' }, { status: 400 });
+  if (!file) {
+    return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
+  
+  // Determine the upload path. Default to client-specific folder if no folder is specified.
+  const uploadPath = folder ? folder : (clientId ? `clients/${clientId}` : 'uploads');
 
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -32,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const uploadResult = await new Promise<any>((resolve, reject) => {
       cloudinary.uploader.upload_stream({
-        folder: `clients/${clientId}`,
+        folder: uploadPath,
         resource_type: resource_type, // Use determined resource_type
       }, (error, result) => {
         if (error) {

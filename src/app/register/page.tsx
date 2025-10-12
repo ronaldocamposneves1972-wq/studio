@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
+import Image from 'next/image';
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
@@ -30,6 +31,13 @@ export default function RegisterPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+
+   const brandingDocRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+  const appName = brandingSettings?.appName || 'ConsorciaTech';
+  const logoUrl = brandingSettings?.logoUrl;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,8 +117,12 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-card">
        <div className="mb-8 flex items-center gap-2 text-primary">
-        <AppLogo className="h-10 w-auto" />
-        <span className="text-2xl font-semibold">ConsorciaTech</span>
+          {logoUrl ? (
+            <Image src={logoUrl} alt={appName} width={40} height={40} />
+          ) : (
+            <AppLogo className="h-10 w-auto" />
+          )}
+        <span className="text-2xl font-semibold">{appName}</span>
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader>

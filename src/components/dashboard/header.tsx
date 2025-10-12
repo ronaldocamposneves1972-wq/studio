@@ -28,9 +28,9 @@ import {
 import Image from 'next/image';
 import { AppLogo } from '../logo';
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth, useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { collection } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import type { Client } from '@/lib/types';
 import { navItems as allNavItems } from './sidebar'; 
 import { cn } from '@/lib/utils';
@@ -79,6 +79,12 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
     if (!firestore) return null;
     return collection(firestore, 'clients');
   }, [firestore]);
+
+  const brandingDocRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+
+  const { data: brandingSettings } = useDoc(brandingDocRef);
   
   const { data: clients } = useCollection<Client>(clientsQuery);
   const searchablePages = useMemo(() => flattenNavItems(allNavItems), []);
@@ -160,8 +166,12 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
               href="/dashboard"
               className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <AppLogo className="h-5 w-5 transition-all group-hover:scale-110" />
-              <span className="sr-only">ConsorciaTech</span>
+              {brandingSettings?.logoUrl ? (
+                <Image src={brandingSettings.logoUrl} alt="Logo" width={24} height={24} />
+              ) : (
+                <AppLogo className="h-5 w-5 transition-all group-hover:scale-110" />
+              )}
+              <span className="sr-only">{brandingSettings?.appName || 'ConsorciaTech'}</span>
             </Link>
              {renderMobileNav(allNavItems)}
              <Link

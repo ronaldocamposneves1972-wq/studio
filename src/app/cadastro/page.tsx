@@ -5,7 +5,7 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { addDoc, collection, query, limit, where, arrayUnion, getDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +18,7 @@ import type { Quiz, TimelineEvent, WhatsappMessageTemplate } from '@/lib/types';
 import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
-
+import Image from 'next/image';
 
 function CadastroContent() {
   const searchParams = useSearchParams();
@@ -219,12 +219,24 @@ function CadastroContent() {
 }
 
 export default function CadastroPage() {
+  const firestore = useFirestore();
+  const brandingDocRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+  const appName = brandingSettings?.appName || 'ConsorciaTech';
+  const logoUrl = brandingSettings?.logoUrl;
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/40 text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background">
         <div className="flex items-center gap-2">
-          <AppLogo className="h-8 w-auto" />
-          <span className="text-xl font-semibold">ConsorciaTech</span>
+           {logoUrl ? (
+             <Image src={logoUrl} alt={appName} width={32} height={32} />
+           ) : (
+             <AppLogo className="h-8 w-auto" />
+           )}
+          <span className="text-xl font-semibold">{appName}</span>
         </div>
         <Button variant="ghost" asChild>
             <Link href="/">Voltar</Link>
