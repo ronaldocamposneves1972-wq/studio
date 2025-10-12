@@ -27,35 +27,9 @@ import { AppLogo } from "@/components/logo"
 const brandingSchema = z.object({
   appName: z.string().min(3, "O nome do aplicativo é obrigatório."),
   logoUrl: z.string().url("URL do logo inválida").optional().or(z.literal('')),
-  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor primária deve ser um código HEX (ex: #1a9fbd)"),
-  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor secundária deve ser um código HEX (ex: #eef2f6)"),
 });
 
 type BrandingFormData = z.infer<typeof brandingSchema>;
-
-function hexToHsl(hex: string): string {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return '';
-    let r = parseInt(result[1], 16) / 255;
-    let g = parseInt(result[2], 16) / 255;
-    let b = parseInt(result[3], 16) / 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
-    if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-    }
-    h = Math.round(h * 360);
-    s = Math.round(s * 100);
-    l = Math.round(l * 100);
-    return `${h} ${s}% ${l}%`;
-}
 
 
 export default function BrandingPage() {
@@ -75,8 +49,6 @@ export default function BrandingPage() {
     defaultValues: {
       appName: 'ConsorciaTech',
       logoUrl: '',
-      primaryColor: '#1a9fbd',
-      secondaryColor: '#eef2f6',
     }
   });
 
@@ -87,8 +59,6 @@ export default function BrandingPage() {
   }, [brandingSettings, form]);
 
   const watchedLogoUrl = form.watch('logoUrl');
-  const watchedPrimaryColor = form.watch('primaryColor');
-  const watchedSecondaryColor = form.watch('secondaryColor');
 
   const onSubmit = async (data: BrandingFormData) => {
     if (!brandingDocRef) {
@@ -97,16 +67,9 @@ export default function BrandingPage() {
     }
     setIsSubmitting(true);
     try {
-      // Save HEX colors in DB, but apply HSL to CSS variables
       await setDoc(brandingDocRef, data, { merge: true });
 
-      const root = document.documentElement.style;
-      root.setProperty('--primary-hsl', hexToHsl(data.primaryColor));
-      root.setProperty('--secondary-hsl', hexToHsl(data.secondaryColor));
-
       toast({ title: "Configurações de marca salvas com sucesso!" });
-      // Optionally force a reload to see changes globally
-      // window.location.reload();
     } catch (error) {
       console.error("Error saving branding settings:", error);
       toast({ variant: "destructive", title: "Erro ao salvar", description: "Não foi possível salvar as configurações." });
@@ -141,7 +104,7 @@ export default function BrandingPage() {
         <CardHeader>
           <CardTitle>Marca e Aparência</CardTitle>
           <CardDescription>
-            Personalize o nome, logo e cores da sua plataforma.
+            Personalize o nome e o logo da sua plataforma.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -167,26 +130,6 @@ export default function BrandingPage() {
                 </div>
             </div>
              {form.formState.errors.logoUrl && <p className="text-sm text-destructive">{form.formState.errors.logoUrl.message}</p>}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="primaryColor">Cor Primária</Label>
-              <div className="flex items-center gap-2">
-                <Input type="color" {...form.register("primaryColor")} className="p-1 h-10 w-12" />
-                <Input id="primaryColor" {...form.register("primaryColor")} placeholder="#1a9fbd" />
-              </div>
-              {form.formState.errors.primaryColor && <p className="text-sm text-destructive">{form.formState.errors.primaryColor.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="secondaryColor">Cor Secundária</Label>
-               <div className="flex items-center gap-2">
-                 <Input type="color" {...form.register("secondaryColor")} className="p-1 h-10 w-12" />
-                 <Input id="secondaryColor" {...form.register("secondaryColor")} placeholder="#eef2f6" />
-               </div>
-              {form.formState.errors.secondaryColor && <p className="text-sm text-destructive">{form.formState.errors.secondaryColor.message}</p>}
-            </div>
           </div>
         </CardContent>
         <CardFooter className="border-t px-6 py-4 flex justify-end">
