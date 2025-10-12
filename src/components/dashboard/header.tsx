@@ -24,6 +24,8 @@ import {
   PanelRightClose,
   Search,
   User,
+  Briefcase,
+  DollarSign
 } from 'lucide-react';
 import Image from 'next/image';
 import { AppLogo } from '../logo';
