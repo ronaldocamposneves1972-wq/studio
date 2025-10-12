@@ -207,12 +207,12 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="relative w-full h-[70vh] min-h-[500px] flex items-center justify-center">
             <Image
-                src="https://picsum.photos/seed/hero-main/1800/1200"
-                alt="Pessoas em um café"
+                src="https://ik.imagekit.io/bpsmw0nyu/uma%20pessoa%20sentada%20e.png"
+                alt="Pessoa sentada usando notebook"
                 layout="fill"
                 objectFit="cover"
                 className="absolute inset-0 z-0 brightness-50"
-                data-ai-hint="people in cafe"
+                data-ai-hint="person sitting notebook"
             />
             <div className="relative z-10 container px-4 md:px-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -323,5 +323,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
