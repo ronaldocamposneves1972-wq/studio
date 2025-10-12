@@ -197,7 +197,6 @@ export default function ClientDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [quizLink, setQuizLink] = useState('');
   const [isCopied, setIsCopied] = useState(false);
-  const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
   const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
   const [isSalesOrderDialogOpen, setIsSalesOrderDialogOpen] = useState(false);
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
@@ -480,11 +479,6 @@ export default function ClientDetailPage() {
     link.click();
     document.body.removeChild(link);
   };
-
-    
-    const handleViewDocument = (doc: ClientDocument) => {
-       setViewingDocument(doc);
-    };
 
     const handleInitiateDocumentation = async () => {
     if (!clientRef || !user || !firestore || !client) return;
@@ -1021,7 +1015,6 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
 
   const documents = client.documents || [];
   const salesOrders = client.salesOrders || [];
-  const isViewingImage = viewingDocument && (viewingDocument.fileType.startsWith('image'));
   const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
   const hasAcceptedProposal = proposals.some(p => p.status === 'Finalizada');
 
@@ -1119,28 +1112,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             )}
         </DialogContent>
       </Dialog>
-
-      <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
-        <DialogContent className="max-w-4xl h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
-            <DialogDescription>
-                 Visualizando documento. <a onClick={() => handleDownload(viewingDocument!)} className="text-primary hover:underline cursor-pointer">Fazer download</a>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="h-full w-full relative bg-muted flex items-center justify-center">
-            {isViewingImage ? (
-              <Image src={viewingDocument.secureUrl} alt={viewingDocument.fileName} layout="fill" objectFit="contain" />
-            ) : (
-                 <div className="text-center p-8">
-                    <FileText className="h-24 w-24 mx-auto text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold">Pré-visualização não disponível.</p>
-                    <p className="text-muted-foreground">Este tipo de arquivo não pode ser exibido. Use a opção de download.</p>
-                </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      
       <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3">
               <Card>
@@ -1325,9 +1297,10 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                               </Button>
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
-                                                              <DropdownMenuItem onSelect={() => handleViewDocument(doc)}>
-                                                                  <Eye className="mr-2 h-4 w-4" />
-                                                                  Ver
+                                                              <DropdownMenuItem asChild>
+                                                                  <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                                                                      <Eye className="mr-2 h-4 w-4" /> Ver
+                                                                  </a>
                                                               </DropdownMenuItem>
                                                                <DropdownMenuItem onClick={() => handleDownload(doc)}>
                                                                   <Download className="mr-2 h-4 w-4" />
