@@ -58,7 +58,7 @@ function LoginPage() {
   return (
     <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center py-12">
-        <div className="mx-auto grid w-[350px] gap-6">
+        <div className="mx-auto grid w-[320px] gap-6">
           <div className="grid gap-2 text-center">
              <div className="flex items-center justify-center gap-2 mb-4">
                  {logoUrl ? (
