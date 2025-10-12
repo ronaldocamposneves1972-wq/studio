@@ -21,6 +21,9 @@ import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
 import Image from 'next/image';
 
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
+
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -31,21 +34,6 @@ export default function RegisterPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-
-   const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-  const appName = brandingSettings?.appName || 'ConsorciaTech';
-  const logoUrl = brandingSettings?.logoUrl;
-  
-  useEffect(() => {
-    if (brandingSettings) {
-      const root = document.documentElement;
-      root.style.setProperty('--primary', brandingSettings.primaryColor);
-      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
-    }
-  }, [brandingSettings]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

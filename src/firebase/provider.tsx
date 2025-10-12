@@ -38,24 +38,6 @@ export interface FirebaseServices {
   storage: FirebaseStorage;
 }
 
-function BrandingEffect() {
-  const firestore = useFirestore();
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc<{ primaryColor: string, secondaryColor: string }>(brandingDocRef);
-
-  useEffect(() => {
-    if (brandingSettings) {
-      const root = document.documentElement;
-      root.style.setProperty('--primary', brandingSettings.primaryColor);
-      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
-    }
-  }, [brandingSettings]);
-
-  return null;
-}
-
 /**
  * FirebaseProvider manages and provides Firebase services.
  */
@@ -80,7 +62,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   return (
     <FirebaseContext.Provider value={contextValue}>
-      <BrandingEffect />
       <FirebaseErrorListener />
       {children}
     </FirebaseContext.Provider>

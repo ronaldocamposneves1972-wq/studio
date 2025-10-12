@@ -22,7 +22,6 @@ const navLinks = [
   { href: "/dashboard/settings/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/dashboard/settings/integrations", label: "Integrações", icon: KeyRound },
   { href: "/dashboard/settings/notifications", label: "Notificações", icon: Bell },
-  { href: "/dashboard/settings/branding", label: "Marca", icon: Palette },
   { href: "/dashboard/settings/webhooks", label: "Webhooks", icon: Webhook },
 ]
 

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,6 +16,9 @@ import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
 import Image from 'next/image';
+
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 export default function StandaloneQuizPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,7 +97,7 @@ export default function StandaloneQuizPage() {
        toast({
         variant: "destructive",
         title: "CEP inválido",
-        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manualmente.`,
+        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manually.`,
       });
       // Re-throw the error to be caught by the caller (handleNext in the form)
       throw error;
@@ -275,13 +277,6 @@ export default function StandaloneQuizPage() {
         </div>
     );
   }
-
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-  const appName = brandingSettings?.appName || 'ConsorciaTech';
-  const logoUrl = brandingSettings?.logoUrl;
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40 text-foreground">

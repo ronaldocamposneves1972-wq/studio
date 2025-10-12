@@ -14,29 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
 import Image from 'next/image';
-import { useEffect } from 'react';
+
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 export default function LandingPage() {
   const router = useRouter();
-  const firestore = useFirestore();
-
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-  const appName = brandingSettings?.appName || 'ConsorciaTech';
-  const logoUrl = brandingSettings?.logoUrl;
-  
-   useEffect(() => {
-    if (brandingSettings) {
-      const root = document.documentElement;
-      root.style.setProperty('--primary', brandingSettings.primaryColor);
-      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
-    }
-  }, [brandingSettings]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">

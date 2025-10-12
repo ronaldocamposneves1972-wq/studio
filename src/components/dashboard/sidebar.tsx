@@ -12,12 +12,6 @@ import {
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,9 +23,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
 
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 export const navItems = [
   { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -179,14 +173,6 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
 
 
 export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean }) {
-  const firestore = useFirestore();
-
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-
   return (
     <aside className={cn(
       "hidden sm:flex flex-col fixed inset-y-0 left-0 z-10 border-r bg-background transition-all",
@@ -194,12 +180,12 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
     )}>
       <div className={cn("flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6", isCollapsed ? 'justify-center' : 'justify-start')}>
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-           {brandingSettings?.logoUrl ? (
-             <Image src={brandingSettings.logoUrl} alt="Logo" width={24} height={24} />
+           {logoUrl ? (
+             <Image src={logoUrl} alt="Logo" width={24} height={24} />
            ) : (
              <AppLogo className="h-6 w-6" />
            )}
-          {!isCollapsed && <span>{brandingSettings?.appName || 'ConsorciaTech'}</span>}
+          {!isCollapsed && <span>{appName}</span>}
         </Link>
       </div>
       <nav className="flex-1 overflow-auto py-2">

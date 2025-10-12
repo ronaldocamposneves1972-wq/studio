@@ -3,10 +3,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser } from '@/firebase';
 import DashboardHeader from '@/components/dashboard/header';
 import DashboardSidebar from '@/components/dashboard/sidebar';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,
   CardContent,
@@ -23,26 +22,18 @@ import { useAuth } from '@/firebase';
 import { AppLogo } from '@/components/logo';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { doc } from 'firebase/firestore';
 import Image from 'next/image';
+
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
+
 
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth();
-  const firestore = useFirestore();
-  const router = useRouter();
   const { toast } = useToast();
-
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-
-  const appName = brandingSettings?.appName || 'ConsorciaTech';
-  const logoUrl = brandingSettings?.logoUrl;
-
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,21 +156,6 @@ function LoginPage() {
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const firestore = useFirestore();
-
-  const brandingDocRef = useMemoFirebase(() =>
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-
-  useEffect(() => {
-    if (brandingSettings) {
-      const root = document.documentElement;
-      root.style.setProperty('--primary', brandingSettings.primaryColor);
-      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
-    }
-  }, [brandingSettings]);
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">

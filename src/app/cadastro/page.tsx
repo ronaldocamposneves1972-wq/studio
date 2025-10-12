@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { Suspense } from 'react';
@@ -19,6 +18,9 @@ import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
 import Image from 'next/image';
+
+const appName = 'ConsorciaTech';
+const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 function CadastroContent() {
   const searchParams = useSearchParams();
@@ -219,14 +221,6 @@ function CadastroContent() {
 }
 
 export default function CadastroPage() {
-  const firestore = useFirestore();
-  const brandingDocRef = useMemoFirebase(() => 
-    firestore ? doc(firestore, 'settings', 'branding') : null
-  , [firestore]);
-  const { data: brandingSettings } = useDoc(brandingDocRef);
-  const appName = brandingSettings?.appName || 'ConsorciaTech';
-  const logoUrl = brandingSettings?.logoUrl;
-
   return (
     <div className="flex flex-col min-h-screen bg-muted/40 text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background">
