@@ -129,7 +129,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
             <Link
               href={item.href || '#'}
               className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-primary md:h-8 md:w-8",
+                "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground md:h-8 md:w-8",
                 isActive && "bg-accent text-accent-foreground"
               )}
             >
@@ -147,7 +147,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                 <Button variant="ghost" className="flex items-center justify-start gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary w-full">
+                 <Button variant="ghost" className="flex items-center justify-start gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground w-full">
                     <NavItemContent item={item} />
                  </Button>
             </DropdownMenuTrigger>
@@ -162,7 +162,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
       <Link
         href={item.href}
         className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground",
           isActive && "bg-accent text-accent-foreground"
         )}
       >
@@ -199,8 +199,8 @@ export default function DashboardSidebar({ isCollapsed }: { isCollapsed: boolean
         <TooltipProvider>
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <Button variant="ghost" className={cn("w-full", isCollapsed ? 'justify-center' : 'justify-start')}>
-                  <Link href="/dashboard/settings" className={cn("flex items-center gap-3 rounded-lg text-muted-foreground transition-all hover:text-primary", isCollapsed && "justify-center")}>
+              <Button asChild variant="ghost" className={cn("w-full transition-colors hover:bg-accent hover:text-accent-foreground", isCollapsed ? 'justify-center' : 'justify-start')}>
+                  <Link href="/dashboard/settings" className={cn("flex items-center gap-3 rounded-lg text-muted-foreground transition-all", isCollapsed && "justify-center")}>
                       <Settings className="h-4 w-4" />
                       {!isCollapsed && "Configurações"}
                   </Link>
