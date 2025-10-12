@@ -105,10 +105,10 @@ function LoginPage() {
       </div>
       <div className="hidden bg-muted lg:block h-screen overflow-hidden">
         <Image
-          src="https://picsum.photos/seed/portal-login/1200/1800"
+          src="https://picsum.photos/seed/portal-login/1800/1200"
           alt="Image"
-          width="1920"
-          height="1080"
+          width={1800}
+          height={1200}
           className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
           data-ai-hint="office background"
         />
