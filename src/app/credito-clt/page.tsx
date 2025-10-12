@@ -14,16 +14,41 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import Image from 'next/image';
+import { useEffect } from 'react';
 
 export default function CreditoCLTPage() {
   const router = useRouter();
+  const firestore = useFirestore();
+  
+  const brandingDocRef = useMemoFirebase(() =>
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+  const appName = brandingSettings?.appName || 'ConsorciaTech';
+  const logoUrl = brandingSettings?.logoUrl;
+  
+  useEffect(() => {
+    if (brandingSettings) {
+      const root = document.documentElement;
+      root.style.setProperty('--primary', brandingSettings.primaryColor);
+      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
+    }
+  }, [brandingSettings]);
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b">
         <div className="flex items-center gap-2">
-          <AppLogo className="h-8 w-auto" />
-          <span className="text-xl font-semibold">ConsorciaTech</span>
+          {logoUrl ? (
+             <Image src={logoUrl} alt={appName} width={32} height={32} />
+           ) : (
+             <AppLogo className="h-8 w-auto" />
+           )}
+          <span className="text-xl font-semibold">{appName}</span>
         </div>
         <nav className="hidden lg:flex gap-4 sm:gap-6">
           <Button variant="link" asChild><Link href="/">Início</Link></Button>
@@ -163,7 +188,7 @@ export default function CreditoCLTPage() {
         </section>
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; 2024 ConsorciaTech. Todos os direitos reservados.</p>
+        <p className="text-xs text-muted-foreground">&copy; 2024 {appName}. Todos os direitos reservados.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <a href="#" className="text-xs hover:underline underline-offset-4">Termos de Serviço</a>
           <a href="#" className="text-xs hover:underline underline-offset-4">Política de Privacidade</a>

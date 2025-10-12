@@ -17,6 +17,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import Image from 'next/image';
+import { useEffect } from 'react';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -28,6 +29,14 @@ export default function LandingPage() {
   const { data: brandingSettings } = useDoc(brandingDocRef);
   const appName = brandingSettings?.appName || 'ConsorciaTech';
   const logoUrl = brandingSettings?.logoUrl;
+  
+   useEffect(() => {
+    if (brandingSettings) {
+      const root = document.documentElement;
+      root.style.setProperty('--primary', brandingSettings.primaryColor);
+      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
+    }
+  }, [brandingSettings]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">

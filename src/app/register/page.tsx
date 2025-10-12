@@ -38,6 +38,14 @@ export default function RegisterPage() {
   const { data: brandingSettings } = useDoc(brandingDocRef);
   const appName = brandingSettings?.appName || 'ConsorciaTech';
   const logoUrl = brandingSettings?.logoUrl;
+  
+  useEffect(() => {
+    if (brandingSettings) {
+      const root = document.documentElement;
+      root.style.setProperty('--primary', brandingSettings.primaryColor);
+      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
+    }
+  }, [brandingSettings]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

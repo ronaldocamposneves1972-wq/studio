@@ -165,6 +165,21 @@ function LoginPage() {
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const firestore = useFirestore();
+
+  const brandingDocRef = useMemoFirebase(() =>
+    firestore ? doc(firestore, 'settings', 'branding') : null
+  , [firestore]);
+  
+  const { data: brandingSettings } = useDoc(brandingDocRef);
+
+  useEffect(() => {
+    if (brandingSettings) {
+      const root = document.documentElement;
+      root.style.setProperty('--primary', brandingSettings.primaryColor);
+      root.style.setProperty('--secondary', brandingSettings.secondaryColor);
+    }
+  }, [brandingSettings]);
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
