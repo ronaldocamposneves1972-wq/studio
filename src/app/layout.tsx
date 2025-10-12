@@ -6,7 +6,7 @@ import { FirebaseClientProvider } from '@/firebase';
 
 
 export const metadata: Metadata = {
-  title: 'ConsorciaTech',
+  title: 'Safecred',
   description: 'Sistema completo de consórcio e crédito',
 };
 

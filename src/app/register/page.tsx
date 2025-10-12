@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/logo';
 import Image from 'next/image';
 
-const appName = 'ConsorciaTech';
+const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 export default function RegisterPage() {

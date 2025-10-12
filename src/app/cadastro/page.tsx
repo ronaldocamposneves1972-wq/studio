@@ -19,7 +19,7 @@ import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
 import Image from 'next/image';
 
-const appName = 'ConsorciaTech';
+const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 function CadastroContent() {

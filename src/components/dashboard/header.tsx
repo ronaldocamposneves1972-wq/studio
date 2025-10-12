@@ -51,7 +51,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
-const appName = 'ConsorciaTech';
+const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 
 const flattenNavItems = (items: any[]): any[] => {
