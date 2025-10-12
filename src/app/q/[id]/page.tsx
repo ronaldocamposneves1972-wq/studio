@@ -287,7 +287,7 @@ export default function StandaloneQuizPage() {
             ) : (
                 <AppLogo className="h-8 w-auto" />
             )}
-            <span className="text-xl font-semibold">{appName}</span>
+            <span className="text-xl font-semibold text-primary">{appName}</span>
         </div>
       </header>
       <main className="flex-1 flex items-center justify-center p-4">

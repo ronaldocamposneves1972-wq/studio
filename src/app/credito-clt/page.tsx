@@ -31,7 +31,7 @@ export default function CreditoCLTPage() {
            ) : (
              <AppLogo className="h-8 w-auto" />
            )}
-          <span className="text-xl font-semibold">{appName}</span>
+          <span className="text-xl font-semibold text-primary">{appName}</span>
         </div>
         <nav className="hidden lg:flex gap-4 sm:gap-6">
           <Button variant="link" asChild><Link href="/">Início</Link></Button>

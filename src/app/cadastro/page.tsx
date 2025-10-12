@@ -230,7 +230,7 @@ export default function CadastroPage() {
            ) : (
              <AppLogo className="h-8 w-auto" />
            )}
-          <span className="text-xl font-semibold">{appName}</span>
+          <span className="text-xl font-semibold text-primary">{appName}</span>
         </div>
         <Button variant="ghost" asChild>
             <Link href="/">Voltar</Link>
