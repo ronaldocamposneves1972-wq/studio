@@ -130,7 +130,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
               href={item.href || '#'}
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-primary md:h-8 md:w-8",
-                isActive && "bg-accent text-primary"
+                isActive && "bg-accent text-accent-foreground"
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -163,7 +163,7 @@ const NavItem = ({ item, isCollapsed }: { item: any, isCollapsed: boolean }) => 
         href={item.href}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-          isActive && "bg-accent text-primary"
+          isActive && "bg-accent text-accent-foreground"
         )}
       >
         <NavItemContent item={item} />
