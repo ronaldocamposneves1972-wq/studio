@@ -199,7 +199,7 @@ export default function DashboardHeader({ isSidebarCollapsed, setIsSidebarCollap
       </div>
 
        <CommandDialog open={openCommand} onOpenChange={setOpenCommand}>
-         <DialogHeader>
+         <DialogHeader className="p-4 border-b">
             <DialogTitle>Pesquisa Global</DialogTitle>
             <DialogDescription>Pesquise clientes por nome/CPF ou navegue para páginas do sistema.</DialogDescription>
         </DialogHeader>
