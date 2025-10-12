@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import { AppLogo } from '@/components/logo';
 import Link from 'next/link';
@@ -58,30 +58,6 @@ function LoginPage() {
           error.code === 'auth/invalid-credential'
             ? 'Credenciais inválidas. Verifique seu e-mail e senha.'
             : 'Ocorreu um erro ao fazer login.',
-      });
-      setIsLoading(false);
-    }
-  };
-  
-    const handleAnonymousLogin = async () => {
-    setIsLoading(true);
-    if (!auth) {
-        toast({
-            variant: 'destructive',
-            title: 'Erro',
-            description: 'O serviço de autenticação não está disponível.',
-        });
-        setIsLoading(false);
-        return;
-    }
-    try {
-      await signInAnonymously(auth);
-      // The user state change will be detected by DashboardLayout.
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Ocorreu um erro ao tentar o login anônimo.',
       });
       setIsLoading(false);
     }
@@ -131,15 +107,6 @@ function LoginPage() {
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Entrando...' : 'Entrar'}
-            </Button>
-             <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleAnonymousLogin}
-              disabled={isLoading}
-              type="button"
-            >
-              Entrar como Convidado
             </Button>
           </form>
         </CardContent>
