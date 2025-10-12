@@ -4,14 +4,29 @@ import { v2 as cloudinary } from 'cloudinary';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { firebaseConfig } from '@/firebase/config';
 
 // Configure Cloudinary with your credentials
-// These are securely stored on the server and not exposed to the client.
 cloudinary.config({
   cloud_name: 'duuaxalsw',
   api_key: '581358637918314',
   api_secret: 'NTNgWHeJJAQVxWQ8GvMZtx3Uam0',
 });
+
+// Centralized Firebase Admin initialization
+if (!getApps().length) {
+    try {
+        const serviceAccount = JSON.parse(
+            process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
+        );
+        initializeApp({
+            credential: cert(serviceAccount),
+            databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`,
+        });
+    } catch (e) {
+        console.error('Firebase Admin SDK initialization error in API route', e);
+    }
+}
 
 
 export async function POST(request: NextRequest) {

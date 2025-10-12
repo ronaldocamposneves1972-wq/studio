@@ -3,8 +3,27 @@ import { Toaster } from "@/components/ui/toaster";
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { firebaseConfig } from '@/firebase/config';
+
+// Initialize Firebase Admin SDK if not already initialized
+if (!getApps().length) {
+    try {
+        const serviceAccount = JSON.parse(
+            process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
+        );
+        initializeApp({
+            credential: cert(serviceAccount),
+            // The databaseURL is required for the Admin SDK to connect to Firestore.
+            databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`,
+        });
+        console.log("Firebase Admin SDK initialized successfully.");
+    } catch (e) {
+        console.error('Firebase Admin SDK initialization error', e);
+    }
+}
+
 
 export const metadata: Metadata = {
   title: 'ConsorciaTech',
@@ -12,14 +31,13 @@ export const metadata: Metadata = {
 };
 
 async function getBranding() {
-  // We need to initialize a temporary client-side instance on the server
-  // to fetch the initial branding settings.
-  // This is a read-only operation and doesn't involve user authentication.
+  // Use the Admin SDK to fetch data on the server.
   try {
-    const { firestore } = initializeFirebase();
-    const brandingRef = doc(firestore, 'settings', 'branding');
-    const brandingSnap = await getDoc(brandingRef);
-    if (brandingSnap.exists()) {
+    const firestore = getFirestore();
+    const brandingRef = firestore.collection('settings').doc('branding');
+    const brandingSnap = await brandingRef.get();
+    
+    if (brandingSnap.exists) {
       return brandingSnap.data();
     }
   } catch (error) {
