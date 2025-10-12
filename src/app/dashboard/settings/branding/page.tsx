@@ -35,9 +35,7 @@ type BrandingFormData = z.infer<typeof brandingSchema>;
 
 export default function BrandingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isUploading, setIsUploading] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-
+  
   const { toast } = useToast()
   const firestore = useFirestore()
 
@@ -60,47 +58,10 @@ export default function BrandingPage() {
   useEffect(() => {
     if (brandingSettings) {
       form.reset(brandingSettings);
-      if (brandingSettings.logoUrl) {
-        setLogoPreview(brandingSettings.logoUrl);
-      }
     }
   }, [brandingSettings, form]);
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    toast({ title: 'Enviando logo...' });
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      // Add a specific folder for branding assets
-      formData.append('folder', 'branding'); 
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha no upload da imagem.');
-      }
-
-      const uploadData = await response.json();
-      form.setValue('logoUrl', uploadData.secure_url, { shouldValidate: true });
-      setLogoPreview(uploadData.secure_url);
-      toast({ title: 'Logo enviado com sucesso!' });
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Não foi possível enviar o logo.';
-      toast({ variant: 'destructive', title: 'Erro no Upload', description: errorMessage });
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  const watchedLogoUrl = form.watch('logoUrl');
 
   const onSubmit = async (data: BrandingFormData) => {
     if (!brandingDocRef) {
@@ -161,19 +122,16 @@ export default function BrandingPage() {
             <Label>Logo</Label>
             <div className="flex items-center gap-4">
                <div className="h-16 w-16 rounded-md border flex items-center justify-center bg-muted">
-                    {isUploading ? (
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground"/>
-                    ) : logoPreview ? (
-                        <Image src={logoPreview} alt="Preview do Logo" width={64} height={64} className="object-contain rounded-md"/>
+                    {watchedLogoUrl ? (
+                        <Image src={watchedLogoUrl} alt="Preview do Logo" width={64} height={64} className="object-contain rounded-md" onError={(e) => (e.currentTarget.style.display = 'none')} />
                     ) : (
                         <AppLogo className="h-10 w-10 text-muted-foreground"/>
                     )}
                </div>
-               <Button type="button" variant="outline" onClick={() => document.getElementById('logo-upload')?.click()} disabled={isUploading}>
-                 <Upload className="mr-2 h-4 w-4"/>
-                 {isUploading ? 'Enviando...' : 'Carregar Logo'}
-               </Button>
-               <Input id="logo-upload" type="file" className="hidden" onChange={handleLogoUpload} accept="image/png, image/jpeg, image/svg+xml" />
+                <div className="flex-1">
+                    <Label htmlFor="logoUrl">URL do Logo</Label>
+                    <Input id="logoUrl" {...form.register('logoUrl')} placeholder="https://exemplo.com/logo.png" />
+                </div>
             </div>
              {form.formState.errors.logoUrl && <p className="text-sm text-destructive">{form.formState.errors.logoUrl.message}</p>}
           </div>
