@@ -13,6 +13,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AppLogo } from '@/components/logo';
 import { validateCPF, maskCPF } from '@/lib/utils';
 import Image from 'next/image';
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel"
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -106,14 +112,26 @@ export default function HomePage() {
                             </Form>
                         </div>
                     </div>
-                     <Image
-                        src="https://picsum.photos/seed/hero-banner/600/600"
-                        alt="Banner principal"
-                        width={600}
-                        height={600}
-                        className="mx-auto aspect-square overflow-hidden rounded-xl object-cover"
-                        data-ai-hint="business person smiling"
-                    />
+                     <Carousel className="w-full max-w-full">
+                        <CarouselContent>
+                            <CarouselItem>
+                                <div className="p-1">
+                                <Card>
+                                    <CardContent className="flex aspect-square items-center justify-center p-0">
+                                        <Image
+                                            src="https://picsum.photos/seed/hero-banner/600/600"
+                                            alt="Banner principal"
+                                            width={600}
+                                            height={600}
+                                            className="mx-auto aspect-square overflow-hidden rounded-xl object-cover w-full h-full"
+                                            data-ai-hint="business person smiling"
+                                        />
+                                    </CardContent>
+                                </Card>
+                                </div>
+                            </CarouselItem>
+                        </CarouselContent>
+                    </Carousel>
                 </div>
             </div>
         </section>
