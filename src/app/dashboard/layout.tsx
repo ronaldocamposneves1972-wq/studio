@@ -6,23 +6,15 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@/firebase';
 import DashboardHeader from '@/components/dashboard/header';
 import DashboardSidebar from '@/components/dashboard/sidebar';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import { AppLogo } from '@/components/logo';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -64,24 +56,24 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-card">
-      <div className="mb-8 flex items-center gap-2 text-primary">
-         {logoUrl ? (
-            <Image src={logoUrl} alt={appName} width={40} height={40} />
-          ) : (
-            <AppLogo className="h-10 w-auto" />
-          )}
-        <span className="text-2xl font-semibold text-primary">{appName}</span>
-      </div>
-      <Card className="w-full max-w-sm border-0 md:border shadow-none md:shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Entre com seu e-mail e senha para acessar o painel.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="grid gap-4">
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2 xl:min-h-screen">
+      <div className="flex items-center justify-center py-12">
+        <div className="mx-auto grid w-[350px] gap-6">
+          <div className="grid gap-2 text-center">
+             <div className="flex items-center justify-center gap-2 mb-4">
+                 {logoUrl ? (
+                    <Image src={logoUrl} alt={appName} width={40} height={40} />
+                  ) : (
+                    <AppLogo className="h-10 w-auto" />
+                  )}
+                <span className="text-2xl font-bold text-primary">{appName}</span>
+              </div>
+            <h1 className="text-3xl font-bold">Acessar Painel</h1>
+            <p className="text-balance text-muted-foreground">
+              Entre com seu e-mail e senha para continuar
+            </p>
+          </div>
+           <form onSubmit={handleLogin} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -109,8 +101,18 @@ function LoginPage() {
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+      <div className="hidden bg-muted lg:block">
+        <Image
+          src="https://picsum.photos/seed/portal-login/1200/1800"
+          alt="Image"
+          width="1920"
+          height="1080"
+          className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          data-ai-hint="office background"
+        />
+      </div>
     </div>
   )
 }
