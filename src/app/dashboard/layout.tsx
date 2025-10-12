@@ -95,7 +95,7 @@ function LoginPage() {
           ) : (
             <AppLogo className="h-10 w-auto" />
           )}
-        <span className="text-2xl font-semibold">{appName}</span>
+        <span className="text-2xl font-semibold text-primary">{appName}</span>
       </div>
       <Card className="w-full max-w-sm border-0 md:border shadow-none md:shadow-sm">
         <CardHeader>
@@ -142,12 +142,6 @@ function LoginPage() {
               Entrar como Convidado
             </Button>
           </form>
-            <div className="mt-4 text-center text-sm">
-            Não tem uma conta?{' '}
-            <Link href="/register" className="underline">
-              Cadastre-se
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
