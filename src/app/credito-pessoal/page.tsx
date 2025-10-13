@@ -24,118 +24,111 @@ export default function CreditoPessoalPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="px-4 lg:px-6 h-16 flex items-center justify-between border-b">
-        <div className="flex items-center gap-2">
-          {logoUrl ? (
-             <Image src={logoUrl} alt={appName} width={32} height={32} />
-           ) : (
-             <AppLogo className="h-8 w-auto" />
-           )}
-          <span className="text-xl font-semibold text-primary">{appName}</span>
-        </div>
-        <nav className="hidden lg:flex gap-4 sm:gap-6">
-          <Button variant="link" asChild><Link href="/">Início</Link></Button>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="link">
-                Pra você <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem asChild><Link href="/credito-pessoal">Crédito Pessoal</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="/credito-clt">Crédito CLT</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Financiamento</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Cartões de crédito</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Investimentos</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Título de capitalização</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Consórcio</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Seguros</Link></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="link">
-                Para Aposentados <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem asChild><Link href="#">Crédito consignado</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="/refinanciamento">Refinanciamento</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Portabilidade</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Siape</Link></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="link">
-                Ajuda <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem asChild><Link href="#">Central de ajuda</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Ajuda para você</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Ajuda para Micro empresas</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Dúvidas frequentes</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">iToken</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Renegociação</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link href="#">Faturas</Link></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </nav>
-        <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
-            <Sheet>
-            <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="lg:hidden">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Abrir menu</span>
+       <header className="border-b sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
+              {logoUrl ? (
+                <Image src={logoUrl} alt={appName} width={32} height={32} />
+              ) : (
+                <AppLogo className="h-8 w-auto" />
+              )}
+              <span className="text-xl font-semibold text-primary">{appName}</span>
+            </Link>
+          </div>
+          <nav className="hidden lg:flex gap-4 sm:gap-6">
+            <Button variant="link" asChild><Link href="/">Início</Link></Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="link">
+                  Pra você <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
-            </SheetTrigger>
-            <SheetContent side="right">
-                <div className="grid gap-4 py-6">
-                <Link href="/" className="font-bold">Início</Link>
-                <Accordion type="single" collapsible>
-                    <AccordionItem value="pra-voce">
-                    <AccordionTrigger>Pra você</AccordionTrigger>
-                    <AccordionContent className="grid gap-2 pl-4">
-                        <Link href="/credito-pessoal">Crédito Pessoal</Link>
-                        <Link href="/credito-clt">Crédito CLT</Link>
-                        <Link href="#">Financiamento</Link>
-                        <Link href="#">Cartões de crédito</Link>
-                        <Link href="#">Investimentos</Link>
-                        <Link href="#">Título de capitalização</Link>
-                        <Link href="#">Consórcio</Link>
-                        <Link href="#">Seguros</Link>
-                    </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="aposentados">
-                    <AccordionTrigger>Para Aposentados</AccordionTrigger>
-                    <AccordionContent className="grid gap-2 pl-4">
-                        <Link href="#">Crédito consignado</Link>
-                        <Link href="/refinanciamento">Refinanciamento</Link>
-                        <Link href="#">Portabilidade</Link>
-                        <Link href="#">Siape</Link>
-                    </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="ajuda">
-                    <AccordionTrigger>Ajuda</AccordionTrigger>
-                    <AccordionContent className="grid gap-2 pl-4">
-                        <Link href="#">Central de ajuda</Link>
-                        <Link href="#">Ajuda para você</Link>
-                        <Link href="#">Ajuda para Micro empresas</Link>
-                        <Link href="#">Dúvidas frequentes</Link>
-                        <Link href="#">iToken</Link>
-                        <Link href="#">Renegociação</Link>
-                        <Link href="#">Faturas</Link>
-                    </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-                </div>
-            </SheetContent>
-            </Sheet>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild><Link href="/credito-pessoal">Crédito Pessoal</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="/credito-clt">Crédito CLT</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Crédito imobiliário</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Cartão consignado</Link></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="link">
+                  Para Aposentados <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild><Link href="#">Crédito consignado</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="/refinanciamento">Refinanciamento</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Portabilidade</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Siape</Link></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="link">
+                  Ajuda <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild><Link href="#">Central de ajuda</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Ajuda para você</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Ajuda para Micro empresas</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Dúvidas frequentes</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Renegociação</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Faturas</Link></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </nav>
+          <div className="flex items-center gap-2">
+              <Button variant="ghost" onClick={() => router.push('/dashboard')}>+Acessos</Button>
+              <Sheet>
+              <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="lg:hidden">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Abrir menu</span>
+                  </Button>
+              </SheetTrigger>
+              <SheetContent side="right">
+                  <div className="grid gap-4 py-6">
+                  <Link href="/" className="font-bold">Início</Link>
+                  <Accordion type="single" collapsible>
+                      <AccordionItem value="pra-voce">
+                      <AccordionTrigger>Pra você</AccordionTrigger>
+                      <AccordionContent className="grid gap-2 pl-4">
+                          <Link href="/credito-pessoal">Crédito Pessoal</Link>
+                          <Link href="/credito-clt">Crédito CLT</Link>
+                          <Link href="#">Crédito imobiliário</Link>
+                          <Link href="#">Cartão consignado</Link>    
+                      </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="aposentados">
+                      <AccordionTrigger>Para Aposentados</AccordionTrigger>
+                      <AccordionContent className="grid gap-2 pl-4">
+                          <Link href="#">Crédito consignado</Link>
+                          <Link href="/refinanciamento">Refinanciamento</Link>
+                          <Link href="#">Portabilidade</Link>
+                      </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="ajuda">
+                      <AccordionTrigger>Ajuda</AccordionTrigger>
+                      <AccordionContent className="grid gap-2 pl-4">
+                          <Link href="#">Central de ajuda</Link>
+                          <Link href="#">Ajuda para você</Link>
+                          <Link href="#">Ajuda para Micro empresas</Link>
+                          <Link href="#">Dúvidas frequentes</Link>
+                          <Link href="#">Renegociação</Link>
+                          <Link href="#">Faturas</Link>
+                      </AccordionContent>
+                      </AccordionItem>
+                  </Accordion>
+                  </div>
+              </SheetContent>
+              </Sheet>
+          </div>
         </div>
       </header>
       <main className="flex-1">
@@ -173,8 +166,8 @@ export default function CreditoPessoalPage() {
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">&copy; 2024 {appName}. Todos os direitos reservados.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <a href="#" className="text-xs hover:underline underline-offset-4">Termos de Serviço</a>
-          <a href="#" className="text-xs hover:underline underline-offset-4">Política de Privacidade</a>
+          <Link href="#" className="text-xs hover:underline underline-offset-4">Termos de Serviço</Link>
+          <Link href="#" className="text-xs hover:underline underline-offset-4">Política de Privacidade</Link>
         </nav>
       </footer>
     </div>
