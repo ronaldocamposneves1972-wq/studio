@@ -276,15 +276,15 @@ export default function HomePage() {
                 >
                   <CarouselContent>
                     {productCards.map((card, index) => (
-                      <CarouselItem key={index} className="basis-4/5">
-                        <Link href={card.href} className="block group">
+                      <CarouselItem key={index} className="basis-3/4">
+                        <Link href={card.href} className="block group h-full">
                           <Card className="h-full rounded-xl">
                             <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
                               <div className="flex items-center justify-center h-24 w-24 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                 <card.icon className="h-12 w-12" />
                               </div>
                               <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
-                              <p className="text-base leading-snug text-muted-foreground">{card.description}</p>
+                              <p className="text-base text-muted-foreground">{card.description}</p>
                             </CardContent>
                           </Card>
                         </Link>
@@ -297,14 +297,14 @@ export default function HomePage() {
               </div>
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                  {productCards.map((card, index) => (
-                    <Link href={card.href} key={index} className="block group">
+                    <Link href={card.href} key={index} className="block group h-full">
                       <Card className="h-full rounded-xl hover:border-primary/50 hover:shadow-lg transition-all">
                         <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
                             <div className="flex items-center justify-center h-24 w-24 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                 <card.icon className="h-12 w-12" />
                             </div>
                             <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
-                            <p className="text-base leading-snug text-muted-foreground">{card.description}</p>
+                            <p className="text-base text-muted-foreground">{card.description}</p>
                         </CardContent>
                       </Card>
                     </Link>
@@ -320,7 +320,47 @@ export default function HomePage() {
                 <div className="space-y-3">
                     <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">O banco feito de futuro está presente na vida de milhões de pessoas</h2>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-5xl">
+                
+                 {/* Carousel for Mobile */}
+                <div className="md:hidden">
+                    <Carousel className="w-full max-w-xs mx-auto">
+                        <CarouselContent>
+                            <CarouselItem>
+                                <div className="flex flex-col items-center gap-2 p-4">
+                                    <Users className="w-10 h-10 text-primary"/>
+                                    <p className="font-semibold text-lg">+70 mil pessoas</p>
+                                    <p className="text-muted-foreground">com dívidas solucionadas todos os meses.</p>
+                                </div>
+                            </CarouselItem>
+                            <CarouselItem>
+                                <div className="flex flex-col items-center gap-2 p-4">
+                                    <DollarSign className="w-10 h-10 text-primary"/>
+                                    <p className="font-semibold text-lg">+2 bilhões</p>
+                                    <p className="text-muted-foreground">em descontos para você quitar dívidas com as melhores condições.</p>
+                                </div>
+                            </CarouselItem>
+                             <CarouselItem>
+                                <div className="flex flex-col items-center gap-2 p-4">
+                                    <CreditCard className="w-10 h-10 text-primary"/>
+                                    <p className="font-semibold text-lg">+1 milhão de pessoas</p>
+                                    <p className="text-muted-foreground">com nome limpo e reinseridas no crédito.</p>
+                                </div>
+                            </CarouselItem>
+                            <CarouselItem>
+                                <div className="flex flex-col items-center gap-2 p-4">
+                                    <Check className="w-10 h-10 text-primary"/>
+                                    <p className="font-semibold text-lg">100 anos</p>
+                                    <p className="text-muted-foreground">sempre cuidando da sua segurança.</p>
+                                </div>
+                            </CarouselItem>
+                        </CarouselContent>
+                        <CarouselPrevious />
+                        <CarouselNext />
+                    </Carousel>
+                </div>
+
+                {/* Grid for Desktop */}
+                <div className="hidden md:grid md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-5xl">
                     <div className="flex flex-col items-center gap-2">
                         <Users className="w-10 h-10 text-primary"/>
                         <p className="font-semibold text-lg">+70 mil pessoas</p>
