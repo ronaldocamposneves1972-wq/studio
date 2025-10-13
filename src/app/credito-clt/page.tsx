@@ -195,7 +195,6 @@ export default function CreditoCLTPage() {
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
             <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-12">
-               <img src="https://picsum.photos/seed/clt-credit/600/600" alt="Crédito CLT" data-ai-hint="formal worker" className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center sm:w-full lg:order-last" />
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
                   <div className="inline-block rounded-lg bg-primary/10 px-3 py-1 text-sm text-primary font-semibold">Exclusivo para você, trabalhador</div>
@@ -219,6 +218,7 @@ export default function CreditoCLTPage() {
                   </Button>
                 </div>
               </div>
+              <img src="https://picsum.photos/seed/clt-credit/600/600" alt="Crédito CLT" data-ai-hint="formal worker" className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center sm:w-full" />
             </div>
           </div>
         </section>
