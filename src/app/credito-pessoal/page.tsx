@@ -111,6 +111,7 @@ export default function CreditoPessoalPage() {
                           <Link href="#">Crédito consignado</Link>
                           <Link href="/refinanciamento">Refinanciamento</Link>
                           <Link href="#">Portabilidade</Link>
+                          <Link href="#">Siape</Link>
                       </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="ajuda">
