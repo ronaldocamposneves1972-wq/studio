@@ -53,7 +53,7 @@ export default function CreditoCLTPage() {
 
   const scrollToProduct = useCallback((index: number) => productCarouselApi?.scrollTo(index), [productCarouselApi]);
   const scrollToStat = useCallback((index: number) => statsCarouselApi?.scrollTo(index), [statsCarouselApi]);
-  
+
   const productCards = [
       {
         title: "Crédito Pessoal",
@@ -378,5 +378,3 @@ export default function CreditoCLTPage() {
     </div>
   );
 }
-
-    
