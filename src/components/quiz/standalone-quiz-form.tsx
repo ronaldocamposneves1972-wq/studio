@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -56,6 +56,17 @@ export function StandaloneQuizForm({ quiz, onComplete, isSubmitting, initialAnsw
     
     // We get the current question based on the step
     const currentQuestion = quiz.questions[currentStep];
+
+    useEffect(() => {
+        if (initialAnswers) {
+            for (const key in initialAnswers) {
+                if(initialAnswers[key] && form.getValues(key) !== initialAnswers[key]) {
+                    const maskedValue = key === 'q-cpf' ? maskCPF(initialAnswers[key]) : initialAnswers[key];
+                    form.setValue(key, maskedValue, { shouldValidate: true });
+                }
+            }
+        }
+    }, [initialAnswers, form]);
 
     const validateEmailWithAPI = async (email: string) => {
         try {

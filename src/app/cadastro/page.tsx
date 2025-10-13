@@ -3,7 +3,7 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { addDoc, collection, query, limit, where, arrayUnion, getDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { StandaloneQuizForm } from '@/components/quiz/standalone-quiz-form';
 import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
 import Image from 'next/image';
+import { maskCPF } from '@/lib/utils';
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -25,6 +26,7 @@ const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
 function CadastroContent() {
   const searchParams = useSearchParams();
   const quizSlug = searchParams.get('quiz');
+  const cpfFromUrl = searchParams.get('cpf');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -32,7 +34,11 @@ function CadastroContent() {
   const firestore = useFirestore();
 
   // Initialize useForm here and pass the context down
-  const form = useForm();
+  const form = useForm({
+    defaultValues: {
+        'q-cpf': cpfFromUrl ? maskCPF(cpfFromUrl) : ''
+    }
+  });
   
   const quizQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -204,6 +210,7 @@ function CadastroContent() {
             onComplete={handleSubmit} 
             isSubmitting={isSubmitting}
             onCEPChange={handleCEPChange}
+            initialAnswers={{'q-cpf': cpfFromUrl}}
          />
        );
     }
