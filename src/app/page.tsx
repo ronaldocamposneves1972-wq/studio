@@ -110,12 +110,8 @@ export default function HomePage() {
               <DropdownMenuContent>
                 <DropdownMenuItem asChild><Link href="/credito-pessoal">Crédito Pessoal</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="/credito-clt">Crédito CLT</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Financiamento</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Cartões de crédito</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Investimentos</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Título de capitalização</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Consórcio</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">Seguros</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Crédito imobiliário</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="#">Cartão consignado</Link></DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -144,7 +140,6 @@ export default function HomePage() {
                 <DropdownMenuItem asChild><Link href="#">Ajuda para você</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="#">Ajuda para Micro empresas</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="#">Dúvidas frequentes</Link></DropdownMenuItem>
-                <DropdownMenuItem asChild><Link href="#">iToken</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="#">Renegociação</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link href="#">Faturas</Link></DropdownMenuItem>
               </DropdownMenuContent>
@@ -168,12 +163,8 @@ export default function HomePage() {
                       <AccordionContent className="grid gap-2 pl-4">
                           <Link href="/credito-pessoal">Crédito Pessoal</Link>
                           <Link href="/credito-clt">Crédito CLT</Link>
-                          <Link href="#">Financiamento</Link>
-                          <Link href="#">Cartões de crédito</Link>
-                          <Link href="#">Investimentos</Link>
-                          <Link href="#">Título de capitalização</Link>
-                          <Link href="#">Consórcio</Link>
-                          <Link href="#">Seguros</Link>
+                          <Link href="#">Crédito imobiliário</Link>
+                          <Link href="#">Cartão consignado</Link>    
                       </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="aposentados">
@@ -182,7 +173,6 @@ export default function HomePage() {
                           <Link href="#">Crédito consignado</Link>
                           <Link href="/refinanciamento">Refinanciamento</Link>
                           <Link href="#">Portabilidade</Link>
-                          <Link href="#">Siape</Link>
                       </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="ajuda">
@@ -192,7 +182,6 @@ export default function HomePage() {
                           <Link href="#">Ajuda para você</Link>
                           <Link href="#">Ajuda para Micro empresas</Link>
                           <Link href="#">Dúvidas frequentes</Link>
-                          <Link href="#">iToken</Link>
                           <Link href="#">Renegociação</Link>
                           <Link href="#">Faturas</Link>
                       </AccordionContent>
@@ -227,7 +216,7 @@ export default function HomePage() {
                     <div className="flex justify-center">
                          <Card className="w-full max-w-sm">
                             <CardContent className="p-6">
-                                <h2 className="text-xl font-bold mb-2">Peça seu Cartão de Crédito e sua Conta {appName}</h2>
+                                <h2 className="text-xl font-bold mb-2">Peça seu Crédito e tenha béneficios na {appName}</h2>
                                 <p className="text-muted-foreground mb-4">É rápido, fácil e seguro.</p>
                                  <Form {...form}>
                                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -325,24 +314,33 @@ export default function HomePage() {
           </div>
         </section>
         
-        {/* Best Card Section */}
+        {/* Stats Section */}
         <section className="w-full py-12 md:py-24 lg:py-32">
-           <div className="container grid items-center justify-center gap-4 px-4 text-center md:px-6">
+           <div className="container grid items-center justify-center gap-8 px-4 text-center md:px-6">
                 <div className="space-y-3">
-                    <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">O melhor cartão para seu perfil</h2>
-                    <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                        Um cartão de crédito com benefícios exclusivos, anuidade zero e a segurança que você precisa para suas compras do dia a dia.
-                    </p>
+                    <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">O banco feito de futuro está presente na vida de milhões de pessoas</h2>
                 </div>
-                <div className="relative flex justify-center">
-                    <Image
-                        src="https://picsum.photos/seed/credit-card/600/400"
-                        alt="Cartão de Crédito"
-                        width={600}
-                        height={400}
-                        className="rounded-xl shadow-lg"
-                        data-ai-hint="credit card"
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full max-w-5xl">
+                    <div className="flex flex-col items-center gap-2">
+                        <Users className="w-10 h-10 text-primary"/>
+                        <p className="font-semibold text-lg">+70 mil pessoas</p>
+                        <p className="text-muted-foreground">com dívidas solucionadas todos os meses.</p>
+                    </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <DollarSign className="w-10 h-10 text-primary"/>
+                        <p className="font-semibold text-lg">+2 bilhões</p>
+                        <p className="text-muted-foreground">em descontos para você quitar dívidas com as melhores condições.</p>
+                    </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <CreditCard className="w-10 h-10 text-primary"/>
+                        <p className="font-semibold text-lg">+1 milhão de pessoas</p>
+                        <p className="text-muted-foreground">com nome limpo e reinseridas no crédito.</p>
+                    </div>
+                     <div className="flex flex-col items-center gap-2">
+                        <Check className="w-10 h-10 text-primary"/>
+                        <p className="font-semibold text-lg">100 anos</p>
+                        <p className="text-muted-foreground">sempre cuidando da sua segurança.</p>
+                    </div>
                 </div>
             </div>
         </section>
