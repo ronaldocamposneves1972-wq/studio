@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/logo';
-import { ArrowRight, CheckCircle, ChevronDown, Menu, DollarSign, Clock, Briefcase, Landmark, CreditCard, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown, Menu, DollarSign, Clock, Briefcase, Landmark, CreditCard, Users, Check } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
