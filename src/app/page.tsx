@@ -289,7 +289,7 @@ export default function HomePage() {
                     {productCards.map((card, index) => (
                       <CarouselItem key={index} className="basis-4/5">
                         <Link href={card.href} className="block group">
-                          <Card className="h-full">
+                          <Card className="h-full rounded-xl">
                             <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
                               <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                 <card.icon className="h-8 w-8" />
@@ -309,7 +309,7 @@ export default function HomePage() {
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                  {productCards.map((card, index) => (
                     <Link href={card.href} key={index} className="block group">
-                      <Card className="h-full hover:border-primary/50 hover:shadow-lg transition-all">
+                      <Card className="h-full rounded-xl hover:border-primary/50 hover:shadow-lg transition-all">
                         <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
                             <div className="flex items-center justify-center h-20 w-20 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                 <card.icon className="h-10 w-10" />
