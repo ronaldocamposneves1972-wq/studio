@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,9 +27,9 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
+import { cn } from '@/lib/utils';
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -45,6 +45,12 @@ type CpfFormData = z.infer<typeof CpfSchema>;
 export default function HomePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [productCarouselApi, setProductCarouselApi] = useState<CarouselApi>();
+  const [statsCarouselApi, setStatsCarouselApi] = useState<CarouselApi>();
+  const [productCurrent, setProductCurrent] = useState(0);
+  const [statsCurrent, setStatsCurrent] = useState(0);
+  const [productCount, setProductCount] = useState(0);
+  const [statsCount, setStatsCount] = useState(0);
 
   const form = useForm<CpfFormData>({
     resolver: zodResolver(CpfSchema),
@@ -55,6 +61,23 @@ export default function HomePage() {
     setIsLoading(true);
     router.push(`/cadastro?cpf=${data.cpf}`);
   };
+  
+   useEffect(() => {
+    if (!productCarouselApi) return;
+    setProductCount(productCarouselApi.scrollSnapList().length);
+    setProductCurrent(productCarouselApi.selectedScrollSnap());
+    productCarouselApi.on("select", () => setProductCurrent(productCarouselApi.selectedScrollSnap()));
+  }, [productCarouselApi]);
+
+  useEffect(() => {
+    if (!statsCarouselApi) return;
+    setStatsCount(statsCarouselApi.scrollSnapList().length);
+    setStatsCurrent(statsCarouselApi.selectedScrollSnap());
+    statsCarouselApi.on("select", () => setStatsCurrent(statsCarouselApi.selectedScrollSnap()));
+  }, [statsCarouselApi]);
+  
+  const scrollToProduct = useCallback((index: number) => productCarouselApi?.scrollTo(index), [productCarouselApi]);
+  const scrollToStat = useCallback((index: number) => statsCarouselApi?.scrollTo(index), [statsCarouselApi]);
 
   const productCards = [
       {
@@ -268,12 +291,7 @@ export default function HomePage() {
             </div>
             <div className="mt-12">
               <div className="md:hidden">
-                <Carousel
-                  opts={{
-                    align: "start",
-                  }}
-                  className="w-full"
-                >
+                 <Carousel setApi={setProductCarouselApi} className="w-full">
                   <CarouselContent>
                     {productCards.map((card, index) => (
                       <CarouselItem key={index} className="basis-3/4">
@@ -291,9 +309,20 @@ export default function HomePage() {
                       </CarouselItem>
                     ))}
                   </CarouselContent>
-                  <CarouselPrevious className="ml-14" />
-                  <CarouselNext className="mr-14" />
                 </Carousel>
+                <div className="py-2 flex justify-center gap-1">
+                  {Array.from({ length: productCount }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => scrollToProduct(i)}
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        productCurrent === i ? "bg-primary" : "bg-primary/20"
+                      )}
+                      aria-label={`Go to slide ${i + 1}`}
+                    />
+                  ))}
+                </div>
               </div>
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                  {productCards.map((card, index) => (
@@ -323,7 +352,7 @@ export default function HomePage() {
                 
                  {/* Carousel for Mobile */}
                 <div className="md:hidden">
-                    <Carousel className="w-full max-w-xs mx-auto">
+                    <Carousel setApi={setStatsCarouselApi} className="w-full max-w-xs mx-auto">
                         <CarouselContent>
                             <CarouselItem>
                                 <div className="flex flex-col items-center gap-2 p-4">
@@ -354,9 +383,20 @@ export default function HomePage() {
                                 </div>
                             </CarouselItem>
                         </CarouselContent>
-                        <CarouselPrevious />
-                        <CarouselNext />
                     </Carousel>
+                     <div className="py-2 flex justify-center gap-1">
+                      {Array.from({ length: statsCount }).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => scrollToStat(i)}
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            statsCurrent === i ? "bg-primary" : "bg-primary/20"
+                          )}
+                          aria-label={`Go to slide ${i + 1}`}
+                        />
+                      ))}
+                    </div>
                 </div>
 
                 {/* Grid for Desktop */}
