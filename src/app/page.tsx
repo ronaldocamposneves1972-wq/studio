@@ -291,11 +291,11 @@ export default function HomePage() {
                         <Link href={card.href} className="block group">
                           <Card className="h-full rounded-xl">
                             <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
-                              <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                <card.icon className="h-8 w-8" />
+                              <div className="flex items-center justify-center h-24 w-24 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                <card.icon className="h-12 w-12" />
                               </div>
-                              <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{card.title}</h3>
-                              <p className="text-sm leading-snug text-muted-foreground">{card.description}</p>
+                              <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
+                              <p className="text-base leading-snug text-muted-foreground">{card.description}</p>
                             </CardContent>
                           </Card>
                         </Link>
@@ -311,11 +311,11 @@ export default function HomePage() {
                     <Link href={card.href} key={index} className="block group">
                       <Card className="h-full rounded-xl hover:border-primary/50 hover:shadow-lg transition-all">
                         <CardContent className="flex flex-col items-center justify-center text-center p-6 gap-4">
-                            <div className="flex items-center justify-center h-20 w-20 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                <card.icon className="h-10 w-10" />
+                            <div className="flex items-center justify-center h-24 w-24 rounded-full bg-primary/10 text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                <card.icon className="h-12 w-12" />
                             </div>
-                            <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
-                            <p className="text-sm leading-snug text-muted-foreground">{card.description}</p>
+                            <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">{card.title}</h3>
+                            <p className="text-base leading-snug text-muted-foreground">{card.description}</p>
                         </CardContent>
                       </Card>
                     </Link>
