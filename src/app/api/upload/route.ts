@@ -1,7 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-import FormData from 'form-data';
 
 const API_URL = "https://unsterile-magen-spectrographic.ngrok-free.dev";
 const API_KEY = "IUKPANx1QmVDbKokf7ipjFf5Gh5DE3Cs";
@@ -10,38 +8,59 @@ const BASE_FOLDER = "clients";
 
 export async function POST(request: NextRequest) {
   const data = await request.formData();
+
   const file: File | null = data.get('file') as unknown as File;
   const clientId = data.get('clientId') as string | null;
 
   if (!file) {
+    console.error('Arquivo ausente.');
     return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
 
-  const uploadFolder = clientId ? `${BASE_FOLDER}/${clientId}` : 'uploads';
+  if (!clientId) {
+    console.error('clientId ausente.');
+    return NextResponse.json({ error: 'clientId é obrigatório.' }, { status: 400 });
+  }
+
+  const uploadFolder = `${BASE_FOLDER}/${clientId}`;
+  console.log('Pasta de upload definida para:', uploadFolder);
+
   const fileBuffer = await file.arrayBuffer();
-  
+
   const formData = new FormData();
-  formData.append('file', Buffer.from(fileBuffer), {
-    filename: file.name,
-    contentType: file.type,
-  });
+  formData.append('file', new Blob([fileBuffer], { type: file.type }), file.name);
   formData.append('folder', uploadFolder);
 
+
   try {
-    const response = await axios.post(`${API_URL}/upload`, formData, {
+    const response = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
       headers: {
         'accept': 'application/json',
         'x-api-key': API_KEY,
         'x-client-secret': CLIENT_SECRET,
-        ...formData.getHeaders(),
       },
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
+      body: formData,
     });
 
-    const result = response.data;
+    if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `API Error: ${response.status} - ${errorText}`;
+        try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorJson.message || errorMessage;
+        } catch (e) {
+            // Not a JSON error, use the text
+        }
+        console.error('Falha no upload para a API externa:', errorMessage);
+        return NextResponse.json({ error: errorMessage }, { status: response.status });
+    }
+
+    const result = await response.json();
     const filename = result.fileUrl ? result.fileUrl.split('/').pop() : result.originalName;
     const unsterilePublicId = `${result.folder}/${filename}`;
+
+    console.log('Upload finalizado com sucesso:', result);
 
     return NextResponse.json({
       id: unsterilePublicId,
@@ -54,14 +73,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Server-side upload error:', error);
     let errorMessage = 'Falha no upload do arquivo no servidor.';
-    if (axios.isAxiosError(error) && error.response) {
-      errorMessage = error.response.data?.error || error.response.data?.message || `Erro da API: ${error.response.statusText}`;
-    } else if (error instanceof Error) {
+    if (error instanceof Error) {
       errorMessage = error.message;
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+
 
 export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
