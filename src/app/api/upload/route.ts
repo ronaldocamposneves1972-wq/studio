@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       console.error('API Error:', errorText);
-      // Try to parse error as JSON, if not, use the text
       let errorMessage = `Falha no upload: ${errorText}`;
       try {
         const errorJson = JSON.parse(errorText);
@@ -49,14 +48,20 @@ export async function POST(request: NextRequest) {
 
     const result = await uploadResponse.json();
     
-    // According to the new info, the API returns a `fileUrl` for public access.
-    // We should save this URL.
+    // Construct a download URL as a fallback if fileUrl is not provided
+    const downloadUrl = new URL(`${request.nextUrl.origin}/api/download`);
+    downloadUrl.searchParams.append('folder', uploadFolder);
+    downloadUrl.searchParams.append('filename', result.filename);
+    
+    // Ensure fileUrl is always present, using the direct URL if available, otherwise our download proxy.
+    const finalFileUrl = result.fileUrl || downloadUrl.toString();
+    
     return NextResponse.json({
-      id: result.fileId || randomUUID(), // Use fileId from API if available
-      fileUrl: result.fileUrl,
+      id: result.fileId || randomUUID(),
+      fileUrl: finalFileUrl,
       original_filename: file.name,
       folder: uploadFolder,
-      filename: result.filename,
+      filename: result.filename, // Important for deletion
     });
 
   } catch (error) {

@@ -152,7 +152,7 @@ export default function StandaloneQuizPage() {
                 original_filename: uploadData.original_filename,
                 filename: uploadData.filename,
                 fileType: uploadData.resource_type || 'raw',
-                secureUrl: uploadData.secure_url,
+                fileUrl: uploadData.fileUrl, // Use the correct fileUrl
                 uploadedAt: now,
                 folder: uploadData.folder,
                 validationStatus: 'pending',
