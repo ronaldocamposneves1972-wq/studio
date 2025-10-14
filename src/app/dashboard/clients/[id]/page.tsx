@@ -1,4 +1,3 @@
-
 'use client'
 
 import Image from "next/image"
@@ -349,12 +348,12 @@ export default function ClientDetailPage() {
       const uploadData = await uploadResponse.json();
 
       const newDocument: ClientDocument = {
-        id: uploadData.public_id,
+        id: uploadData.id,
         clientId: clientId,
         fileName: uploadData.original_filename || file.name,
         fileType: uploadData.resource_type || 'raw',
-        cloudinaryPublicId: uploadData.public_id,
         secureUrl: uploadData.secure_url,
+        folder: uploadData.folder,
         uploadedAt: new Date().toISOString(),
         validationStatus: 'pending',
       };
@@ -394,43 +393,43 @@ export default function ClientDetailPage() {
 
   const handleDeleteDocument = async (docToDelete: ClientDocument) => {
     if (!clientRef || !client?.documents) return;
-
+  
     try {
-        const response = await fetch('/api/upload', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              public_id: docToDelete.cloudinaryPublicId,
-              resource_type: docToDelete.fileType
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha ao deletar arquivo no Cloudinary.');
-        }
-
-        const updatedDocuments = client.documents.filter(doc => doc.id !== docToDelete.id);
-        await updateDoc(clientRef, {
-            documents: updatedDocuments
-        });
-
-        toast({
-            title: "Documento excluído",
-            description: `${docToDelete.fileName} foi removido com sucesso.`
-        });
-
+      const response = await fetch('/api/upload', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          folder: docToDelete.folder,
+          filename: docToDelete.fileName 
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao deletar arquivo na API.');
+      }
+  
+      const updatedDocuments = client.documents.filter(doc => doc.id !== docToDelete.id);
+      await updateDoc(clientRef, {
+        documents: updatedDocuments
+      });
+  
+      toast({
+        title: "Documento excluído",
+        description: `${docToDelete.fileName} foi removido com sucesso.`
+      });
+  
     } catch (error) {
-        console.error("Error deleting document:", error);
-        toast({
-            variant: "destructive",
-            title: "Erro ao Excluir",
-            description: error instanceof Error ? error.message : "Não foi possível excluir o documento.",
-        });
+      console.error("Error deleting document:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao Excluir",
+        description: error instanceof Error ? error.message : "Não foi possível excluir o documento.",
+      });
     }
-  }
+  };
 
   const handleValidationStatusChange = async (docToUpdate: ClientDocument, newStatus: DocumentStatus) => {
     if (!clientRef || !client?.documents || !user) return;
@@ -475,6 +474,7 @@ export default function ClientDetailPage() {
     const link = document.createElement('a');
     link.href = doc.secureUrl;
     link.download = doc.fileName;
+    link.target = "_blank";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1299,13 +1299,9 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                           <DropdownMenuContent>
                                                               <DropdownMenuItem asChild>
                                                                   <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                                                                      <Eye className="mr-2 h-4 w-4" /> Ver
+                                                                      <Eye className="mr-2 h-4 w-4" /> Ver/Baixar
                                                                   </a>
                                                               </DropdownMenuItem>
-                                                               <DropdownMenuItem onClick={() => handleDownload(doc)}>
-                                                                  <Download className="mr-2 h-4 w-4" />
-                                                                  Baixar
-                                                               </DropdownMenuItem>
                                                               <DropdownMenuSeparator />
 
                                                               <AlertDialog>
@@ -1366,7 +1362,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                       <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
                                                                       <AlertDialogDescription>
-                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido permanentemente do Cloudinary e do sistema.
+                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido permanentemente.
                                                                       </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>

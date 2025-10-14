@@ -27,9 +27,9 @@ export type ClientDocument = {
   clientId: string;
   fileType: string;
   fileName: string;
-  cloudinaryPublicId: string;
   secureUrl: string;
   uploadedAt: string;
+  folder?: string;
   validationStatus?: DocumentStatus;
   statusUpdatedAt?: string;
   validatedBy?: string;

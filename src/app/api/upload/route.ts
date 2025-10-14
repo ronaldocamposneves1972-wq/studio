@@ -1,72 +1,58 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import { v2 as cloudinary } from 'cloudinary';
-import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { firebaseConfig } from '@/firebase/config';
+import { randomUUID } from 'crypto';
 
-// Configure Cloudinary with your credentials
-cloudinary.config({
-  cloud_name: 'duuaxalsw',
-  api_key: '581358637918314',
-  api_secret: 'NTNgWHeJJAQVxWQ8GvMZtx3Uam0',
-});
-
-// Centralized Firebase Admin initialization
-if (!getApps().length) {
-    try {
-        const serviceAccount = JSON.parse(
-            process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
-        );
-        initializeApp({
-            credential: cert(serviceAccount),
-            databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`,
-        });
-    } catch (e) {
-        console.error('Firebase Admin SDK initialization error in API route', e);
-    }
-}
-
+const API_URL = "https://unsterile-magen-spectrographic.ngrok-free.dev";
+const API_KEY = "IUKPANx1QmVDbKokf7ipjFf5Gh5DE3Cs";
+const CLIENT_SECRET = "5CJH5YNrfb8zSWUk30pgCAvbU3hmbWan";
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-  const file = formData.get('file') as File;
-  const clientId = formData.get('clientId') as string | null;
-  const folder = formData.get('folder') as string | null; // e.g., 'branding'
+  const data = await request.formData();
+  const file = data.get('file') as File;
+  const clientId = data.get('clientId') as string | null;
+  const folder = data.get('folder') as string | null;
 
   if (!file) {
     return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
-  
-  // Determine the upload path. Default to client-specific folder if no folder is specified.
-  const uploadPath = folder ? folder : (clientId ? `clients/${clientId}` : 'uploads');
+
+  const uploadFolder = folder ? folder : (clientId ? `clients/${clientId}` : 'uploads');
+
+  const uploadData = new FormData();
+  uploadData.append('file', file);
+  uploadData.append('folder', uploadFolder);
 
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-
-    // Determine resource_type based on file's MIME type
-    const resource_type = file.type.startsWith('image/') ? 'image' : 'raw';
-
-    const uploadResult = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload_stream({
-        folder: uploadPath,
-        resource_type: resource_type, // Use determined resource_type
-      }, (error, result) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(result);
-        }
-      }).end(buffer);
+    const uploadResponse = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        'ApiKey': API_KEY,
+        'ClientSecret': CLIENT_SECRET,
+      },
+      body: uploadData,
     });
 
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('API Error:', errorText);
+      return NextResponse.json({ error: `Falha no upload: ${errorText}` }, { status: uploadResponse.status });
+    }
+
+    // Assuming the API returns a JSON with the filename upon successful upload.
+    // The documentation says "Upload realizado", but a JSON response is more likely.
+    const result = await uploadResponse.json();
+    const filename = result.filename || file.name;
+    const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
+
+    // Construct the URL for accessing the file based on the download endpoint
+    const secure_url = `${API_URL}/download/${uploadFolder}/${filename}`;
+
     return NextResponse.json({
-      public_id: uploadResult.public_id,
-      secure_url: uploadResult.secure_url,
+      id: randomUUID(),
+      secure_url: secure_url,
       original_filename: file.name,
-      resource_type: uploadResult.resource_type,
+      resource_type: resourceType,
+      folder: uploadFolder,
+      filename: filename,
     });
 
   } catch (error) {
@@ -76,23 +62,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
 export async function DELETE(request: NextRequest) {
   try {
-    const { public_id, resource_type } = await request.json();
+    const { folder, filename } = await request.json();
 
-    if (!public_id) {
-      return NextResponse.json({ error: 'ID público do arquivo ausente.' }, { status: 400 });
+    if (!folder || !filename) {
+      return NextResponse.json({ error: 'Dados do arquivo ausentes.' }, { status: 400 });
     }
 
-    const result = await cloudinary.uploader.destroy(public_id, {
-        resource_type: resource_type || 'raw'
+    const deleteResponse = await fetch(`${API_URL}/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'ApiKey': API_KEY,
+        'ClientSecret': CLIENT_SECRET,
+      },
+      body: JSON.stringify({ folder, filename }),
     });
 
-    if (result.result !== 'ok' && result.result !== 'not found') {
-       throw new Error(result.result || 'Falha ao deletar o arquivo no Cloudinary.');
+    if (!deleteResponse.ok) {
+       const errorText = await deleteResponse.text();
+       throw new Error(`Falha ao deletar arquivo na API: ${errorText}`);
     }
-    
+
     return NextResponse.json({ message: 'Arquivo deletado com sucesso.' });
 
   } catch (error) {
