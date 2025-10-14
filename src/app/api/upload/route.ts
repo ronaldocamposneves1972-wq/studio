@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     const uploadResponse = await fetch(`${API_URL}/upload`, {
       method: 'POST',
       headers: {
-        'ApiKey': API_KEY,
-        'ClientSecret': CLIENT_SECRET,
+        'x-api-key': API_KEY,
+        'x-client-secret': CLIENT_SECRET,
       },
       body: uploadData,
     });
@@ -80,8 +80,8 @@ export async function DELETE(request: NextRequest) {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'ApiKey': API_KEY,
-        'ClientSecret': CLIENT_SECRET,
+        'x-api-key': API_KEY,
+        'x-client-secret': CLIENT_SECRET,
       },
       body: JSON.stringify({ folder, filename }),
     });
