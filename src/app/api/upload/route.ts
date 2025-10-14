@@ -35,16 +35,21 @@ export async function POST(request: NextRequest) {
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       console.error('API Error:', errorText);
-      return NextResponse.json({ error: `Falha no upload: ${errorText}` }, { status: uploadResponse.status });
+      // Try to parse error as JSON, if not, use the text
+      let errorMessage = `Falha no upload: ${errorText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch (e) {
+        // Not a JSON error, use the raw text
+      }
+      return NextResponse.json({ error: errorMessage }, { status: uploadResponse.status });
     }
 
-    // Assuming the API returns a JSON with the filename upon successful upload.
-    // The documentation says "Upload realizado", but a JSON response is more likely.
     const result = await uploadResponse.json();
     const filename = result.filename || file.name;
     const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
 
-    // Construct the URL for accessing the file based on the download endpoint
     const secure_url = `${API_URL}/download/${uploadFolder}/${filename}`;
 
     return NextResponse.json({

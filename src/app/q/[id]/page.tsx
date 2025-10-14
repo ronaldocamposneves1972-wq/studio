@@ -45,7 +45,7 @@ export default function StandaloneQuizPage() {
 
   const { data: client, isLoading: isLoadingClient } = useDoc<Client>(clientRef);
 
-  const uploadFileToCloudinary = async (file: File, clientId: string) => {
+  const uploadFile = async (file: File, clientId: string) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('clientId', clientId);
@@ -97,7 +97,7 @@ export default function StandaloneQuizPage() {
        toast({
         variant: "destructive",
         title: "CEP inválido",
-        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manually.`,
+        description: `Não foi possível encontrar o endereço para este CEP. Por favor, preencha manualmente.`,
       });
       // Re-throw the error to be caught by the caller (handleNext in the form)
       throw error;
@@ -127,7 +127,7 @@ export default function StandaloneQuizPage() {
             if (value instanceof FileList && value.length > 0) {
                  for (let i = 0; i < value.length; i++) {
                     const file = value[i];
-                    fileUploadPromises.push(uploadFileToCloudinary(file, clientId));
+                    fileUploadPromises.push(uploadFile(file, clientId));
                 }
             } else if (!(value instanceof FileList)) {
                 nonFileAnswers[key] = value;
@@ -141,19 +141,19 @@ export default function StandaloneQuizPage() {
 
         const newDocuments: ClientDocument[] = uploadResults.map((uploadData) => {
             timelineEvents.push({
-                id: `tl-${Date.now()}-${uploadData.public_id}`,
+                id: `tl-${Date.now()}-${uploadData.id}`,
                 activity: `Documento "${uploadData.original_filename}" enviado via link`,
                 timestamp: now,
                 user: { name: "Cliente" }
             });
             return {
-                id: uploadData.public_id,
+                id: uploadData.id,
                 clientId: clientId,
                 fileName: uploadData.original_filename,
                 fileType: uploadData.resource_type || 'raw',
-                cloudinaryPublicId: uploadData.public_id,
                 secureUrl: uploadData.secure_url,
                 uploadedAt: now,
+                folder: uploadData.folder,
                 validationStatus: 'pending',
             };
         });
