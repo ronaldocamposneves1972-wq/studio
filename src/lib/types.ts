@@ -23,18 +23,18 @@ export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'R
 export type DocumentStatus = 'pending' | 'validated' | 'rejected';
 
 export type ClientDocument = {
-  id: string;
+  id: string; // The unique ID for the document entry in Firestore
   clientId: string;
-  fileType: string;
+  fileUrl: string; // The public URL for viewing/downloading the file
   original_filename: string;
-  filename: string;
-  secureUrl: string;
+  filename: string; // The filename as stored in the external service
+  folder?: string; // The folder path in the external service
   uploadedAt: string;
-  folder?: string;
   validationStatus?: DocumentStatus;
   statusUpdatedAt?: string;
   validatedBy?: string;
   validatedAt?: string;
+  fileType?: string; // e.g., 'image', 'pdf', etc.
 };
 
 export type ProposalSummary = {

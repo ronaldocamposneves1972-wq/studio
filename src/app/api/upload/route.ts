@@ -48,20 +48,15 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await uploadResponse.json();
-    const filename = result.filename || file.name;
-    const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
     
-    const filePath = `${uploadFolder}/${filename}`;
-    const secure_url = `${API_URL}/download?file=${encodeURIComponent(filePath)}`;
-
-
+    // According to the new info, the API returns a `fileUrl` for public access.
+    // We should save this URL.
     return NextResponse.json({
-      id: randomUUID(),
-      secure_url: secure_url,
+      id: result.fileId || randomUUID(), // Use fileId from API if available
+      fileUrl: result.fileUrl,
       original_filename: file.name,
-      resource_type: resourceType,
       folder: uploadFolder,
-      filename: filename, // Returning the filename from the API response
+      filename: result.filename,
     });
 
   } catch (error) {
@@ -72,17 +67,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  try {
-    const { folder, filename } = await request.json();
+    const { searchParams } = new URL(request.url);
+    const folder = searchParams.get('folder');
+    const filename = searchParams.get('filename');
 
     if (!folder || !filename) {
-      return NextResponse.json({ error: 'Dados do arquivo ausentes.' }, { status: 400 });
+        return NextResponse.json({ error: 'Parâmetros folder e filename são obrigatórios.' }, { status: 400 });
     }
 
     const deleteUrl = new URL(`${API_URL}/delete`);
     deleteUrl.searchParams.append('folder', folder);
     deleteUrl.searchParams.append('filename', filename);
 
+  try {
     const deleteResponse = await fetch(deleteUrl.toString(), {
       method: 'DELETE',
       headers: {

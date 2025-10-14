@@ -356,8 +356,8 @@ export default function ClientDetailPage() {
         clientId: clientId,
         original_filename: uploadData.original_filename,
         filename: uploadData.filename,
-        fileType: uploadData.resource_type || 'raw',
-        secureUrl: uploadData.secure_url,
+        fileUrl: uploadData.fileUrl,
+        fileType: file.type.startsWith('image/') ? 'image' : 'raw',
         folder: uploadData.folder,
         uploadedAt: new Date().toISOString(),
         validationStatus: 'pending',
@@ -366,7 +366,6 @@ export default function ClientDetailPage() {
       const timelineEvent: TimelineEvent = {
         id: `tl-${Date.now()}`,
         activity: `Documento "${file.name}" enviado`,
-        details: `Tipo: ${uploadData.resource_type}`,
         timestamp: new Date().toISOString(),
         user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
       };
@@ -397,14 +396,16 @@ export default function ClientDetailPage() {
   };
 
   const handleDeleteDocument = async (docToDelete: ClientDocument) => {
-    if (!clientRef || !client?.documents) return;
-  
+    if (!clientRef || !client?.documents || !docToDelete.folder || !docToDelete.filename) return;
+
     try {
-        const deleteResponse = await fetch('/api/upload', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder: docToDelete.folder, filename: docToDelete.filename }),
-        });
+      const deleteUrl = new URL(window.location.origin + '/api/upload');
+      deleteUrl.searchParams.append('folder', docToDelete.folder);
+      deleteUrl.searchParams.append('filename', docToDelete.filename);
+
+      const deleteResponse = await fetch(deleteUrl, {
+        method: 'DELETE',
+      });
 
       if (!deleteResponse.ok) {
         const errorData = await deleteResponse.json();
@@ -471,33 +472,7 @@ export default function ClientDetailPage() {
   }
   
   const handleDownload = async (doc: ClientDocument) => {
-    try {
-        const filePath = `${doc.folder}/${doc.filename}`;
-        const response = await fetch(`/api/download?file=${encodeURIComponent(filePath)}`);
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha no download.');
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = doc.original_filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-        console.error("Download error:", error);
-        toast({
-            variant: "destructive",
-            title: "Erro de Download",
-            description: error instanceof Error ? error.message : "Não foi possível baixar o arquivo.",
-        });
-    }
+    window.open(doc.fileUrl, '_blank');
   };
 
 
@@ -1143,20 +1118,11 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             </DialogHeader>
             <div className="flex-1 rounded-md overflow-hidden">
                 {viewingDocument && (
-                    viewingDocument.fileType.startsWith('image/') ? (
-                        <Image
-                            src={viewingDocument.secureUrl}
-                            alt={viewingDocument.original_filename}
-                            layout="fill"
-                            objectFit="contain"
-                        />
-                    ) : (
-                        <iframe
-                            src={viewingDocument.secureUrl}
-                            title={viewingDocument.original_filename}
-                            className="w-full h-full border-0"
-                        />
-                    )
+                    <iframe
+                        src={viewingDocument.fileUrl}
+                        title={viewingDocument.original_filename}
+                        className="w-full h-full border-0"
+                    />
                 )}
             </div>
             <DialogFooter>
@@ -1351,7 +1317,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                               </Button>
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
-                                                              <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
+                                                              <DropdownMenuItem onSelect={() => window.open(doc.fileUrl, '_blank')}>
                                                                   <Eye className="mr-2 h-4 w-4" /> Ver
                                                               </DropdownMenuItem>
                                                               <DropdownMenuItem onSelect={() => handleDownload(doc)}>
