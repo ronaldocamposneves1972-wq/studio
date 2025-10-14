@@ -398,11 +398,13 @@ export default function ClientDetailPage() {
     if (!clientRef || !client?.documents || !docToDelete.unsterilePublicId) return;
 
     try {
-      const [folder, filename] = docToDelete.unsterilePublicId.split('/');
+      const pathParts = docToDelete.unsterilePublicId.split('/');
+      const filename = pathParts.pop();
+      const folder = pathParts.join('/');
       
       const deleteUrl = new URL(window.location.origin + '/api/upload');
       deleteUrl.searchParams.append('folder', folder);
-      deleteUrl.searchParams.append('filename', filename);
+      deleteUrl.searchParams.append('filename', filename!);
 
       const deleteResponse = await fetch(deleteUrl, {
         method: 'DELETE',
@@ -472,7 +474,7 @@ export default function ClientDetailPage() {
     }
   }
   
-  const handleDownload = async (doc: ClientDocument) => {
+  const handleDownload = (doc: ClientDocument) => {
     window.open(doc.secureUrl, '_blank');
   };
 

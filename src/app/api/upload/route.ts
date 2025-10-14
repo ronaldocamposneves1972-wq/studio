@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 
 const API_URL = "https://unsterile-magen-spectrographic.ngrok-free.dev";
 const API_KEY = "IUKPANx1QmVDbKokf7ipjFf5Gh5DE3Cs";
@@ -10,13 +9,12 @@ export async function POST(request: NextRequest) {
   const data = await request.formData();
   const file = data.get('file') as File;
   const clientId = data.get('clientId') as string | null;
-  const folder = data.get('folder') as string | null; // Generic folder from form data
+  const folder = data.get('folder') as string | null; 
 
   if (!file) {
     return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
 
-  // Determine the upload folder. Priority: specific folder > client-specific folder > default.
   const uploadFolder = folder || (clientId ? `clients/${clientId}` : 'uploads');
 
   const uploadData = new FormData();
@@ -48,14 +46,15 @@ export async function POST(request: NextRequest) {
 
     const result = await uploadResponse.json();
     
-    // Construct the response object with the desired structure
-    const unsterilePublicId = `${uploadFolder}/${result.filename}`;
-    
+    // Extract filename from the fileUrl
+    const filename = result.fileUrl.split('/').pop();
+    const unsterilePublicId = `${result.folder}/${filename}`;
+
     return NextResponse.json({
       id: unsterilePublicId,
       unsterilePublicId: unsterilePublicId,
-      secureUrl: result.fileUrl,
-      fileName: file.name,
+      secureUrl: `https://${result.fileUrl}`,
+      fileName: result.originalName,
       fileType: file.type.startsWith('image/') ? 'image' : 'raw',
     });
 
