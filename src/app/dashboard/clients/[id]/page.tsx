@@ -397,15 +397,12 @@ export default function ClientDetailPage() {
     if (!clientRef || !client?.documents) return;
   
     try {
-      const response = await fetch('/api/upload', {
+      const deleteUrl = new URL(window.location.origin + '/api/upload');
+      deleteUrl.searchParams.append('folder', docToDelete.folder || '');
+      deleteUrl.searchParams.append('filename', docToDelete.filename);
+
+      const response = await fetch(deleteUrl.toString(), {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          folder: docToDelete.folder,
-          filename: docToDelete.filename 
-        }),
       });
   
       if (!response.ok) {
@@ -1300,9 +1297,12 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
                                                               <DropdownMenuItem asChild>
-                                                                  <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                                                                      <Eye className="mr-2 h-4 w-4" /> Ver/Baixar
+                                                                  <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" className="flex items-center w-full">
+                                                                      <Eye className="mr-2 h-4 w-4" /> Ver
                                                                   </a>
+                                                              </DropdownMenuItem>
+                                                              <DropdownMenuItem onSelect={() => handleDownload(doc)}>
+                                                                  <Download className="mr-2 h-4 w-4" /> Baixar
                                                               </DropdownMenuItem>
                                                               <DropdownMenuSeparator />
 
@@ -1661,3 +1661,5 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
+
+    
