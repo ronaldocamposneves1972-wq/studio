@@ -142,19 +142,18 @@ export default function StandaloneQuizPage() {
         const newDocuments: ClientDocument[] = uploadResults.map((uploadData) => {
             timelineEvents.push({
                 id: `tl-${Date.now()}-${uploadData.id}`,
-                activity: `Documento "${uploadData.original_filename}" enviado via link`,
+                activity: `Documento "${uploadData.fileName}" enviado via link`,
                 timestamp: now,
                 user: { name: "Cliente" }
             });
             return {
                 id: uploadData.id,
                 clientId: clientId,
-                original_filename: uploadData.original_filename,
-                filename: uploadData.filename,
-                fileType: uploadData.resource_type || 'raw',
-                fileUrl: uploadData.fileUrl, // Use the correct fileUrl
+                fileName: uploadData.fileName,
+                fileType: uploadData.fileType,
+                secureUrl: uploadData.secureUrl,
+                unsterilePublicId: uploadData.unsterilePublicId,
                 uploadedAt: now,
-                folder: uploadData.folder,
                 validationStatus: 'pending',
             };
         });
@@ -180,11 +179,11 @@ export default function StandaloneQuizPage() {
         };
 
         if (newDocuments.length > 0) {
-            updatePayload.documents = arrayUnion(...(clientData.documents || []), ...newDocuments);
+            updatePayload.documents = arrayUnion(...newDocuments);
         }
 
         if (timelineEvents.length > 0) {
-            updatePayload.timeline = arrayUnion(...(clientData.timeline || []), ...timelineEvents);
+            updatePayload.timeline = arrayUnion(...timelineEvents);
         }
 
         await updateDoc(clientRef, updatePayload);
@@ -250,7 +249,7 @@ export default function StandaloneQuizPage() {
       );
     }
 
-    if (isSubmitted || (client && client.documents && client.documents.length > 0)) {
+    if (isSubmitted || (client && client.documents && client.documents.length > 0 && !client.documents.some(d => d.validationStatus === 'rejected'))) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4 text-center">
             <CheckCircle className="h-16 w-16 text-green-500" />

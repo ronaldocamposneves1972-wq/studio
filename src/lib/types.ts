@@ -1,5 +1,4 @@
 
-
 type CollectionKey = typeof collections[number];
 
 export type Permissions = Record<CollectionKey, {
@@ -23,18 +22,17 @@ export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'R
 export type DocumentStatus = 'pending' | 'validated' | 'rejected';
 
 export type ClientDocument = {
-  id: string; // The unique ID for the document entry in Firestore
+  id: string;
   clientId: string;
-  fileUrl: string; // The public URL for viewing/downloading the file
-  original_filename: string;
-  filename: string; // The filename as stored in the external service
-  folder?: string; // The folder path in the external service
+  unsterilePublicId: string;
+  fileName: string;
+  fileType: string;
+  secureUrl: string;
   uploadedAt: string;
   validationStatus?: DocumentStatus;
   statusUpdatedAt?: string;
   validatedBy?: string;
   validatedAt?: string;
-  fileType?: string; // e.g., 'image', 'pdf', etc.
 };
 
 export type ProposalSummary = {

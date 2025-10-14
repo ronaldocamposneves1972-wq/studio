@@ -48,20 +48,15 @@ export async function POST(request: NextRequest) {
 
     const result = await uploadResponse.json();
     
-    // Construct a download URL as a fallback if fileUrl is not provided
-    const downloadUrl = new URL(`${request.nextUrl.origin}/api/download`);
-    downloadUrl.searchParams.append('folder', uploadFolder);
-    downloadUrl.searchParams.append('filename', result.filename);
-    
-    // Ensure fileUrl is always present, using the direct URL if available, otherwise our download proxy.
-    const finalFileUrl = result.fileUrl || downloadUrl.toString();
+    // Construct the response object with the desired structure
+    const unsterilePublicId = `${uploadFolder}/${result.filename}`;
     
     return NextResponse.json({
-      id: result.fileId || randomUUID(),
-      fileUrl: finalFileUrl,
-      original_filename: file.name,
-      folder: uploadFolder,
-      filename: result.filename, // Important for deletion
+      id: unsterilePublicId,
+      unsterilePublicId: unsterilePublicId,
+      secureUrl: result.fileUrl,
+      fileName: file.name,
+      fileType: file.type.startsWith('image/') ? 'image' : 'raw',
     });
 
   } catch (error) {

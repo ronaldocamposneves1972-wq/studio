@@ -354,11 +354,10 @@ export default function ClientDetailPage() {
       const newDocument: ClientDocument = {
         id: uploadData.id,
         clientId: clientId,
-        original_filename: uploadData.original_filename,
-        filename: uploadData.filename,
-        fileUrl: uploadData.fileUrl,
-        fileType: file.type.startsWith('image/') ? 'image' : 'raw',
-        folder: uploadData.folder,
+        fileName: uploadData.fileName,
+        secureUrl: uploadData.secureUrl,
+        unsterilePublicId: uploadData.unsterilePublicId,
+        fileType: uploadData.fileType,
         uploadedAt: new Date().toISOString(),
         validationStatus: 'pending',
       };
@@ -396,12 +395,14 @@ export default function ClientDetailPage() {
   };
 
   const handleDeleteDocument = async (docToDelete: ClientDocument) => {
-    if (!clientRef || !client?.documents || !docToDelete.folder || !docToDelete.filename) return;
+    if (!clientRef || !client?.documents || !docToDelete.unsterilePublicId) return;
 
     try {
+      const [folder, filename] = docToDelete.unsterilePublicId.split('/');
+      
       const deleteUrl = new URL(window.location.origin + '/api/upload');
-      deleteUrl.searchParams.append('folder', docToDelete.folder);
-      deleteUrl.searchParams.append('filename', docToDelete.filename);
+      deleteUrl.searchParams.append('folder', folder);
+      deleteUrl.searchParams.append('filename', filename);
 
       const deleteResponse = await fetch(deleteUrl, {
         method: 'DELETE',
@@ -419,7 +420,7 @@ export default function ClientDetailPage() {
   
       toast({
         title: "Documento excluído",
-        description: `${docToDelete.original_filename} foi removido com sucesso.`
+        description: `${docToDelete.fileName} foi removido com sucesso.`
       });
   
     } catch (error) {
@@ -448,7 +449,7 @@ export default function ClientDetailPage() {
         
         const timelineEvent: TimelineEvent = {
             id: `tl-${Date.now()}`,
-            activity: `Documento "${docToUpdate.original_filename}" ${newStatus === 'validated' ? 'validado' : newStatus === 'rejected' ? 'rejeitado' : 'marcado como pendente'}.`,
+            activity: `Documento "${docToUpdate.fileName}" ${newStatus === 'validated' ? 'validado' : newStatus === 'rejected' ? 'rejeitado' : 'marcado como pendente'}.`,
             timestamp: now,
             user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
         };
@@ -459,7 +460,7 @@ export default function ClientDetailPage() {
         });
         toast({
             title: `Status do documento atualizado para ${newStatus}.`,
-            description: `${docToUpdate.original_filename} foi atualizado.`
+            description: `${docToUpdate.fileName} foi atualizado.`
         });
     } catch(e) {
         console.error(e)
@@ -472,7 +473,7 @@ export default function ClientDetailPage() {
   }
   
   const handleDownload = async (doc: ClientDocument) => {
-    window.open(doc.fileUrl, '_blank');
+    window.open(doc.secureUrl, '_blank');
   };
 
 
@@ -1111,7 +1112,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
       <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
             <DialogHeader>
-                <DialogTitle>{viewingDocument?.original_filename}</DialogTitle>
+                <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
                 <DialogDescription>
                     Visualização do documento.
                 </DialogDescription>
@@ -1119,8 +1120,8 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             <div className="flex-1 rounded-md overflow-hidden">
                 {viewingDocument && (
                     <iframe
-                        src={viewingDocument.fileUrl}
-                        title={viewingDocument.original_filename}
+                        src={viewingDocument.secureUrl}
+                        title={viewingDocument.fileName}
                         className="w-full h-full border-0"
                     />
                 )}
@@ -1302,7 +1303,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                               <TableRow key={doc.id}>
                                                   <TableCell className="font-medium flex items-center gap-2">
                                                       <FileText className="h-4 w-4 text-muted-foreground" />
-                                                      {doc.original_filename}
+                                                      {doc.fileName}
                                                   </TableCell>
                                                   <TableCell>{statusBadge}</TableCell>
                                                   <TableCell>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</TableCell>
@@ -1317,7 +1318,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                               </Button>
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
-                                                              <DropdownMenuItem onSelect={() => window.open(doc.fileUrl, '_blank')}>
+                                                              <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
                                                                   <Eye className="mr-2 h-4 w-4" /> Ver
                                                               </DropdownMenuItem>
                                                               <DropdownMenuItem onSelect={() => handleDownload(doc)}>
@@ -1336,7 +1337,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                           <AlertDialogTitle>Confirmar Validação?</AlertDialogTitle>
                                                                           <AlertDialogDescription>
-                                                                              Você tem certeza de que deseja marcar o documento <strong>{doc.original_filename}</strong> como validado?
+                                                                              Você tem certeza de que deseja marcar o documento <strong>{doc.fileName}</strong> como validado?
                                                                           </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>
@@ -1357,7 +1358,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                           <AlertDialogTitle>Confirmar Rejeição?</AlertDialogTitle>
                                                                           <AlertDialogDescription>
-                                                                              Você tem certeza de que deseja rejeitar o documento <strong>{doc.original_filename}</strong>?
+                                                                              Você tem certeza de que deseja rejeitar o documento <strong>{doc.fileName}</strong>?
                                                                           </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>
@@ -1383,7 +1384,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                       <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
                                                                       <AlertDialogDescription>
-                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.original_filename}</strong> será removido permanentemente.
+                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido permanentemente.
                                                                       </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>
