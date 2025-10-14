@@ -110,6 +110,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose
 } from "@/components/ui/dialog"
 import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
@@ -202,6 +204,7 @@ export default function ClientDetailPage() {
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
   const [proposalToAccept, setProposalToAccept] = useState<ProposalSummary | null>(null);
   const [formalizationLink, setFormalizationLink] = useState('');
+  const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
 
 
   const proposalRef = useMemoFirebase(() => {
@@ -1130,6 +1133,39 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             )}
         </DialogContent>
       </Dialog>
+      <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && setViewingDocument(null)}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle>{viewingDocument?.original_filename}</DialogTitle>
+                <DialogDescription>
+                    Visualização do documento.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 rounded-md overflow-hidden">
+                {viewingDocument && (
+                    viewingDocument.fileType.startsWith('image/') ? (
+                        <Image
+                            src={viewingDocument.secureUrl}
+                            alt={viewingDocument.original_filename}
+                            layout="fill"
+                            objectFit="contain"
+                        />
+                    ) : (
+                        <iframe
+                            src={viewingDocument.secureUrl}
+                            title={viewingDocument.original_filename}
+                            className="w-full h-full border-0"
+                        />
+                    )
+                )}
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button>Fechar</Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3">
@@ -1315,10 +1351,8 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                               </Button>
                                                           </DropdownMenuTrigger>
                                                           <DropdownMenuContent>
-                                                              <DropdownMenuItem asChild>
-                                                                  <a href={doc.secureUrl} target="_blank" rel="noopener noreferrer" className="flex items-center w-full">
-                                                                      <Eye className="mr-2 h-4 w-4" /> Ver
-                                                                  </a>
+                                                              <DropdownMenuItem onSelect={() => setViewingDocument(doc)}>
+                                                                  <Eye className="mr-2 h-4 w-4" /> Ver
                                                               </DropdownMenuItem>
                                                               <DropdownMenuItem onSelect={() => handleDownload(doc)}>
                                                                   <Download className="mr-2 h-4 w-4" /> Baixar
@@ -1680,5 +1714,3 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
     </>
   )
 }
-
-    
