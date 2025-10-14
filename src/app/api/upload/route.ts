@@ -23,13 +23,15 @@ export async function POST(request: NextRequest) {
   }
 
   const uploadFolder = `${BASE_FOLDER}/${clientId}`;
-  const uploadUrl = `${API_URL}/upload/${uploadFolder}`;
+  
+  const uploadUrl = new URL(`${API_URL}/upload`);
+  uploadUrl.searchParams.append('folder', uploadFolder);
 
   const body = new FormData();
   body.append('file', file);
 
   try {
-    const response = await fetch(uploadUrl, {
+    const response = await fetch(uploadUrl.toString(), {
       method: 'POST',
       headers: {
         'accept': 'application/json',
