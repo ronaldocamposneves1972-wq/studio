@@ -50,8 +50,10 @@ export async function POST(request: NextRequest) {
     const result = await uploadResponse.json();
     const filename = result.filename || file.name;
     const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
+    
+    const filePath = `${uploadFolder}/${filename}`;
+    const secure_url = `${API_URL}/download?file=${encodeURIComponent(filePath)}`;
 
-    const secure_url = `${API_URL}/download/${uploadFolder}/${filename}`;
 
     return NextResponse.json({
       id: randomUUID(),
@@ -77,19 +79,28 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Dados do arquivo ausentes.' }, { status: 400 });
     }
 
-    const deleteResponse = await fetch(`${API_URL}/delete`, {
+    const deleteUrl = new URL(`${API_URL}/delete`);
+    deleteUrl.searchParams.append('folder', folder);
+    deleteUrl.searchParams.append('filename', filename);
+
+    const deleteResponse = await fetch(deleteUrl.toString(), {
       method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
         'x-api-key': API_KEY,
         'x-client-secret': CLIENT_SECRET,
       },
-      body: JSON.stringify({ folder, filename }),
     });
 
     if (!deleteResponse.ok) {
        const errorText = await deleteResponse.text();
-       throw new Error(`Falha ao deletar arquivo na API: ${errorText}`);
+       let errorMessage = `Falha ao deletar arquivo na API: ${errorText}`;
+       try {
+           const errorJson = JSON.parse(errorText);
+           errorMessage = errorJson.error || `Falha ao deletar arquivo na API: ${errorText}`;
+       } catch (e) {
+            // Not a JSON error
+       }
+       throw new Error(errorMessage);
     }
 
     return NextResponse.json({ message: 'Arquivo deletado com sucesso.' });
