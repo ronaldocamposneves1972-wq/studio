@@ -7,6 +7,7 @@ const CLIENT_SECRET = "5CJH5YNrfb8zSWUk30pgCAvbU3hmbWan";
 const BASE_FOLDER = "clients";
 
 export async function POST(request: NextRequest) {
+  // Get the form data from the original request
   const data = await request.formData();
   const file = data.get('file') as File;
   const clientId = data.get('clientId') as string | null;
@@ -15,12 +16,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
 
-  // Use the clientId to create a specific folder for the client within the base folder.
+  // Determine the correct folder and set it on the existing FormData object
   const uploadFolder = clientId ? `${BASE_FOLDER}/${clientId}` : 'uploads';
-
-  const uploadData = new FormData();
-  uploadData.append('file', file);
-  uploadData.append('folder', uploadFolder);
+  data.set('folder', uploadFolder); // Use .set() to add or overwrite the folder field
 
   try {
     const uploadResponse = await fetch(`${API_URL}/upload`, {
@@ -29,7 +27,8 @@ export async function POST(request: NextRequest) {
         'x-api-key': API_KEY,
         'x-client-secret': CLIENT_SECRET,
       },
-      body: uploadData,
+      // Pass the modified FormData object directly
+      body: data, 
     });
 
     if (!uploadResponse.ok) {
