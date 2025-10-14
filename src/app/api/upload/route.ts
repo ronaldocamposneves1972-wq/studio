@@ -23,24 +23,20 @@ export async function POST(request: NextRequest) {
   }
 
   const uploadFolder = `${BASE_FOLDER}/${clientId}`;
-  console.log('Pasta de upload definida para:', uploadFolder);
+  const uploadUrl = `${API_URL}/upload/${uploadFolder}`;
 
-  const fileBuffer = await file.arrayBuffer();
-
-  const formData = new FormData();
-  formData.append('file', new Blob([fileBuffer], { type: file.type }), file.name);
-  formData.append('folder', uploadFolder);
-
+  const body = new FormData();
+  body.append('file', file);
 
   try {
-    const response = await fetch(`${API_URL}/upload`, {
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
         'accept': 'application/json',
         'x-api-key': API_KEY,
         'x-client-secret': CLIENT_SECRET,
       },
-      body: formData,
+      body: body,
     });
 
     if (!response.ok) {
@@ -57,7 +53,9 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json();
-    const filename = result.fileUrl ? result.fileUrl.split('/').pop() : result.originalName;
+    
+    // A API agora retorna o nome do arquivo em 'originalName'
+    const filename = result.originalName;
     const unsterilePublicId = `${result.folder}/${filename}`;
 
     console.log('Upload finalizado com sucesso:', result);
@@ -65,7 +63,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: unsterilePublicId,
       unsterilePublicId: unsterilePublicId,
-      secureUrl: `https://${result.fileUrl}`,
+      secureUrl: `https://${result.fileUrl}`, // Usando o fileUrl retornado
       fileName: result.originalName,
       fileType: file.type.startsWith('image/') ? 'image' : 'raw',
     });
