@@ -10,13 +10,14 @@ export async function POST(request: NextRequest) {
   const data = await request.formData();
   const file = data.get('file') as File;
   const clientId = data.get('clientId') as string | null;
-  const folder = data.get('folder') as string | null;
+  const folder = data.get('folder') as string | null; // Generic folder from form data
 
   if (!file) {
     return NextResponse.json({ error: 'Arquivo ausente.' }, { status: 400 });
   }
 
-  const uploadFolder = folder ? folder : (clientId ? `clients/${clientId}` : 'uploads');
+  // Determine the upload folder. Priority: specific folder > client-specific folder > default.
+  const uploadFolder = folder || (clientId ? `clients/${clientId}` : 'uploads');
 
   const uploadData = new FormData();
   uploadData.append('file', file);
