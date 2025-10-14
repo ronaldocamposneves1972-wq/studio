@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       original_filename: file.name,
       resource_type: resourceType,
       folder: uploadFolder,
-      filename: filename,
+      filename: filename, // Returning the filename from the API response
     });
 
   } catch (error) {

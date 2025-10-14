@@ -26,7 +26,8 @@ export type ClientDocument = {
   id: string;
   clientId: string;
   fileType: string;
-  fileName: string;
+  original_filename: string;
+  filename: string;
   secureUrl: string;
   uploadedAt: string;
   folder?: string;

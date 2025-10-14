@@ -351,7 +351,8 @@ export default function ClientDetailPage() {
       const newDocument: ClientDocument = {
         id: uploadData.id,
         clientId: clientId,
-        fileName: uploadData.original_filename || file.name,
+        original_filename: uploadData.original_filename,
+        filename: uploadData.filename,
         fileType: uploadData.resource_type || 'raw',
         secureUrl: uploadData.secure_url,
         folder: uploadData.folder,
@@ -403,7 +404,7 @@ export default function ClientDetailPage() {
         },
         body: JSON.stringify({ 
           folder: docToDelete.folder,
-          filename: docToDelete.fileName 
+          filename: docToDelete.filename 
         }),
       });
   
@@ -419,7 +420,7 @@ export default function ClientDetailPage() {
   
       toast({
         title: "Documento excluído",
-        description: `${docToDelete.fileName} foi removido com sucesso.`
+        description: `${docToDelete.original_filename} foi removido com sucesso.`
       });
   
     } catch (error) {
@@ -448,7 +449,7 @@ export default function ClientDetailPage() {
         
         const timelineEvent: TimelineEvent = {
             id: `tl-${Date.now()}`,
-            activity: `Documento "${docToUpdate.fileName}" ${newStatus === 'validated' ? 'validado' : newStatus === 'rejected' ? 'rejeitado' : 'marcado como pendente'}.`,
+            activity: `Documento "${docToUpdate.original_filename}" ${newStatus === 'validated' ? 'validado' : newStatus === 'rejected' ? 'rejeitado' : 'marcado como pendente'}.`,
             timestamp: now,
             user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
         };
@@ -459,7 +460,7 @@ export default function ClientDetailPage() {
         });
         toast({
             title: `Status do documento atualizado para ${newStatus}.`,
-            description: `${docToUpdate.fileName} foi atualizado.`
+            description: `${docToUpdate.original_filename} foi atualizado.`
         });
     } catch(e) {
         console.error(e)
@@ -474,7 +475,7 @@ export default function ClientDetailPage() {
   const handleDownload = (doc: ClientDocument) => {
     const link = document.createElement('a');
     link.href = doc.secureUrl;
-    link.download = doc.fileName;
+    link.download = doc.original_filename;
     link.target = "_blank";
     document.body.appendChild(link);
     link.click();
@@ -1283,7 +1284,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                               <TableRow key={doc.id}>
                                                   <TableCell className="font-medium flex items-center gap-2">
                                                       <FileText className="h-4 w-4 text-muted-foreground" />
-                                                      {doc.fileName}
+                                                      {doc.original_filename}
                                                   </TableCell>
                                                   <TableCell>{statusBadge}</TableCell>
                                                   <TableCell>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</TableCell>
@@ -1316,7 +1317,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                           <AlertDialogTitle>Confirmar Validação?</AlertDialogTitle>
                                                                           <AlertDialogDescription>
-                                                                              Você tem certeza de que deseja marcar o documento <strong>{doc.fileName}</strong> como validado?
+                                                                              Você tem certeza de que deseja marcar o documento <strong>{doc.original_filename}</strong> como validado?
                                                                           </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>
@@ -1337,7 +1338,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                           <AlertDialogTitle>Confirmar Rejeição?</AlertDialogTitle>
                                                                           <AlertDialogDescription>
-                                                                              Você tem certeza de que deseja rejeitar o documento <strong>{doc.fileName}</strong>?
+                                                                              Você tem certeza de que deseja rejeitar o documento <strong>{doc.original_filename}</strong>?
                                                                           </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>
@@ -1363,7 +1364,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                       <AlertDialogHeader>
                                                                       <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
                                                                       <AlertDialogDescription>
-                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.fileName}</strong> será removido permanentemente.
+                                                                          Esta ação não pode ser desfeita. O documento <strong>{doc.original_filename}</strong> será removido permanentemente.
                                                                       </AlertDialogDescription>
                                                                       </AlertDialogHeader>
                                                                       <AlertDialogFooter>

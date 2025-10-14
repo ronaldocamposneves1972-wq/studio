@@ -149,7 +149,8 @@ export default function StandaloneQuizPage() {
             return {
                 id: uploadData.id,
                 clientId: clientId,
-                fileName: uploadData.original_filename,
+                original_filename: uploadData.original_filename,
+                filename: uploadData.filename,
                 fileType: uploadData.resource_type || 'raw',
                 secureUrl: uploadData.secure_url,
                 uploadedAt: now,
