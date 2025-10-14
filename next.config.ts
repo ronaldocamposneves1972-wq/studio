@@ -1,6 +1,11 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Adicionado para permitir o hot-reloading dentro do ambiente do Cloud Workstation.
+    allowedDevOrigins: ["*.cloudworkstations.dev"],
+  },
   images: {
     remotePatterns: [
       {
