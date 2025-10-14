@@ -397,16 +397,14 @@ export default function ClientDetailPage() {
     if (!clientRef || !client?.documents) return;
   
     try {
-      const deleteUrl = new URL(window.location.origin + '/api/upload');
-      deleteUrl.searchParams.append('folder', docToDelete.folder || '');
-      deleteUrl.searchParams.append('filename', docToDelete.filename);
+        const deleteResponse = await fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder: docToDelete.folder, filename: docToDelete.filename }),
+        });
 
-      const response = await fetch(deleteUrl.toString(), {
-        method: 'DELETE',
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
         throw new Error(errorData.error || 'Falha ao deletar arquivo na API.');
       }
   
@@ -469,15 +467,36 @@ export default function ClientDetailPage() {
     }
   }
   
-  const handleDownload = (doc: ClientDocument) => {
-    const link = document.createElement('a');
-    link.href = doc.secureUrl;
-    link.download = doc.original_filename;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (doc: ClientDocument) => {
+    try {
+        const filePath = `${doc.folder}/${doc.filename}`;
+        const response = await fetch(`/api/download?file=${encodeURIComponent(filePath)}`);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha no download.');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.original_filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error("Download error:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro de Download",
+            description: error instanceof Error ? error.message : "Não foi possível baixar o arquivo.",
+        });
+    }
   };
+
 
     const handleInitiateDocumentation = async () => {
     if (!clientRef || !user || !firestore || !client) return;
