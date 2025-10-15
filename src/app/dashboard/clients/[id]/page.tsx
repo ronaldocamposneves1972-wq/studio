@@ -329,121 +329,34 @@ function EditClientDialog({
     );
 }
 
-const completeRequestSchema = z.object({
-    createReceivable: z.boolean().default(false),
-    description: z.string().optional(),
-    amount: z.preprocess(
-      (a) => a ? parseFloat(String(a).replace(/\./g, '').replace(',', '.')) : undefined,
-      z.number().positive("O valor deve ser positivo.").optional()
-    ),
-    categoryId: z.string().optional(),
-}).refine(data => {
-    if (data.createReceivable) {
-        return !!data.description && !!data.amount && !!data.categoryId;
-    }
-    return true;
-}, {
-    message: "Descrição, valor e categoria são obrigatórios ao criar uma conta a receber.",
-    path: ["description"], // Can point to one field to show the general error
-});
-
-type CompleteRequestFormData = z.infer<typeof completeRequestSchema>;
-
-
 function CompleteRequestDialog({
     isOpen,
     onOpenChange,
     onConfirm,
-    categories,
     isSubmitting,
 }: {
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
-    onConfirm: (data: CompleteRequestFormData) => void,
-    categories: ExpenseCategory[] | null,
+    onConfirm: () => void,
     isSubmitting: boolean
 }) {
-    const form = useForm<CompleteRequestFormData>({
-        resolver: zodResolver(completeRequestSchema)
-    });
-    const { register, handleSubmit, watch, control, formState: { errors } } = form;
-    const createReceivable = watch("createReceivable");
-
-    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const { value } = e.target;
-      const digitsOnly = value.replace(/[^\d]/g, '');
-      if (!digitsOnly) {
-        // @ts-ignore
-        control.fieldsRef.current.amount.value = '';
-        return;
-      }
-      const numberValue = parseInt(digitsOnly, 10);
-      const formatted = (numberValue / 100).toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-      e.target.value = formatted;
-    }
-
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <form onSubmit={handleSubmit(onConfirm)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Concluir Solicitação?</DialogTitle>
-                        <DialogDescription>
-                            Esta ação moverá o cliente de volta para a esteira "Ledger", indicando que os pagamentos foram realizados.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="flex items-center space-x-2">
-                            <Checkbox id="createReceivable" {...register("createReceivable")} />
-                            <Label htmlFor="createReceivable" className="font-normal">
-                                Gerar uma nova Conta a Receber (ex: comissão da venda)?
-                            </Label>
-                        </div>
-                        {createReceivable && (
-                            <div className="grid gap-4 border p-4 rounded-lg">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="description">Descrição da Receita</Label>
-                                    <Input id="description" {...register("description")} placeholder="Comissão Venda Contrato X" />
-                                     {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                     <div className="grid gap-2">
-                                        <Label htmlFor="amount">Valor (R$)</Label>
-                                        <Input id="amount" {...register("amount")} placeholder="1.250,00" onChange={handleAmountChange}/>
-                                        {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="categoryId">Categoria</Label>
-                                        <Controller
-                                            control={control}
-                                            name="categoryId"
-                                            render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                        {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                            Sim, Concluir
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </form>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Concluir Solicitação?</DialogTitle>
+                    <DialogDescription>
+                        Esta ação moverá o cliente de volta para a esteira "Ledger", indicando que os pagamentos foram realizados.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                    <Button onClick={onConfirm} disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Sim, Concluir
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
         </Dialog>
     )
 }
@@ -1162,7 +1075,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
 
-    const handleCompleteRequest = async (data: CompleteRequestFormData) => {
+    const handleCompleteRequest = async () => {
         if (!firestore || !user || !client || !clientRef) {
             toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou do sistema indisponíveis.' });
             return;
@@ -1186,28 +1099,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             };
             batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-            // 3. (Optional) Create an 'income' transaction
-            if (data.createReceivable && data.amount && data.description && data.categoryId) {
-                 const category = expenseCategories?.find(c => c.id === data.categoryId);
-
-                 const transactionData: Partial<Transaction> = {
-                    description: data.description,
-                    amount: data.amount,
-                    type: 'income',
-                    status: 'pending',
-                    dueDate: format(addBusinessDays(new Date(), 2), 'yyyy-MM-dd'),
-                    clientId: client.id,
-                    clientName: client.name,
-                    categoryId: data.categoryId,
-                    category: category?.name,
-                    costCenterId: category?.costCenterId,
-                    costCenterName: category?.costCenterName,
-                };
-                const newTransactionRef = doc(collection(firestore, 'transactions'));
-                batch.set(newTransactionRef, transactionData);
-            }
-
-            // 4. Commit all operations
+            // 3. Commit all operations
             await batch.commit();
 
             toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger." });
@@ -1500,7 +1392,6 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         isOpen={isCompleteRequestDialogOpen}
         onOpenChange={setIsCompleteRequestDialogOpen}
         onConfirm={handleCompleteRequest}
-        categories={expenseCategories}
         isSubmitting={isCompletingRequest}
       />
       
