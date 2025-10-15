@@ -998,9 +998,9 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
             const template = querySnapshot.docs[0].data() as WhatsappMessageTemplate;
 
             const proposalDetails = `
-*${proposal.productName} (${proposal.bankName})*
-Valor: R$ ${proposal.value.toLocaleString('pt-br', { minimumFractionDigits: 2 })}
-Parcelas: ${proposal.installments}x de R$ ${proposal.installmentValue?.toLocaleString('pt-br', { minimumFractionDigits: 2 })}
+*${proposal.productName}*
+Valor: *R$ ${proposal.value.toLocaleString('pt-br', { minimumFractionDigits: 2 })}*
+Parcelas: *${proposal.installments}x* de R$ *${proposal.installmentValue?.toLocaleString('pt-br', { minimumFractionDigits: 2 })}*
 `;
             
             const placeholders = {
