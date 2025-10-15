@@ -69,8 +69,8 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, query, doc, addDoc, updateDoc } from 'firebase/firestore'
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, query, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 import type { Supplier } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 
@@ -250,7 +250,7 @@ export default function SuppliersPage() {
   const handleDelete = async (id: string) => {
     if (!firestore) return
     try {
-      await deleteDocumentNonBlocking(doc(firestore, 'suppliers', id))
+      await deleteDoc(doc(firestore, 'suppliers', id))
       toast({ title: 'Fornecedor excluído com sucesso!' })
     } catch (error) {
       console.error('Error deleting supplier:', error)
@@ -391,5 +391,3 @@ export default function SuppliersPage() {
     </>
   )
 }
-
-    
