@@ -73,12 +73,6 @@ export const navItems = [
       { href: '/dashboard/financials/billing', label: 'Faturamento e Cobrança', icon: FileText },
     ]
   },
-  {
-    label: 'Utilitários', icon: Briefcase, children: [
-      { href: '/dashboard/utils/internal-mail', label: 'Correio Interno', icon: Mail },
-      { href: '/dashboard/utils/docs-download', label: 'Download de Documentos', icon: Download },
-    ]
-  },
   { href: '/dashboard/legal', icon: Scale, label: 'Jurídico' },
 ];
 
