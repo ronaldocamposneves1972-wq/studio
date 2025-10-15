@@ -220,7 +220,7 @@ export type ExpenseCategory = {
     costCenterName?: string;
 }
 
-export type WhatsappMessageStage = "Cadastro (Quiz)" | "Documentação" | "Valor" | "Clearance" | "Ledger" | "Envio de Proposta" | "Formalização" | "Manual" | "Reciclagem";
+export type WhatsappMessageStage = "Cadastro (Quiz)" | "Documentação" | "Valor" | "Clearance" | "Ledger" | "Envio de Proposta" | "Formalização" | "Manual" | "Reciclagem" | "Painel de Oportunidades";
 
 export type WhatsappMessageTemplate = {
   id: string;

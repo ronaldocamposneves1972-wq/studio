@@ -408,7 +408,7 @@ export default function ClientDetailPage() {
   }
 
   const handleReproveAndMoveToOpportunityPanel = async () => {
-    if (!clientRef || !user) return;
+    if (!clientRef || !user || !client) return;
 
     const now = new Date().toISOString();
     const timelineEvent: TimelineEvent = {
@@ -420,16 +420,36 @@ export default function ClientDetailPage() {
     };
 
     try {
-      await updateDoc(clientRef, { 
-        status: 'Reprovado',
-        reprovalDate: now,
-        timeline: arrayUnion(timelineEvent) 
-      });
-      toast({
-        title: "Cliente movido!",
-        description: "O cliente foi movido para o Painel de Oportunidades para reanálise futura.",
-      });
-      router.push('/dashboard/opportunity-panel');
+        const batch = writeBatch(firestore);
+        
+        batch.update(clientRef, { 
+            status: 'Reprovado',
+            reprovalDate: now,
+            timeline: arrayUnion(timelineEvent) 
+        });
+
+        await batch.commit();
+
+        toast({
+            title: "Cliente movido!",
+            description: "O cliente foi movido para o Painel de Oportunidades para reanálise futura.",
+        });
+        
+        // --- Send WhatsApp Message ---
+        const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Painel de Oportunidades'), limit(1));
+        const templatesSnap = await getDocs(templatesQuery);
+        
+        if (!templatesSnap.empty) {
+            const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+            await sendWhatsappMessage(template, { clientName: client.name }, client.phone);
+            toast({
+                title: "Notificação enviada!",
+                description: "Uma mensagem foi enviada ao cliente sobre os próximos passos."
+            });
+        }
+        
+        router.push('/dashboard/opportunity-panel');
+
     } catch (e) {
       console.error(e)
       toast({
