@@ -1623,15 +1623,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                                 ))}
                                             </TableBody>
                                         </Table>
-                                         <div className="text-center py-6 border-t mt-4">
-                                            <p className="text-muted-foreground mb-4">
-                                                Finalize a venda e mova o cliente para a etapa de pagamento.
-                                            </p>
-                                            <Button onClick={handleSendToLedger} disabled={client.status !== 'Aprovado' || salesOrders.length === 0}>
-                                                <Send className="mr-2 h-4 w-4" />
-                                                Enviar para Ledger
-                                            </Button>
-                                        </div>
+                                        
                                         </>
                                     )}
                                 </CardContent>
