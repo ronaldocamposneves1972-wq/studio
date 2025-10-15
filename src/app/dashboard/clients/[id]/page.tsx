@@ -35,7 +35,7 @@ import {
   Recycle,
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -93,7 +93,6 @@ import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocki
 import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc, getDocs, limit } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1136,6 +1135,11 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
 
+    const handleSendToBilling = async () => {
+        await handleStatusChange('Faturamento');
+        router.push('/dashboard/financials/billing');
+    }
+
 
   if (isLoadingClient) {
      return (
@@ -1788,10 +1792,17 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                                 ))}
                                             </TableBody>
                                         </Table>
-                                        
                                         </>
                                     )}
                                 </CardContent>
+                                {client.status === 'Ledger' && salesOrders.length > 0 && (
+                                     <CardFooter className="border-t px-6 py-4 flex justify-end">
+                                        <Button onClick={handleSendToBilling}>
+                                            <Send className="mr-2 h-4 w-4" />
+                                            Enviar para Faturamento
+                                        </Button>
+                                    </CardFooter>
+                                )}
                             </Card>
                         </TabsContent>
                          <TabsContent value="payment_guides">
@@ -1825,3 +1836,5 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
+
+    
