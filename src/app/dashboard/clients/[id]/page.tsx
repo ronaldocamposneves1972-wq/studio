@@ -215,6 +215,24 @@ function EditClientDialog({
     onSave: (data: ClientFormData) => Promise<void>;
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Helper function to parse DD/MM/YYYY into YYYY-MM-DD
+    const parseBirthDate = (dateString?: string): string => {
+        if (!dateString) return '';
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+            // Assuming DD/MM/YYYY -> YYYY-MM-DD
+            const [day, month, year] = parts;
+            if (day && month && year && day.length === 2 && month.length === 2 && year.length === 4) {
+                 return `${year}-${month}-${day}`;
+            }
+        }
+        // If it's already in YYYY-MM-DD or some other format, return as is.
+        // The input[type=date] is robust enough to handle YYYY-MM-DD.
+        return dateString;
+    };
+
+
     const { register, handleSubmit, formState: { errors }, control } = useForm<ClientFormData>({
         resolver: zodResolver(clientSchema),
         defaultValues: {
@@ -222,7 +240,7 @@ function EditClientDialog({
             email: client.email || '',
             phone: client.phone || '',
             cpf: client.cpf || '',
-            birthDate: client.birthDate ? format(new Date(client.birthDate), 'yyyy-MM-dd') : '',
+            birthDate: parseBirthDate(client.birthDate),
             motherName: client.motherName || '',
         }
     });
