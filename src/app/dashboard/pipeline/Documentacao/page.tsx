@@ -1,3 +1,4 @@
+
 'use client'
 
 import Image from "next/image"
@@ -9,7 +10,8 @@ import {
   PlusCircle,
   Users,
   Trash2,
-  Pencil
+  Pencil,
+  Recycle
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -55,7 +57,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, where } from "firebase/firestore"
+import { collection, doc, query, where, updateDoc } from "firebase/firestore"
 import { useMemo } from "react"
 
 
@@ -95,6 +97,25 @@ export default function DocumentacaoPage() {
       description: `O cliente "${client.name}" foi removido com sucesso.`,
     });
   }
+
+  const handleRecycleClient = async (client: Client) => {
+    if (!firestore) return;
+    try {
+      const clientRef = doc(firestore, 'clients', client.id);
+      await updateDoc(clientRef, { status: 'Reciclagem' });
+      toast({
+        title: "Cliente movido para Reciclagem!",
+        description: `${client.name} foi movido para a lista de reciclagem.`,
+      });
+    } catch (error) {
+      console.error("Error moving client to recycling:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível mover o cliente para a reciclagem.",
+      });
+    }
+  };
   
   const clientList = clients || []
 
@@ -158,7 +179,32 @@ export default function DocumentacaoPage() {
               <DropdownMenuItem>
                 <Pencil className="mr-2 h-4 w-4" /> Editar
               </DropdownMenuItem>
-               <DropdownMenuSeparator />
+              <DropdownMenuSeparator />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Recycle className="mr-2 h-4 w-4" /> Mover para Reciclagem
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Mover para Reciclagem?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      O cliente <strong>{client.name}</strong> será movido para a lista de reciclagem para contato futuro. Deseja continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleRecycleClient(client)}
+                    >
+                      Sim, mover
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <DropdownMenuItem
