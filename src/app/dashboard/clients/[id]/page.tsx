@@ -330,7 +330,7 @@ function EditClientDialog({
 }
 
 const completeRequestSchema = z.object({
-    createPayable: z.boolean().default(false),
+    createReceivable: z.boolean().default(false),
     description: z.string().optional(),
     amount: z.preprocess(
       (a) => a ? parseFloat(String(a).replace(/\./g, '').replace(',', '.')) : undefined,
@@ -338,12 +338,12 @@ const completeRequestSchema = z.object({
     ),
     categoryId: z.string().optional(),
 }).refine(data => {
-    if (data.createPayable) {
+    if (data.createReceivable) {
         return !!data.description && !!data.amount && !!data.categoryId;
     }
     return true;
 }, {
-    message: "Descrição, valor e categoria são obrigatórios ao criar uma conta a pagar.",
+    message: "Descrição, valor e categoria são obrigatórios ao criar uma conta a receber.",
     path: ["description"], // Can point to one field to show the general error
 });
 
@@ -367,7 +367,7 @@ function CompleteRequestDialog({
         resolver: zodResolver(completeRequestSchema)
     });
     const { register, handleSubmit, watch, control, formState: { errors } } = form;
-    const createPayable = watch("createPayable");
+    const createReceivable = watch("createReceivable");
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { value } = e.target;
@@ -397,16 +397,16 @@ function CompleteRequestDialog({
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="flex items-center space-x-2">
-                            <Checkbox id="createPayable" {...register("createPayable")} />
-                            <Label htmlFor="createPayable" className="font-normal">
-                                Gerar uma nova Conta a Pagar (ex: comissão do parceiro)?
+                            <Checkbox id="createReceivable" {...register("createReceivable")} />
+                            <Label htmlFor="createReceivable" className="font-normal">
+                                Gerar uma nova Conta a Receber (ex: comissão da venda)?
                             </Label>
                         </div>
-                        {createPayable && (
+                        {createReceivable && (
                             <div className="grid gap-4 border p-4 rounded-lg">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="description">Descrição da Despesa</Label>
-                                    <Input id="description" {...register("description")} placeholder="Comissão Parceiro X" />
+                                    <Label htmlFor="description">Descrição da Receita</Label>
+                                    <Input id="description" {...register("description")} placeholder="Comissão Venda Contrato X" />
                                      {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -1186,14 +1186,14 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             };
             batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-            // 3. (Optional) Create an 'expense' transaction
-            if (data.createPayable && data.amount && data.description && data.categoryId) {
+            // 3. (Optional) Create an 'income' transaction
+            if (data.createReceivable && data.amount && data.description && data.categoryId) {
                  const category = expenseCategories?.find(c => c.id === data.categoryId);
 
                  const transactionData: Partial<Transaction> = {
                     description: data.description,
                     amount: data.amount,
-                    type: 'expense',
+                    type: 'income',
                     status: 'pending',
                     dueDate: format(addBusinessDays(new Date(), 2), 'yyyy-MM-dd'),
                     clientId: client.id,
