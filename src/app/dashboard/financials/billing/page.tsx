@@ -28,14 +28,7 @@ import { Badge } from "@/components/ui/badge"
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
     case 'Faturamento':
-    case 'Aprovado':
-    case 'Ledger':
       return 'default';
-    case 'Reprovado':
-      return 'destructive';
-    case 'Em análise':
-    case 'Pendente':
-      return 'secondary';
     default:
       return 'outline';
   }
@@ -75,7 +68,7 @@ export default function BillingPage() {
     }
 
     return clients.map(client => (
-      <TableRow key={client.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
+      <TableRow key={client.id} className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}?action=addPaymentGuide`)}>
         <TableCell className="font-medium">{client.name}</TableCell>
         <TableCell>{client.phone}</TableCell>
         <TableCell>{client.email}</TableCell>

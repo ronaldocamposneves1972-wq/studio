@@ -2077,5 +2077,3 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
-
-    

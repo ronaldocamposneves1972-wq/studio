@@ -244,11 +244,11 @@ export default function ClearancePage() {
   const handleContractSigned = async (client: Client, createSalesOrder: boolean) => {
       const acceptedProposal = client.proposals?.find(p => p.status === 'Finalizada');
 
-      if (!firestore || !user || !client || !acceptedProposal || !acceptedProposal.productId) {
+      if (!firestore || !user || !client || !acceptedProposal) {
            toast({
                 variant: 'destructive',
                 title: 'Erro de Dados',
-                description: 'Não foi possível localizar todos os dados necessários para gerar a comissão.',
+                description: 'Não foi possível localizar todos os dados necessários.',
             });
             return;
       }
@@ -256,65 +256,20 @@ export default function ClearancePage() {
       toast({ title: 'Processando Contrato Assinado...' });
 
       const batch = writeBatch(firestore);
-      const now = new Date();
-      const nowISO = now.toISOString();
+      const nowISO = new Date().toISOString();
 
       try {
-          // --- 1. Fetch the full product to get commission details ---
-            const productRef = doc(firestore, 'products', acceptedProposal.productId);
-            const productSnap = await getDoc(productRef);
-            if (!productSnap.exists() || productSnap.data()?.behavior !== 'Proposta') {
-                throw new Error("Produto da proposta não encontrado ou inválido.");
-            }
-            const productData = productSnap.data() as Product & { behavior: 'Proposta' };
-
-            // --- 2. Calculate Commission ---
-            let commissionableValue = 0;
-            if (productData.commissionBase === 'bruto' && acceptedProposal.installmentValue && acceptedProposal.installments) {
-                commissionableValue = acceptedProposal.installmentValue * acceptedProposal.installments;
-            } else { // Default to 'liquido'
-                commissionableValue = acceptedProposal.value;
-            }
-            const commissionAmount = commissionableValue * (productData.commissionRate / 100);
-
-            // --- 3. Calculate Due Date (2 business days from now) ---
-            const dueDate = addBusinessDays(now, 2);
-
-            // --- 4. Create Transaction (Contas a Receber) ---
-            const transactionCollection = collection(firestore, 'transactions');
-            const newTransactionRef = doc(transactionCollection);
-            const newTransactionData: Transaction = {
-                id: newTransactionRef.id,
-                description: `Comissão - ${client.name} - Prop. ${acceptedProposal.productName}`,
-                amount: commissionAmount,
-                type: 'income',
-                status: 'pending',
-                dueDate: dueDate.toISOString().split('T')[0],
-                clientId: client.id,
-                clientName: client.name,
-                category: 'Comissão',
-                accountId: '',
-            };
-            batch.set(newTransactionRef, newTransactionData);
-
-            // --- 5. Update client status to Ledger ---
+            // --- Update client status to Ledger ---
             const clientRef = doc(firestore, 'clients', client.id);
             batch.update(clientRef, { status: 'Ledger' });
             
-            // --- 6. Add timeline events ---
+            // --- Add timeline events ---
             const timelineEvents: TimelineEvent[] = [
                  {
                     id: `tl-${Date.now()}-signed`,
                     activity: `Contrato assinado pelo cliente.`,
                     timestamp: nowISO,
                     user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
-                },
-                {
-                    id: `tl-${Date.now()}-commission`,
-                    activity: `Comissão gerada (Contas a Receber).`,
-                    details: `Valor: R$ ${commissionAmount.toLocaleString('pt-br', {minimumFractionDigits: 2})}. Vencimento: ${dueDate.toLocaleDateString('pt-br')}`,
-                    timestamp: nowISO,
-                    user: { name: 'Sistema' },
                 },
                 {
                     id: `tl-${Date.now()}-ledger`,
@@ -326,20 +281,18 @@ export default function ClearancePage() {
             ];
             batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
 
-            // --- 7. Commit batch ---
+            // --- Commit batch ---
             await batch.commit();
 
             toast({
                 title: "Contrato Confirmado!",
-                description: `A comissão foi gerada e o cliente ${client.name} movido para Ledger.`
+                description: `O cliente ${client.name} foi movido para Ledger.`
             });
 
             if (createSalesOrder) {
                 // Redirect to client page to open sales order dialog
                 router.push(`/dashboard/clients/${client.id}?action=openSalesOrder`);
             }
-            
-            // The table will auto-update, no need to manually push to router if not redirecting
             
       } catch (error) {
            console.error("Error confirming signed contract: ", error);
