@@ -43,7 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { Client, ClientStatus } from "@/lib/types"
+import type { Client, ClientStatus, WhatsappMessageTemplate } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
@@ -56,10 +56,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, where, updateDoc, writeBatch } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, doc, query, where, updateDoc, writeBatch, deleteDoc, getDocs, limit } from "firebase/firestore"
 import { useMemo, useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { sendWhatsappMessage } from "@/lib/whatsapp"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -92,19 +93,56 @@ export default function DocumentacaoPage() {
   
   const { data: clients, isLoading } = useCollection<Client>(clientsQuery)
   
-  const handleDeleteClient = (client: Client) => {
+  const handleDeleteClient = async (client: Client) => {
     if(!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'clients', client.id));
-    toast({
-      title: "Cliente excluído!",
-      description: `O cliente "${client.name}" foi removido com sucesso.`,
-    });
+    try {
+        await deleteDoc(doc(firestore, 'clients', client.id));
+        toast({
+        title: "Cliente excluído!",
+        description: `O cliente "${client.name}" foi removido com sucesso.`,
+        });
+    } catch (error) {
+        toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: `Não foi possível excluir o cliente "${client.name}".`,
+        });
+    }
   }
+
+  const handleRecycleClient = async (client: Client) => {
+    if (!firestore) return;
+    try {
+      await updateDoc(doc(firestore, 'clients', client.id), { status: 'Reciclagem' });
+      
+      const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Reciclagem'), limit(1));
+      const templatesSnap = await getDocs(templatesQuery);
+      
+      if (!templatesSnap.empty) {
+        const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+        await sendWhatsappMessage(template, { clientName: client.name }, client.phone);
+      }
+      
+      toast({
+        title: "Cliente movido!",
+        description: `${client.name} foi movido para a reciclagem.`,
+      });
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Erro ao mover",
+        description: `Não foi possível mover o cliente.`,
+      });
+    }
+  };
 
   const handleBulkRecycle = async () => {
     if (!firestore || selectedRows.length === 0) return;
 
     const batch = writeBatch(firestore);
+    const selectedClients = clients?.filter(c => selectedRows.includes(c.id));
+    if (!selectedClients) return;
+
     selectedRows.forEach(clientId => {
         const clientRef = doc(firestore, 'clients', clientId);
         batch.update(clientRef, { status: 'Reciclagem' });
@@ -116,6 +154,16 @@ export default function DocumentacaoPage() {
             title: `${selectedRows.length} cliente(s) movido(s)!`,
             description: "Os clientes selecionados foram movidos para a reciclagem.",
         });
+
+        const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Reciclagem'), limit(1));
+        const templatesSnap = await getDocs(templatesQuery);
+        if (!templatesSnap.empty) {
+            const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+            for (const client of selectedClients) {
+                await sendWhatsappMessage(template, { clientName: client.name }, client.phone);
+            }
+        }
+        
         setSelectedRows([]);
     } catch (error) {
         console.error("Error recycling clients:", error);
@@ -237,7 +285,7 @@ export default function DocumentacaoPage() {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => updateDoc(doc(firestore, 'clients', client.id), { status: 'Reciclagem' })}
+                      onClick={() => handleRecycleClient(client)}
                     >
                       Sim, mover
                     </AlertDialogAction>

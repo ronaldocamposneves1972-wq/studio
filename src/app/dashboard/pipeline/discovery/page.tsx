@@ -44,7 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { Client, ClientStatus } from "@/lib/types"
+import type { Client, ClientStatus, WhatsappMessageTemplate } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
@@ -57,11 +57,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, where, writeBatch } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, doc, query, where, writeBatch, deleteDoc, getDocs, limit } from "firebase/firestore"
 import { useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { sendWhatsappMessage } from "@/lib/whatsapp"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -95,20 +96,31 @@ export default function DiscoveryPage() {
   
   const { data: clients, isLoading } = useCollection<Client>(clientsQuery)
   
-  const handleDeleteClient = (client: Client) => {
+  const handleDeleteClient = async (client: Client) => {
     if(!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'clients', client.id));
-    toast({
-      title: "Cliente excluído!",
-      description: `O cliente "${client.name}" foi removido com sucesso.`,
-    });
+     try {
+      await deleteDoc(doc(firestore, 'clients', client.id));
+      toast({
+        title: "Cliente excluído!",
+        description: `O cliente "${client.name}" foi removido com sucesso.`,
+      });
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: `Não foi possível excluir o cliente "${client.name}".`,
+      });
+    }
   }
 
   const handleBulkAction = async (action: 'delete' | 'recycle') => {
     if (!firestore || selectedRows.length === 0) return;
 
     const batch = writeBatch(firestore);
+    const selectedClients = clients?.filter(c => selectedRows.includes(c.id));
     
+    if (!selectedClients) return;
+
     if (action === 'delete') {
         selectedRows.forEach(clientId => {
             const clientRef = doc(firestore, 'clients', clientId);
@@ -121,10 +133,10 @@ export default function DiscoveryPage() {
         });
     }
 
-
     try {
         await batch.commit();
         const noun = selectedRows.length > 1 ? 'clientes' : 'cliente';
+
         if (action === 'delete') {
             toast({
                 title: `${selectedRows.length} ${noun} excluído(s)!`,
@@ -134,6 +146,15 @@ export default function DiscoveryPage() {
              toast({
                 title: `${selectedRows.length} ${noun} movido(s) para reciclagem!`,
             });
+            // Send WhatsApp messages after successful batch commit
+            const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Reciclagem'), limit(1));
+            const templatesSnap = await getDocs(templatesQuery);
+            if (!templatesSnap.empty) {
+                const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+                for (const client of selectedClients) {
+                    await sendWhatsappMessage(template, { clientName: client.name }, client.phone);
+                }
+            }
         }
         setSelectedRows([]);
     } catch (error) {
