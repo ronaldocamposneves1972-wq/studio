@@ -91,7 +91,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, useCollection } from "@/firebase"
-import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc, getDocs, limit } from "firebase/firestore"
+import { doc, arrayUnion, arrayRemove, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, query, where, writeBatch, getDoc, getDocs, limit, increment } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -146,6 +146,7 @@ const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
     case 'Aprovado':
     case 'Ledger':
+    case 'Finalizado':
       return 'default';
     case 'Reprovado':
     case 'Reciclagem':
@@ -554,6 +555,12 @@ export default function ClientDetailPage() {
         })
     }
   }
+  
+  const handleFinalizeClient = async () => {
+      await handleStatusChange('Finalizado');
+      router.push('/dashboard/contracts/finished');
+  }
+
 
   const handleReproveAndMoveToOpportunityPanel = async () => {
     if (!clientRef || !user || !client) return;
@@ -1198,7 +1205,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     };
 
     const handleCompleteRequest = async (data: CompleteRequestFormData) => {
-        if (!firestore || !user || !client || !clientRef || !client.salesOrders || client.salesOrders.length === 0) {
+        if (!firestore || !user || !client || !clientRef) {
             toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou pedido de venda indisponíveis.' });
             return;
         }
@@ -1206,26 +1213,29 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         setIsCompletingRequest(true);
         const batch = writeBatch(firestore);
         const now = new Date().toISOString();
-        const latestSalesOrder = client.salesOrders[client.salesOrders.length - 1];
 
         try {
             // 1. Update client status to Ledger
             batch.update(clientRef, { status: 'Ledger' });
             
             // 2. Create transaction for Accounts Receivable from the latest Sales Order
-            const transactionRef = doc(collection(firestore, 'transactions'));
-            const newTransaction: Omit<Transaction, 'id'> = {
-                description: `Recebimento referente ao Pedido de Venda #${latestSalesOrder.id.substring(0, 6)}`,
-                amount: latestSalesOrder.totalValue,
-                type: 'income',
-                status: 'pending',
-                dueDate: latestSalesOrder.dueDate,
-                clientId: client.id,
-                clientName: client.name,
-                accountId: '', // To be filled upon payment
-                invoiceNumber: data.invoiceNumber,
-            };
-            batch.set(transactionRef, newTransaction);
+            const latestSalesOrder = client.salesOrders ? [...client.salesOrders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : null;
+
+            if (latestSalesOrder) {
+                const transactionRef = doc(collection(firestore, 'transactions'));
+                const newTransaction: Omit<Transaction, 'id'> = {
+                    description: `Recebimento referente ao Pedido de Venda #${latestSalesOrder.id.substring(0, 6)}`,
+                    amount: latestSalesOrder.totalValue,
+                    type: 'income',
+                    status: 'pending',
+                    dueDate: latestSalesOrder.dueDate,
+                    clientId: client.id,
+                    clientName: client.name,
+                    accountId: '', // To be filled upon payment
+                    invoiceNumber: data.invoiceNumber,
+                };
+                batch.set(transactionRef, newTransaction);
+            }
 
             // 3. Add timeline event
             const timelineEvent: TimelineEvent = {
@@ -1511,7 +1521,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             <DialogFooter className="gap-2 sm:justify-end">
                 <Button variant="outline" onClick={() => setViewingDocument(null)}>Fechar</Button>
                  <AlertDialog>
-                    <AlertDialogTrigger asChild><Button variant="destructive"><XCircle className="mr-2 h-4 w-4" />Rejeitar</Button></AlertDialogTrigger>
+                    <AlertDialogTrigger asChild><Button variant="destructive" disabled={!viewingDocument || viewingDocument.validationStatus === 'rejected'}><XCircle className="mr-2 h-4 w-4" />Rejeitar</Button></AlertDialogTrigger>
                     <AlertDialogContent>
                         <AlertDialogHeader><AlertDialogTitle>Confirmar Rejeição?</AlertDialogTitle><AlertDialogDescription>Você tem certeza que deseja rejeitar o documento <strong>{viewingDocument?.fileName}</strong>?</AlertDialogDescription></AlertDialogHeader>
                         <AlertDialogFooter>
@@ -1521,7 +1531,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                     </AlertDialogContent>
                 </AlertDialog>
                 <AlertDialog>
-                     <AlertDialogTrigger asChild><Button className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-2 h-4 w-4" />Validar</Button></AlertDialogTrigger>
+                     <AlertDialogTrigger asChild><Button className="bg-green-600 hover:bg-green-700" disabled={!viewingDocument || viewingDocument.validationStatus === 'validated'}><CheckCircle2 className="mr-2 h-4 w-4" />Validar</Button></AlertDialogTrigger>
                      <AlertDialogContent>
                         <AlertDialogHeader><AlertDialogTitle>Confirmar Validação?</AlertDialogTitle><AlertDialogDescription>Você tem certeza que deseja validar o documento <strong>{viewingDocument?.fileName}</strong>?</AlertDialogDescription></AlertDialogHeader>
                         <AlertDialogFooter>
@@ -1572,6 +1582,12 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     <Button disabled={!allDocumentsValidated} onClick={handleSendToCreditAnalysis}>
                                         <Send className="h-4 w-4 mr-2"/>
                                         Enviar para Análise
+                                    </Button>
+                                )}
+                                 {client.status === 'Ledger' && (
+                                    <Button onClick={handleFinalizeClient}>
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Finalizar
                                     </Button>
                                 )}
                                <DropdownMenu>
@@ -2112,7 +2128,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                         onChange={(e) => handleFileUpload(e, 'payment_guide', selectedSalesOrderIdForGuide)}
                                         className="hidden"
                                     />
-                                     <Button onClick={handleFileSelect} disabled={isUploading || allSalesOrdersBilled}>
+                                     <Button onClick={handleFileSelect} disabled={isUploading || allSalesOrdersBilled || client.status === 'Ledger'}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                         {isUploading ? 'Enviando...' : 'Anexar Guia'}
                                     </Button>
