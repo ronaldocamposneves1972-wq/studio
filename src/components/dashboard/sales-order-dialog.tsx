@@ -14,7 +14,7 @@ import type { Client } from "@/lib/types"
 interface SalesOrderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (data: any) => void
+  onSave: (data: any, sendToBilling: boolean) => void
   client: Client
 }
 
