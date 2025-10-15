@@ -33,13 +33,13 @@ import {
   Receipt,
   ShoppingCart,
   Recycle,
-  Whatsapp
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { format } from "date-fns"
 
 
 import { Badge } from "@/components/ui/badge"
@@ -137,12 +137,11 @@ type ClientFormData = z.infer<typeof clientSchema>;
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
     case 'Aprovado':
+    case 'Ledger':
       return 'default';
     case 'Reprovado':
     case 'Reciclagem':
       return 'destructive';
-    case 'Ledger':
-        return 'default';
     case 'Em análise':
       return 'secondary';
     case 'Pendente':
@@ -1776,5 +1775,3 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
-
-    
