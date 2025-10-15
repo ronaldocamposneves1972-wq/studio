@@ -11,6 +11,7 @@ import {
   CalendarIcon,
   Loader2,
   Undo2,
+  Trash2,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState, useMemo } from "react"
@@ -71,7 +72,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import type { Transaction, Account } from "@/lib/types"
-import { collection, query, where, doc, updateDoc, writeBatch, getDoc, increment, serverTimestamp, deleteField } from "firebase/firestore"
+import { collection, query, where, doc, updateDoc, writeBatch, getDoc, increment, serverTimestamp, deleteField, deleteDoc } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useForm, Controller } from 'react-hook-form'
@@ -337,6 +338,21 @@ export default function AccountsReceivablePage() {
     }
   };
   
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (!firestore) return;
+    try {
+        await deleteDoc(doc(firestore, 'transactions', transactionId));
+        toast({ title: "Transação excluída com sucesso!" });
+    } catch (error) {
+        console.error("Error deleting transaction: ", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao excluir",
+            description: "Não foi possível remover a transação.",
+        });
+    }
+  }
+
   const openMarkAsPaidDialog = (transaction: Transaction) => {
     setTransactionToPay(transaction);
     setIsMarkAsPaidDialogOpen(true);
@@ -423,8 +439,29 @@ export default function AccountsReceivablePage() {
                 </DropdownMenuItem>
               )}
              
-              <DropdownMenuItem>Editar</DropdownMenuItem>
-              <DropdownMenuItem>Excluir</DropdownMenuItem>
+              <DropdownMenuItem disabled>Editar</DropdownMenuItem>
+              <DropdownMenuSeparator />
+               <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir Transação?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      A transação "{transaction.description}" será removida permanentemente. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDeleteTransaction(transaction.id)} className="bg-destructive hover:bg-destructive/90">
+                      Sim, Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
@@ -513,5 +550,3 @@ export default function AccountsReceivablePage() {
     </>
   )
 }
-
-    
