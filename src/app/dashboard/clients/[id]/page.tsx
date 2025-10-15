@@ -346,7 +346,7 @@ function CompleteRequestDialog({
                 <DialogHeader>
                     <DialogTitle>Concluir Solicitação?</DialogTitle>
                     <DialogDescription>
-                        Esta ação moverá o cliente de volta para a esteira "Ledger", indicando que os pagamentos foram realizados.
+                       Esta ação moverá o cliente de volta para a esteira "Ledger" e gerará as Contas a Receber com base no Pedido de Venda.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
@@ -1076,8 +1076,8 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     };
 
     const handleCompleteRequest = async () => {
-        if (!firestore || !user || !client || !clientRef) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou do sistema indisponíveis.' });
+        if (!firestore || !user || !client || !clientRef || !client.salesOrders || client.salesOrders.length === 0) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou pedido de venda indisponíveis.' });
             return;
         }
 
@@ -1088,21 +1088,37 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         try {
             // 1. Update client status to Ledger
             batch.update(clientRef, { status: 'Ledger' });
+            
+            // 2. Create transaction(s) for Accounts Receivable from Sales Orders
+            client.salesOrders.forEach(order => {
+                const transactionRef = doc(collection(firestore, 'transactions'));
+                const newTransaction: Omit<Transaction, 'id'> = {
+                    description: `Recebimento referente ao Pedido de Venda #${order.id.substring(0, 6)}`,
+                    amount: order.totalValue,
+                    type: 'income',
+                    status: 'pending',
+                    dueDate: order.dueDate,
+                    clientId: client.id,
+                    clientName: client.name,
+                    accountId: '',
+                };
+                batch.set(transactionRef, newTransaction);
+            });
 
-            // 2. Add timeline event
+            // 3. Add timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-completed`,
                 activity: `Solicitação de pagamento concluída.`,
-                details: `Cliente retornado para a esteira Ledger.`,
+                details: `Cliente retornado para a esteira Ledger e Contas a Receber geradas.`,
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
             batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-            // 3. Commit all operations
+            // 4. Commit all operations
             await batch.commit();
 
-            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger." });
+            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger e a(s) Conta(s) a Receber foi/foram criada(s)." });
             setIsCompleteRequestDialogOpen(false);
         } catch (error) {
             console.error("Error completing request:", error);
@@ -1369,22 +1385,28 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                     />
                 )}
             </div>
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 sm:justify-end">
                 <Button variant="outline" onClick={() => setViewingDocument(null)}>Fechar</Button>
-                <Button variant="destructive" onClick={() => {
-                    handleValidationStatusChange(viewingDocument!, 'rejected');
-                    setViewingDocument(null);
-                }}>
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Rejeitar
-                </Button>
-                <Button className="bg-green-600 hover:bg-green-700" onClick={() => {
-                    handleValidationStatusChange(viewingDocument!, 'validated');
-                    setViewingDocument(null);
-                }}>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Validar
-                </Button>
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild><Button variant="destructive"><XCircle className="mr-2 h-4 w-4" />Rejeitar</Button></AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Confirmar Rejeição?</AlertDialogTitle><AlertDialogDescription>Você tem certeza que deseja rejeitar o documento <strong>{viewingDocument?.fileName}</strong>?</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => { handleValidationStatusChange(viewingDocument!, 'rejected'); setViewingDocument(null); }} className="bg-destructive hover:bg-destructive/90">Sim, rejeitar</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                     <AlertDialogTrigger asChild><Button className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-2 h-4 w-4" />Validar</Button></AlertDialogTrigger>
+                     <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>Confirmar Validação?</AlertDialogTitle><AlertDialogDescription>Você tem certeza que deseja validar o documento <strong>{viewingDocument?.fileName}</strong>?</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => { handleValidationStatusChange(viewingDocument!, 'validated'); setViewingDocument(null); }}>Sim, validar</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogFooter>
         </DialogContent>
       </Dialog>

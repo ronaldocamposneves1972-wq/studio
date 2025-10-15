@@ -281,42 +281,13 @@ export default function ClearancePage() {
                 }
             ];
             batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
-
-            // --- Get Product to calculate commission ---
-            const productDoc = await getDoc(doc(firestore, 'products', acceptedProposal.productId));
-            let commissionAmount = acceptedProposal.value * 0.025; // Default 2.5%
             
-            if (productDoc.exists()) {
-                const product = productDoc.data() as Product;
-                if (product.behavior === 'Proposta' && product.commissionRate) {
-                     const baseValue = product.commissionBase === 'bruto' 
-                        ? (acceptedProposal.installmentValue || 0) * (acceptedProposal.installments || 0)
-                        : acceptedProposal.value;
-                    commissionAmount = baseValue * (product.commissionRate / 100);
-                }
-            }
-            
-            // --- Create Transaction for Commission ---
-            const transactionRef = doc(collection(firestore, 'transactions'));
-            const newTransaction: Omit<Transaction, 'id'> = {
-                description: `Comissão referente à proposta: ${acceptedProposal.productName}`,
-                amount: commissionAmount,
-                type: 'income',
-                status: 'pending',
-                dueDate: format(addBusinessDays(new Date(), 5), "yyyy-MM-dd"),
-                clientId: client.id,
-                clientName: client.name,
-                accountId: '', // To be filled upon payment
-            };
-            batch.set(transactionRef, newTransaction);
-
-
             // --- Commit batch ---
             await batch.commit();
 
             toast({
                 title: "Contrato Confirmado!",
-                description: `O cliente ${client.name} foi movido para Ledger e a comissão foi gerada.`
+                description: `O cliente ${client.name} foi movido para Ledger.`
             });
 
             if (createSalesOrder) {
@@ -459,4 +430,3 @@ export default function ClearancePage() {
   )
 }
 
-    
