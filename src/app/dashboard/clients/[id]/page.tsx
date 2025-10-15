@@ -40,6 +40,7 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format } from "date-fns"
+import Swal from 'sweetalert2'
 
 
 import { Badge } from "@/components/ui/badge"
@@ -440,21 +441,36 @@ export default function ClientDetailPage() {
   }
   
   const handleDeleteClient = async () => {
-    if (!clientRef) return;
-    try {
-        await deleteDoc(clientRef);
-        toast({
-        title: "Cliente excluído!",
-        description: "O cliente foi removido com sucesso.",
-        });
-        router.push('/dashboard/clients');
-    } catch(e) {
-        console.error(e)
-        toast({
-            variant: "destructive",
-            title: "Erro ao excluir",
-            description: "Não foi possível excluir o cliente."
-        })
+    if (!clientRef || !client) return;
+
+    const result = await Swal.fire({
+      title: 'Você tem certeza?',
+      text: `Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente ${client.name}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sim, excluir!',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+          await deleteDoc(clientRef);
+          Swal.fire(
+            'Excluído!',
+            'O cliente foi removido com sucesso.',
+            'success'
+          );
+          router.push('/dashboard/clients');
+      } catch(e) {
+          console.error(e)
+          Swal.fire(
+            'Erro!',
+            'Não foi possível excluir o cliente.',
+            'error'
+          );
+      }
     }
   }
 
@@ -1292,25 +1308,9 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     <Pencil className="mr-2 h-4 w-4" /> Editar Cliente
                                   </DropdownMenuItem>
                                    <DropdownMenuSeparator />
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                        <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
-                                      </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                        <AlertDialogDescription>Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleDeleteClient} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                          Sim, excluir
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                   <DropdownMenuItem onSelect={handleDeleteClient} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                           </div>
