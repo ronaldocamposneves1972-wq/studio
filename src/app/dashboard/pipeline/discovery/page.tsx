@@ -9,7 +9,8 @@ import {
   PlusCircle,
   Users,
   Trash2,
-  Pencil
+  Pencil,
+  Search,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -56,7 +57,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, doc, query, where } from "firebase/firestore"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
+import { Input } from "@/components/ui/input"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -78,6 +80,7 @@ export default function DiscoveryPage() {
   const router = useRouter()
   const { toast } = useToast()
   const firestore = useFirestore()
+  const [searchTerm, setSearchTerm] = useState("")
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -96,7 +99,17 @@ export default function DiscoveryPage() {
     });
   }
   
-  const clientList = clients || []
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    if (!searchTerm) return clients;
+    return clients.filter(client =>
+      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.phone?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [clients, searchTerm]);
+
+  const clientList = filteredClients || []
 
   const renderTableContent = (clientList: Client[]) => {
     if (isLoading) {
@@ -197,6 +210,16 @@ export default function DiscoveryPage() {
   return (
     <>
       <div className="flex items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Pesquisar por nome, email ou telefone..."
+            className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <Button size="sm" className="h-8 gap-1" asChild>
             <Link href="/cadastro">
@@ -238,7 +261,7 @@ export default function DiscoveryPage() {
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-              Mostrando <strong>{clientList?.length || 0}</strong> de <strong>{clientList?.length || 0}</strong>{" "}
+              Mostrando <strong>{clientList?.length || 0}</strong> de <strong>{clients?.length || 0}</strong>{" "}
               novos leads
             </div>
           </CardFooter>
