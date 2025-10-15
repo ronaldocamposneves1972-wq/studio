@@ -14,6 +14,7 @@ import {
   Send,
   Loader2,
   Check,
+  ShoppingCart,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -221,6 +222,7 @@ export default function ClearancePage() {
   const firestore = useFirestore()
   const { user } = useUser();
   const [clientToFormalize, setClientToFormalize] = useState<Client | null>(null);
+  const [clientToProcess, setClientToProcess] = useState<Client | null>(null);
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -239,7 +241,7 @@ export default function ClearancePage() {
     });
   }
 
-  const handleContractSigned = async (client: Client) => {
+  const handleContractSigned = async (client: Client, createSalesOrder: boolean) => {
       const acceptedProposal = client.proposals?.find(p => p.status === 'Finalizada');
 
       if (!firestore || !user || !client || !acceptedProposal || !acceptedProposal.productId) {
@@ -331,8 +333,13 @@ export default function ClearancePage() {
                 title: "Contrato Confirmado!",
                 description: `A comissão foi gerada e o cliente ${client.name} movido para Ledger.`
             });
+
+            if (createSalesOrder) {
+                // Redirect to client page to open sales order dialog
+                router.push(`/dashboard/clients/${client.id}?action=openSalesOrder`);
+            }
             
-            // The table will auto-update, no need to manually push to router
+            // The table will auto-update, no need to manually push to router if not redirecting
             
       } catch (error) {
            console.error("Error confirming signed contract: ", error);
@@ -341,6 +348,8 @@ export default function ClearancePage() {
                 title: 'Erro ao confirmar assinatura',
                 description: error instanceof Error ? error.message : 'Não foi possível completar a operação.',
             });
+      } finally {
+        setClientToProcess(null);
       }
   };
   
@@ -395,14 +404,18 @@ export default function ClearancePage() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Assinatura?</AlertDialogTitle>
+                        <AlertDialogTitle>Contrato Assinado!</AlertDialogTitle>
                         <AlertDialogDescription>
-                           Isso irá gerar a comissão (Contas a Receber) e mover o cliente <strong>{client.name}</strong> para a esteira do Ledger. Deseja continuar?
+                           Deseja incluir algum produto para gerar um Pedido de Venda para <strong>{client.name}</strong>?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleContractSigned(client)}>Sim, Confirmar</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleContractSigned(client, true)}>
+                            <ShoppingCart className="mr-2 h-4 w-4" /> Sim, criar Pedido
+                        </AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleContractSigned(client, false)}>
+                           Não, apenas mover
+                        </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
