@@ -252,6 +252,7 @@ export type Transaction = {
   costCenterName?: string;
   categoryId?: string;
   category?: string;
+  invoiceNumber?: string;
 };
 
 export type SalesOrderItem = {

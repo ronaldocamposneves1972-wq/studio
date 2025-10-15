@@ -135,6 +135,11 @@ const clientSchema = z.object({
 
 type ClientFormData = z.infer<typeof clientSchema>;
 
+const completeRequestSchema = z.object({
+  invoiceNumber: z.string().min(1, "O número do boleto é obrigatório."),
+});
+type CompleteRequestFormData = z.infer<typeof completeRequestSchema>;
+
 
 const getStatusVariant = (status: ClientStatus) => {
   switch (status) {
@@ -337,25 +342,38 @@ function CompleteRequestDialog({
 }: {
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
-    onConfirm: () => void,
+    onConfirm: (data: CompleteRequestFormData) => void,
     isSubmitting: boolean
 }) {
+    const { register, handleSubmit, formState: { errors } } = useForm<CompleteRequestFormData>({
+        resolver: zodResolver(completeRequestSchema),
+    });
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Concluir Solicitação?</DialogTitle>
-                    <DialogDescription>
-                       Esta ação moverá o cliente de volta para a esteira "Ledger" e gerará as Contas a Receber com base no Pedido de Venda.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                    <Button onClick={onConfirm} disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                        Sim, Concluir
-                    </Button>
-                </DialogFooter>
+                 <form onSubmit={handleSubmit(onConfirm)}>
+                    <DialogHeader>
+                        <DialogTitle>Concluir Solicitação?</DialogTitle>
+                        <DialogDescription>
+                           Para concluir e retornar o cliente para a esteira "Ledger", por favor, insira o número do boleto de pagamento.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                             <Label htmlFor="invoiceNumber">Número do Boleto</Label>
+                             <Input id="invoiceNumber" {...register('invoiceNumber')} placeholder="Digite o número ou código de barras" />
+                             {errors.invoiceNumber && <p className="text-sm text-destructive">{errors.invoiceNumber.message}</p>}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                            Sim, Concluir
+                        </Button>
+                    </DialogFooter>
+                </form>
             </DialogContent>
         </Dialog>
     )
@@ -1075,7 +1093,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
 
-    const handleCompleteRequest = async () => {
+    const handleCompleteRequest = async (data: CompleteRequestFormData) => {
         if (!firestore || !user || !client || !clientRef || !client.salesOrders || client.salesOrders.length === 0) {
             toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou pedido de venda indisponíveis.' });
             return;
@@ -1084,32 +1102,32 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         setIsCompletingRequest(true);
         const batch = writeBatch(firestore);
         const now = new Date().toISOString();
+        const latestSalesOrder = client.salesOrders[client.salesOrders.length - 1];
 
         try {
             // 1. Update client status to Ledger
             batch.update(clientRef, { status: 'Ledger' });
             
-            // 2. Create transaction(s) for Accounts Receivable from Sales Orders
-            client.salesOrders.forEach(order => {
-                const transactionRef = doc(collection(firestore, 'transactions'));
-                const newTransaction: Omit<Transaction, 'id'> = {
-                    description: `Recebimento referente ao Pedido de Venda #${order.id.substring(0, 6)}`,
-                    amount: order.totalValue,
-                    type: 'income',
-                    status: 'pending',
-                    dueDate: order.dueDate,
-                    clientId: client.id,
-                    clientName: client.name,
-                    accountId: '',
-                };
-                batch.set(transactionRef, newTransaction);
-            });
+            // 2. Create transaction for Accounts Receivable from the latest Sales Order
+            const transactionRef = doc(collection(firestore, 'transactions'));
+            const newTransaction: Omit<Transaction, 'id'> = {
+                description: `Recebimento referente ao Pedido de Venda #${latestSalesOrder.id.substring(0, 6)}`,
+                amount: latestSalesOrder.totalValue,
+                type: 'income',
+                status: 'pending',
+                dueDate: latestSalesOrder.dueDate,
+                clientId: client.id,
+                clientName: client.name,
+                accountId: '', // To be filled upon payment
+                invoiceNumber: data.invoiceNumber,
+            };
+            batch.set(transactionRef, newTransaction);
 
             // 3. Add timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-completed`,
-                activity: `Solicitação de pagamento concluída.`,
-                details: `Cliente retornado para a esteira Ledger e Contas a Receber geradas.`,
+                activity: `Solicitação de pagamento concluída (Boleto: ${data.invoiceNumber}).`,
+                details: `Cliente retornado para a esteira Ledger e Contas a Receber gerada.`,
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
@@ -1118,7 +1136,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             // 4. Commit all operations
             await batch.commit();
 
-            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger e a(s) Conta(s) a Receber foi/foram criada(s)." });
+            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger e a Conta a Receber foi criada." });
             setIsCompleteRequestDialogOpen(false);
         } catch (error) {
             console.error("Error completing request:", error);
