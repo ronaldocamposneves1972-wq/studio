@@ -76,6 +76,8 @@ import { Badge } from "@/components/ui/badge"
 const accountSchema = z.object({
   name: z.string().min(2, { message: "O nome da conta é obrigatório." }),
   bankName: z.string().min(2, { message: "O nome do banco é obrigatório." }),
+  agency: z.string().optional(),
+  accountNumber: z.string().optional(),
   type: z.enum(["checking", "savings", "digital", "cash"], { required_error: "Selecione o tipo de conta."}),
   balance: z.preprocess(
     (a) => parseFloat(String(a).replace(/\./g, '').replace(',', '.')),
@@ -112,6 +114,8 @@ function AccountDialog({
     } : {
       name: '',
       bankName: '',
+      agency: '',
+      accountNumber: '',
       type: 'checking',
       balance: 0,
     },
@@ -121,7 +125,7 @@ function AccountDialog({
      if (account) {
       reset({ ...account, balance: account.balance });
     } else {
-      reset({ name: '', bankName: '', type: 'checking', balance: 0 });
+      reset({ name: '', bankName: '', agency: '', accountNumber: '', type: 'checking', balance: 0 });
     }
   })
 
@@ -165,6 +169,16 @@ function AccountDialog({
                     <Label htmlFor="bankName">Nome do Banco</Label>
                     <Input id="bankName" {...register('bankName')} placeholder="Ex: Banco Digital S.A." />
                     {errors.bankName && <p className="text-sm text-destructive">{errors.bankName.message}</p>}
+                </div>
+            </div>
+             <div className="grid grid-cols-2 gap-4">
+                 <div className="grid gap-2">
+                    <Label htmlFor="agency">Agência</Label>
+                    <Input id="agency" {...register('agency')} placeholder="Ex: 0001" />
+                </div>
+                 <div className="grid gap-2">
+                    <Label htmlFor="accountNumber">Número da Conta</Label>
+                    <Input id="accountNumber" {...register('accountNumber')} placeholder="Ex: 12345-6" />
                 </div>
             </div>
              <div className="grid grid-cols-2 gap-4">
@@ -299,7 +313,12 @@ export default function AccountsPage() {
     return accounts.map((account) => (
       <TableRow key={account.id}>
         <TableCell className="font-medium">{account.name}</TableCell>
-        <TableCell>{account.bankName}</TableCell>
+        <TableCell>
+            <div>{account.bankName}</div>
+            <div className="text-xs text-muted-foreground">
+                Ag: {account.agency || 'N/A'} / C: {account.accountNumber || 'N/A'}
+            </div>
+        </TableCell>
         <TableCell>
           <Badge variant="outline" className="capitalize">{account.type}</Badge>
         </TableCell>
@@ -380,7 +399,7 @@ export default function AccountsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome da Conta</TableHead>
-                  <TableHead>Banco</TableHead>
+                  <TableHead>Banco/Ag./Conta</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
                   <TableHead className="text-right">

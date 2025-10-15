@@ -199,6 +199,8 @@ export type Account = {
   id: string;
   name: string;
   bankName: string;
+  agency?: string;
+  accountNumber?: string;
   balance: number;
   type: 'checking' | 'savings' | 'digital' | 'cash';
 };
