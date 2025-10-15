@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import Image from "next/image"
@@ -38,6 +37,9 @@ import {
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 
 import { Badge } from "@/components/ui/badge"
@@ -104,7 +106,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import { cn, calculateMonthlyRate, addBusinessDays } from "@/lib/utils"
+import { cn, calculateMonthlyRate, addBusinessDays, maskCPF, maskPhone } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -119,6 +121,17 @@ import {
 import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
+
+const clientSchema = z.object({
+    name: z.string().min(3, "O nome completo é obrigatório."),
+    email: z.string().email("Por favor, insira um e-mail válido."),
+    phone: z.string().min(10, "O telefone é obrigatório."),
+    cpf: z.string().optional(),
+    birthDate: z.string().optional(),
+    motherName: z.string().optional(),
+});
+
+type ClientFormData = z.infer<typeof clientSchema>;
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -191,6 +204,111 @@ const Timeline = ({ events }: { events?: TimelineEvent[] }) => {
     );
 };
 
+function EditClientDialog({
+    client,
+    isOpen,
+    onOpenChange,
+    onSave,
+}: {
+    client: Client;
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSave: (data: ClientFormData) => Promise<void>;
+}) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { register, handleSubmit, formState: { errors }, control } = useForm<ClientFormData>({
+        resolver: zodResolver(clientSchema),
+        defaultValues: {
+            name: client.name || '',
+            email: client.email || '',
+            phone: client.phone || '',
+            cpf: client.cpf || '',
+            birthDate: client.birthDate ? format(new Date(client.birthDate), 'yyyy-MM-dd') : '',
+            motherName: client.motherName || '',
+        }
+    });
+
+    const handleFormSubmit = async (data: ClientFormData) => {
+        setIsSubmitting(true);
+        await onSave(data);
+        setIsSubmitting(false);
+    }
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar Cliente</DialogTitle>
+                    <DialogDescription>
+                        Atualize as informações de <strong>{client.name}</strong>.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">Nome</Label>
+                        <Input id="name" {...register('name')} />
+                        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" {...register('email')} />
+                            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="phone">Telefone</Label>
+                            <Controller
+                                name="phone"
+                                control={control}
+                                render={({ field }) => (
+                                    <Input
+                                        id="phone"
+                                        {...field}
+                                        onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                                    />
+                                )}
+                            />
+                            {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                         <div className="grid gap-2">
+                            <Label htmlFor="cpf">CPF</Label>
+                             <Controller
+                                name="cpf"
+                                control={control}
+                                render={({ field }) => (
+                                    <Input
+                                        id="cpf"
+                                        {...field}
+                                        onChange={(e) => field.onChange(maskCPF(e.target.value))}
+                                    />
+                                )}
+                            />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="birthDate">Data de Nascimento</Label>
+                            <Input id="birthDate" type="date" {...register('birthDate')} />
+                        </div>
+                    </div>
+                     <div className="grid gap-2">
+                        <Label htmlFor="motherName">Nome da Mãe</Label>
+                        <Input id="motherName" {...register('motherName')} />
+                    </div>
+
+                    <DialogFooter className="mt-4">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Salvar Alterações
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -206,6 +324,7 @@ export default function ClientDetailPage() {
   const [isCopied, setIsCopied] = useState(false);
   const [isProposalDialogOpen, setIsProposalDialogOpen] = useState(false);
   const [isSalesOrderDialogOpen, setIsSalesOrderDialogOpen] = useState(false);
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
   const [proposalToAccept, setProposalToAccept] = useState<ProposalSummary | null>(null);
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
@@ -844,24 +963,24 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
     
-    const handleSendToLedger = async () => {
+    const handleUpdateClient = async (data: ClientFormData) => {
         if (!clientRef || !user) return;
         
-        const timelineEvent: TimelineEvent = {
-            id: `tl-${Date.now()}`,
-            activity: `Status alterado para "Ledger"`,
-            details: "Cliente enviado para a etapa final de pagamento.",
-            timestamp: new Date().toISOString(),
-            user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
-        };
-
-        await updateDoc(clientRef, { status: 'Ledger', timeline: arrayUnion(timelineEvent) });
-        
-        toast({
-            title: "Cliente enviado para Ledger",
-            description: `${client?.name} agora está na esteira de pagamento.`
-        });
-        router.push('/dashboard/pipeline/ledger');
+        try {
+            await updateDoc(clientRef, {
+                ...data,
+                phone: data.phone.replace(/\D/g, ''),
+            });
+            toast({ title: "Cliente atualizado com sucesso!" });
+            setIsEditClientOpen(false);
+        } catch (error) {
+            console.error("Error updating client: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao atualizar cliente',
+                description: 'Não foi possível salvar as alterações.'
+            });
+        }
     };
 
 
@@ -1023,6 +1142,12 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         onSave={handleSaveSalesOrder}
         client={client}
       />
+      <EditClientDialog
+        client={client}
+        isOpen={isEditClientOpen}
+        onOpenChange={setIsEditClientOpen}
+        onSave={handleUpdateClient}
+      />
        <AlertDialog open={!!proposalToAccept} onOpenChange={(open) => !open && setProposalToAccept(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
@@ -1130,9 +1255,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                               </div>
                           </div>
                           <div className="flex items-center gap-2">
-                                <Badge variant={getStatusVariant(client.status)} className="text-base px-3 py-1">
-                                    {client.status}
-                                </Badge>
+                               <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
                                 {client.status === 'Novo' && (
                                     <Button onClick={handleInitiateDocumentation}>
                                         <Send className="h-4 w-4 mr-2" />
@@ -1148,7 +1271,9 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                <DropdownMenu>
                                 <DropdownMenuTrigger asChild><Button size="icon" variant="outline"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" /> Editar Cliente</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => setIsEditClientOpen(true)}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Editar Cliente
+                                  </DropdownMenuItem>
                                    <DropdownMenuSeparator />
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -1651,3 +1776,5 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
+
+    
