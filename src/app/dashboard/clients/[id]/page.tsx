@@ -497,7 +497,7 @@ export default function ClientDetailPage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'document' | 'payment_guide' = 'document') => {
     const file = event.target.files?.[0];
     if (!file || !clientId || !clientRef || !user) return;
 
@@ -535,11 +535,12 @@ export default function ClientDetailPage() {
         fileType: uploadData.fileType,
         uploadedAt: new Date().toISOString(),
         validationStatus: 'pending',
+        category: category,
       };
       
       const timelineEvent: TimelineEvent = {
         id: `tl-${Date.now()}`,
-        activity: `Documento "${file.name}" enviado`,
+        activity: `Documento "${file.name}" (${category === 'payment_guide' ? 'Guia de Pag.' : 'Doc.'}) enviado`,
         timestamp: new Date().toISOString(),
         user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
       };
@@ -1179,7 +1180,8 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     )
   }
 
-  const documents = client.documents || [];
+  const documents = client.documents?.filter(doc => doc.category === 'document') || [];
+  const paymentGuides = client.documents?.filter(doc => doc.category === 'payment_guide') || [];
   const salesOrders = client.salesOrders || [];
   const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
   const hasAcceptedProposal = proposals.some(p => p.status === 'Finalizada');
@@ -1560,7 +1562,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                            {client.status === 'Em análise' ? (
                             <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
                                 <div className="flex-grow flex items-center gap-2 min-w-[300px]">
-                                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                    <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'document')} className="hidden" />
                                     <Button onClick={handleFileSelect} disabled={isUploading}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                         {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
@@ -1814,18 +1816,63 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
-                                        <Receipt className="h-12 w-12 text-muted-foreground" />
-                                        <h3 className="text-xl font-semibold">Nenhuma guia de pagamento</h3>
-                                        <p className="text-muted-foreground max-w-sm">
-                                            Anexe aqui os boletos de seguro prestamista, taxas de comissão e outros documentos de pagamento relevantes para este contrato.
-                                        </p>
-                                        <Button>
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            Anexar Guia
-                                        </Button>
-                                    </div>
+                                    {paymentGuides.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center text-center gap-4 min-h-60 rounded-lg border-2 border-dashed p-6">
+                                            <Receipt className="h-12 w-12 text-muted-foreground" />
+                                            <h3 className="text-xl font-semibold">Nenhuma guia de pagamento</h3>
+                                            <p className="text-muted-foreground max-w-sm">
+                                                Anexe aqui os boletos de seguro prestamista, taxas de comissão e outros documentos de pagamento relevantes para este contrato.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Nome do Arquivo</TableHead>
+                                                    <TableHead>Data de Envio</TableHead>
+                                                    <TableHead className="text-right">Ações</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paymentGuides.map(doc => (
+                                                    <TableRow key={doc.id}>
+                                                        <TableCell className="font-medium flex items-center gap-2">
+                                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                                            {doc.fileName}
+                                                        </TableCell>
+                                                        <TableCell>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    <DropdownMenuItem onSelect={() => handleDownload(doc)}><Download className="mr-2 h-4 w-4" /> Baixar</DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Deletar</DropdownMenuItem></AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader><AlertDialogTitle>Excluir guia?</AlertDialogTitle><AlertDialogDescription>A guia <strong>{doc.fileName}</strong> será removida.</AlertDialogDescription></AlertDialogHeader>
+                                                                            <AlertDialogFooter>
+                                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                <AlertDialogAction onClick={() => handleDeleteDocument(doc)} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
+                                                                            </AlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
                                 </CardContent>
+                                <CardFooter className="border-t px-6 py-4">
+                                     <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'payment_guide')} className="hidden" />
+                                     <Button onClick={handleFileSelect} disabled={isUploading}>
+                                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                        {isUploading ? 'Enviando...' : 'Anexar Guia'}
+                                    </Button>
+                                </CardFooter>
                             </Card>
                         </TabsContent>
                     </Tabs>
@@ -1836,5 +1883,3 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
-
-    

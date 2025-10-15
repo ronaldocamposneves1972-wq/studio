@@ -34,6 +34,7 @@ export type ClientDocument = {
   statusUpdatedAt?: string;
   validatedBy?: string;
   validatedAt?: string;
+  category: 'document' | 'payment_guide';
 };
 
 export type ProposalSummary = {
