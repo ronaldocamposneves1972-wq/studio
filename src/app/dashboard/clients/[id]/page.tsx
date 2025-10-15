@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -35,7 +36,7 @@ import {
   Recycle,
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -81,7 +82,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product, WhatsappMessageTemplate } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product, WhatsappMessageTemplate, ExpenseCategory } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -121,6 +122,7 @@ import {
 import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const clientSchema = z.object({
     name: z.string().min(3, "O nome completo é obrigatório."),
@@ -145,6 +147,7 @@ const getStatusVariant = (status: ClientStatus) => {
     case 'Em análise':
       return 'secondary';
     case 'Pendente':
+    case 'Faturamento':
       return 'outline';
     default:
       return 'secondary';
@@ -326,9 +329,130 @@ function EditClientDialog({
     );
 }
 
+const completeRequestSchema = z.object({
+    createPayable: z.boolean().default(false),
+    description: z.string().optional(),
+    amount: z.preprocess(
+      (a) => a ? parseFloat(String(a).replace(/\./g, '').replace(',', '.')) : undefined,
+      z.number().positive("O valor deve ser positivo.").optional()
+    ),
+    categoryId: z.string().optional(),
+}).refine(data => {
+    if (data.createPayable) {
+        return !!data.description && !!data.amount && !!data.categoryId;
+    }
+    return true;
+}, {
+    message: "Descrição, valor e categoria são obrigatórios ao criar uma conta a pagar.",
+    path: ["description"], // Can point to one field to show the general error
+});
+
+type CompleteRequestFormData = z.infer<typeof completeRequestSchema>;
+
+
+function CompleteRequestDialog({
+    isOpen,
+    onOpenChange,
+    onConfirm,
+    categories,
+    isSubmitting,
+}: {
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    onConfirm: (data: CompleteRequestFormData) => void,
+    categories: ExpenseCategory[] | null,
+    isSubmitting: boolean
+}) {
+    const form = useForm<CompleteRequestFormData>({
+        resolver: zodResolver(completeRequestSchema)
+    });
+    const { register, handleSubmit, watch, control, formState: { errors } } = form;
+    const createPayable = watch("createPayable");
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = e.target;
+      const digitsOnly = value.replace(/[^\d]/g, '');
+      if (!digitsOnly) {
+        // @ts-ignore
+        control.fieldsRef.current.amount.value = '';
+        return;
+      }
+      const numberValue = parseInt(digitsOnly, 10);
+      const formatted = (numberValue / 100).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      e.target.value = formatted;
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <form onSubmit={handleSubmit(onConfirm)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Concluir Solicitação?</DialogTitle>
+                        <DialogDescription>
+                            Esta ação moverá o cliente de volta para a esteira "Ledger", indicando que os pagamentos foram realizados.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="createPayable" {...register("createPayable")} />
+                            <Label htmlFor="createPayable" className="font-normal">
+                                Gerar uma nova Conta a Pagar (ex: comissão do parceiro)?
+                            </Label>
+                        </div>
+                        {createPayable && (
+                            <div className="grid gap-4 border p-4 rounded-lg">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="description">Descrição da Despesa</Label>
+                                    <Input id="description" {...register("description")} placeholder="Comissão Parceiro X" />
+                                     {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <div className="grid gap-2">
+                                        <Label htmlFor="amount">Valor (R$)</Label>
+                                        <Input id="amount" {...register("amount")} placeholder="1.250,00" onChange={handleAmountChange}/>
+                                        {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="categoryId">Categoria</Label>
+                                        <Controller
+                                            control={control}
+                                            name="categoryId"
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                            Sim, Concluir
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </form>
+        </Dialog>
+    )
+}
+
+
 
 export default function ClientDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const clientId = params.id as string;
   const firestore = useFirestore();
   const { user } = useUser();
@@ -345,6 +469,18 @@ export default function ClientDetailPage() {
   const [viewingProposalId, setViewingProposalId] = useState<string | null>(null);
   const [proposalToAccept, setProposalToAccept] = useState<ProposalSummary | null>(null);
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
+  const [isCompleteRequestDialogOpen, setIsCompleteRequestDialogOpen] = useState(false);
+  const [isCompletingRequest, setIsCompletingRequest] = useState(false);
+
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'openSalesOrder') {
+        setIsSalesOrderDialogOpen(true);
+        // Clean up the URL
+        router.replace(`/dashboard/clients/${clientId}`, {scroll: false});
+    }
+  }, [searchParams, clientId, router]);
 
 
   const proposalRef = useMemoFirebase(() => {
@@ -353,6 +489,13 @@ export default function ClientDetailPage() {
   }, [firestore, viewingProposalId]);
 
   const { data: viewingProposal, isLoading: isLoadingProposal } = useDoc<Proposal>(proposalRef);
+  
+  const categoriesQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, "expense_categories"))
+  }, [firestore]);
+  const { data: expenseCategories } = useCollection<ExpenseCategory>(categoriesQuery)
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -906,15 +1049,15 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
 
     const handleSaveSalesOrder = async (data: any) => {
         if (!firestore || !user || !client || !clientRef) return;
-
+    
         const batch = writeBatch(firestore);
         const now = new Date().toISOString();
-
+    
         try {
             // 1. Create the main sales order document
             const salesOrderCollection = collection(firestore, 'sales_orders');
             const newSalesOrderRef = doc(salesOrderCollection);
-
+    
             const newSalesOrderData: SalesOrder = {
                 id: newSalesOrderRef.id,
                 clientId: client.id,
@@ -927,7 +1070,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 totalValue: data.totalValue,
             };
             batch.set(newSalesOrderRef, newSalesOrderData);
-
+    
             // 2. Create the summary for the client document
             const salesOrderSummary: SalesOrderSummary = {
                 id: newSalesOrderRef.id,
@@ -936,7 +1079,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 totalValue: data.totalValue,
                 itemCount: data.items.length,
             };
-
+    
             // 3. Create the timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-salesorder`,
@@ -944,36 +1087,19 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
-
+    
             // 4. Update the client document
             batch.update(clientRef, {
                 salesOrders: arrayUnion(salesOrderSummary),
                 timeline: arrayUnion(timelineEvent),
             });
-            
-             // 5. Create Transaction (Contas a Receber)
-            const transactionCollection = collection(firestore, 'transactions');
-            const newTransactionRef = doc(transactionCollection);
-            const newTransactionData: Transaction = {
-                id: newTransactionRef.id,
-                description: `Recebimento - Pedido de Venda - ${client.name}`,
-                amount: data.totalValue,
-                type: 'income',
-                status: 'pending',
-                dueDate: data.dueDate,
-                clientId: client.id,
-                clientName: client.name,
-                category: 'Venda de Produto/Serviço',
-                accountId: '', // Needs to be assigned later
-            };
-            batch.set(newTransactionRef, newTransactionData);
-
-            // 6. Commit all writes
+    
+            // 5. Commit all writes
             await batch.commit();
-
-            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido e a conta a receber foram registrados." });
+    
+            toast({ title: "Pedido de Venda Salvo!", description: "O novo pedido foi registrado com sucesso." });
             setIsSalesOrderDialogOpen(false);
-
+    
         } catch (error) {
             console.error("Error saving sales order:", error);
             toast({
@@ -1033,6 +1159,64 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 title: 'Erro ao atualizar cliente',
                 description: 'Não foi possível salvar as alterações.'
             });
+        }
+    };
+
+    const handleCompleteRequest = async (data: CompleteRequestFormData) => {
+        if (!firestore || !user || !client || !clientRef) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou do sistema indisponíveis.' });
+            return;
+        }
+
+        setIsCompletingRequest(true);
+        const batch = writeBatch(firestore);
+        const now = new Date().toISOString();
+
+        try {
+            // 1. Update client status to Ledger
+            batch.update(clientRef, { status: 'Ledger' });
+
+            // 2. Add timeline event
+            const timelineEvent: TimelineEvent = {
+                id: `tl-${Date.now()}-completed`,
+                activity: `Solicitação de pagamento concluída.`,
+                details: `Cliente retornado para a esteira Ledger.`,
+                timestamp: now,
+                user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+            };
+            batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
+
+            // 3. (Optional) Create an 'expense' transaction
+            if (data.createPayable && data.amount && data.description && data.categoryId) {
+                 const category = expenseCategories?.find(c => c.id === data.categoryId);
+
+                 const transactionData: Partial<Transaction> = {
+                    description: data.description,
+                    amount: data.amount,
+                    type: 'expense',
+                    status: 'pending',
+                    dueDate: format(addBusinessDays(new Date(), 2), 'yyyy-MM-dd'),
+                    clientId: client.id,
+                    clientName: client.name,
+                    categoryId: data.categoryId,
+                    category: category?.name,
+                    costCenterId: category?.costCenterId,
+                    costCenterName: category?.costCenterName,
+                };
+                const newTransactionRef = doc(collection(firestore, 'transactions'));
+                batch.set(newTransactionRef, transactionData);
+            }
+
+            // 4. Commit all operations
+            await batch.commit();
+
+            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger." });
+            setIsCompleteRequestDialogOpen(false);
+        } catch (error) {
+            console.error("Error completing request:", error);
+            toast({ variant: 'destructive', title: 'Erro ao Concluir', description: 'Não foi possível finalizar a solicitação.' });
+        } finally {
+            setIsCompletingRequest(false);
         }
     };
 
@@ -1312,6 +1496,13 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CompleteRequestDialog 
+        isOpen={isCompleteRequestDialogOpen}
+        onOpenChange={setIsCompleteRequestDialogOpen}
+        onConfirm={handleCompleteRequest}
+        categories={expenseCategories}
+        isSubmitting={isCompletingRequest}
+      />
       
       <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3">
@@ -1866,12 +2057,15 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                         </Table>
                                     )}
                                 </CardContent>
-                                <CardFooter className="border-t px-6 py-4">
+                                <CardFooter className="border-t px-6 py-4 flex justify-between">
                                      <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'payment_guide')} className="hidden" />
                                      <Button onClick={handleFileSelect} disabled={isUploading}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                         {isUploading ? 'Enviando...' : 'Anexar Guia'}
                                     </Button>
+                                    {paymentGuides.length > 0 && client.status === 'Faturamento' && (
+                                        <Button onClick={() => setIsCompleteRequestDialogOpen(true)}>Concluir Solicitação</Button>
+                                    )}
                                 </CardFooter>
                             </Card>
                         </TabsContent>
@@ -1883,3 +2077,5 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
+
+    
