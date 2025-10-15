@@ -355,38 +355,26 @@ function CompleteRequestDialog({
 }: {
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
-    onConfirm: (data: CompleteRequestFormData) => void,
+    onConfirm: () => void,
     isSubmitting: boolean
 }) {
-    const { register, handleSubmit, formState: { errors } } = useForm<CompleteRequestFormData>({
-        resolver: zodResolver(completeRequestSchema),
-    });
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
-                 <form onSubmit={handleSubmit(onConfirm)}>
                     <DialogHeader>
                         <DialogTitle>Concluir Solicitação?</DialogTitle>
                         <DialogDescription>
-                           Para concluir e retornar o cliente para a esteira "Ledger", por favor, insira o número do boleto de pagamento.
+                            Esta ação moverá o cliente de volta para a esteira "Ledger", indicando que os pagamentos foram realizados.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                             <Label htmlFor="invoiceNumber">Número do Boleto</Label>
-                             <Input id="invoiceNumber" {...register('invoiceNumber')} placeholder="Digite o número ou código de barras" />
-                             {errors.invoiceNumber && <p className="text-sm text-destructive">{errors.invoiceNumber.message}</p>}
-                        </div>
-                    </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button onClick={onConfirm} disabled={isSubmitting}>
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                             Sim, Concluir
                         </Button>
                     </DialogFooter>
-                </form>
             </DialogContent>
         </Dialog>
     )
@@ -648,6 +636,36 @@ export default function ClientDetailPage() {
       }
     }
   }
+
+    const handleRecycleClient = async () => {
+    if (!clientRef || !client) return;
+
+    try {
+        await updateDoc(clientRef, { status: 'Reciclagem' });
+
+        const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Reciclagem'), limit(1));
+        const templatesSnap = await getDocs(templatesQuery);
+
+        if (!templatesSnap.empty) {
+            const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+            await sendWhatsappMessage(template, { clientName: client.name }, client.phone);
+        }
+        
+        toast({
+            title: "Cliente movido!",
+            description: `${client.name} foi movido para a reciclagem.`,
+        });
+        router.push('/dashboard/recycling');
+
+    } catch (error) {
+       toast({
+            variant: "destructive",
+            title: "Erro ao mover",
+            description: `Não foi possível mover o cliente para reciclagem.`,
+        });
+    }
+  };
+
 
   const handleFileSelect = () => {
       const pendingOrders = client?.salesOrders?.filter(o => o.status === 'Pendente') || [];
@@ -1204,7 +1222,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
 
-    const handleCompleteRequest = async (data: CompleteRequestFormData) => {
+    const handleCompleteRequest = async () => {
         if (!firestore || !user || !client || !clientRef) {
             toast({ variant: 'destructive', title: 'Erro', description: 'Dados do cliente ou pedido de venda indisponíveis.' });
             return;
@@ -1217,40 +1235,21 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         try {
             // 1. Update client status to Ledger
             batch.update(clientRef, { status: 'Ledger' });
-            
-            // 2. Create transaction for Accounts Receivable from the latest Sales Order
-            const latestSalesOrder = client.salesOrders ? [...client.salesOrders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : null;
 
-            if (latestSalesOrder) {
-                const transactionRef = doc(collection(firestore, 'transactions'));
-                const newTransaction: Omit<Transaction, 'id'> = {
-                    description: `Recebimento referente ao Pedido de Venda #${latestSalesOrder.id.substring(0, 6)}`,
-                    amount: latestSalesOrder.totalValue,
-                    type: 'income',
-                    status: 'pending',
-                    dueDate: latestSalesOrder.dueDate,
-                    clientId: client.id,
-                    clientName: client.name,
-                    accountId: '', // To be filled upon payment
-                    invoiceNumber: data.invoiceNumber,
-                };
-                batch.set(transactionRef, newTransaction);
-            }
-
-            // 3. Add timeline event
+            // 2. Add timeline event
             const timelineEvent: TimelineEvent = {
                 id: `tl-${Date.now()}-completed`,
-                activity: `Solicitação de pagamento concluída (Boleto: ${data.invoiceNumber}).`,
-                details: `Cliente retornado para a esteira Ledger e Contas a Receber gerada.`,
+                activity: `Faturamento concluído.`,
+                details: `Cliente retornado para a esteira Ledger.`,
                 timestamp: now,
                 user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
             };
             batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-            // 4. Commit all operations
+            // 3. Commit all operations
             await batch.commit();
 
-            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger e a Conta a Receber foi criada." });
+            toast({ title: "Solicitação Concluída!", description: "O cliente foi movido para a esteira Ledger." });
             setIsCompleteRequestDialogOpen(false);
         } catch (error) {
             console.error("Error completing request:", error);
@@ -1596,6 +1595,27 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                   <DropdownMenuItem onSelect={() => setIsEditClientOpen(true)}>
                                     <Pencil className="mr-2 h-4 w-4" /> Editar Cliente
                                   </DropdownMenuItem>
+                                   <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                            <Recycle className="mr-2 h-4 w-4" /> Mover para Reciclagem
+                                        </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Mover para Reciclagem?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                            O cliente <strong>{client.name}</strong> será movido para a lista de reciclagem para contato futuro. Deseja continuar?
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleRecycleClient}>
+                                            Sim, mover
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                    <DropdownMenuSeparator />
                                    <DropdownMenuItem onSelect={handleDeleteClient} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
                                       <Trash2 className="mr-2 h-4 w-4" /> Excluir Cliente
