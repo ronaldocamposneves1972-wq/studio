@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import Image from "next/image"
@@ -14,6 +13,7 @@ import {
   Pencil,
   Send,
   Loader2,
+  Check,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -70,7 +70,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking, useUser } from "@/firebase"
-import { collection, doc, query, where, writeBatch, getDoc, addDoc, getDocs, limit, arrayUnion } from "firebase/firestore"
+import { collection, doc, query, where, writeBatch, getDoc, addDoc, getDocs, limit, arrayUnion, updateDoc } from "firebase/firestore"
 import { useMemo } from "react"
 import { addBusinessDays, cn } from "@/lib/utils"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
@@ -105,7 +105,6 @@ function SendFormalizationDialog({
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
-    const router = useRouter();
 
     const acceptedProposal = useMemo(() => client.proposals?.find(p => p.status === 'Finalizada'), [client]);
 
@@ -123,48 +122,10 @@ function SendFormalizationDialog({
         toast({ title: 'Processando...' });
 
         const batch = writeBatch(firestore);
-        const now = new Date();
-        const nowISO = now.toISOString();
+        const nowISO = new Date().toISOString();
 
         try {
-            // --- 1. Fetch the full product to get commission details ---
-            const productRef = doc(firestore, 'products', acceptedProposal.productId);
-            const productSnap = await getDoc(productRef);
-            if (!productSnap.exists() || productSnap.data()?.behavior !== 'Proposta') {
-                throw new Error("Produto da proposta não encontrado ou inválido.");
-            }
-            const productData = productSnap.data() as Product & { behavior: 'Proposta' };
-
-            // --- 2. Calculate Commission ---
-            let commissionableValue = 0;
-            if (productData.commissionBase === 'bruto' && acceptedProposal.installmentValue && acceptedProposal.installments) {
-                commissionableValue = acceptedProposal.installmentValue * acceptedProposal.installments;
-            } else { // Default to 'liquido'
-                commissionableValue = acceptedProposal.value;
-            }
-            const commissionAmount = commissionableValue * (productData.commissionRate / 100);
-
-            // --- 3. Calculate Due Date (2 business days from now) ---
-            const dueDate = addBusinessDays(now, 2);
-
-            // --- 4. Create Transaction (Contas a Receber) ---
-            const transactionCollection = collection(firestore, 'transactions');
-            const newTransactionRef = doc(transactionCollection);
-            const newTransactionData: Transaction = {
-                id: newTransactionRef.id,
-                description: `Comissão - ${client.name} - Prop. ${acceptedProposal.productName}`,
-                amount: commissionAmount,
-                type: 'income',
-                status: 'pending',
-                dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-                clientId: client.id,
-                clientName: client.name,
-                category: 'Comissão',
-                accountId: '', // Needs to be assigned later
-            };
-            batch.set(newTransactionRef, newTransactionData);
-            
-            // --- 5. Update proposal with formalization link ---
+            // --- 1. Update proposal with formalization link ---
             const clientRef = doc(firestore, 'clients', client.id);
             const proposalDocRef = doc(firestore, 'sales_proposals', acceptedProposal.id);
 
@@ -175,29 +136,20 @@ function SendFormalizationDialog({
             batch.update(clientRef, { proposals: updatedProposals });
             batch.update(proposalDocRef, { formalizationLink });
 
-            // --- 6. Add timeline events ---
-            const timelineEvents: TimelineEvent[] = [
-                {
-                    id: `tl-${Date.now()}-formalization`,
-                    activity: `Link de formalização enviado ao cliente.`,
-                    details: `Link: ${formalizationLink}`,
-                    timestamp: nowISO,
-                    user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
-                },
-                {
-                    id: `tl-${Date.now()}-commission`,
-                    activity: `Comissão gerada (Contas a Receber).`,
-                    details: `Valor: R$ ${commissionAmount.toLocaleString('pt-br', {minimumFractionDigits: 2})}. Vencimento: ${dueDate.toLocaleDateString('pt-br')}`,
-                    timestamp: nowISO,
-                    user: { name: 'Sistema' },
-                }
-            ];
-            batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
+            // --- 2. Add timeline event ---
+            const timelineEvent: TimelineEvent = {
+                id: `tl-${Date.now()}-formalization`,
+                activity: `Link de formalização enviado ao cliente.`,
+                details: `Link: ${formalizationLink}`,
+                timestamp: nowISO,
+                user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+            };
+            batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-            // --- 7. Commit batch ---
+            // --- 3. Commit batch ---
             await batch.commit();
 
-            // --- 8. Send WhatsApp Message ---
+            // --- 4. Send WhatsApp Message ---
             const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Formalização'), limit(1));
             const templatesSnap = await getDocs(templatesQuery);
             if (!templatesSnap.empty) {
@@ -206,8 +158,8 @@ function SendFormalizationDialog({
             }
             
             toast({
-                title: "Formalização Enviada e Comissão Gerada!",
-                description: `O link foi enviado para ${client.name} e a conta a receber foi criada.`
+                title: "Formalização Enviada!",
+                description: `O link foi enviado para ${client.name}. Aguardando assinatura.`
             });
             onOpenChange(false);
             setFormalizationLink('');
@@ -231,7 +183,7 @@ function SendFormalizationDialog({
                 <DialogHeader>
                     <DialogTitle>Enviar Link de Formalização</DialogTitle>
                     <DialogDescription>
-                        Insira o link do contrato para o cliente <strong>{client.name}</strong> assinar. Uma "Conta a Receber" será gerada para a comissão.
+                        Insira o link do contrato para o cliente <strong>{client.name}</strong> assinar. A mensagem será enviada por WhatsApp.
                     </DialogDescription>
                 </DialogHeader>
                  <div className="space-y-4 py-2">
@@ -267,6 +219,7 @@ export default function ClearancePage() {
   const router = useRouter()
   const { toast } = useToast()
   const firestore = useFirestore()
+  const { user } = useUser();
   const [clientToFormalize, setClientToFormalize] = useState<Client | null>(null);
 
   const clientsQuery = useMemoFirebase(() => {
@@ -285,6 +238,111 @@ export default function ClearancePage() {
       description: `O cliente "${client.name}" foi removido com sucesso.`,
     });
   }
+
+  const handleContractSigned = async (client: Client) => {
+      const acceptedProposal = client.proposals?.find(p => p.status === 'Finalizada');
+
+      if (!firestore || !user || !client || !acceptedProposal || !acceptedProposal.productId) {
+           toast({
+                variant: 'destructive',
+                title: 'Erro de Dados',
+                description: 'Não foi possível localizar todos os dados necessários para gerar a comissão.',
+            });
+            return;
+      }
+      
+      toast({ title: 'Processando Contrato Assinado...' });
+
+      const batch = writeBatch(firestore);
+      const now = new Date();
+      const nowISO = now.toISOString();
+
+      try {
+          // --- 1. Fetch the full product to get commission details ---
+            const productRef = doc(firestore, 'products', acceptedProposal.productId);
+            const productSnap = await getDoc(productRef);
+            if (!productSnap.exists() || productSnap.data()?.behavior !== 'Proposta') {
+                throw new Error("Produto da proposta não encontrado ou inválido.");
+            }
+            const productData = productSnap.data() as Product & { behavior: 'Proposta' };
+
+            // --- 2. Calculate Commission ---
+            let commissionableValue = 0;
+            if (productData.commissionBase === 'bruto' && acceptedProposal.installmentValue && acceptedProposal.installments) {
+                commissionableValue = acceptedProposal.installmentValue * acceptedProposal.installments;
+            } else { // Default to 'liquido'
+                commissionableValue = acceptedProposal.value;
+            }
+            const commissionAmount = commissionableValue * (productData.commissionRate / 100);
+
+            // --- 3. Calculate Due Date (2 business days from now) ---
+            const dueDate = addBusinessDays(now, 2);
+
+            // --- 4. Create Transaction (Contas a Receber) ---
+            const transactionCollection = collection(firestore, 'transactions');
+            const newTransactionRef = doc(transactionCollection);
+            const newTransactionData: Transaction = {
+                id: newTransactionRef.id,
+                description: `Comissão - ${client.name} - Prop. ${acceptedProposal.productName}`,
+                amount: commissionAmount,
+                type: 'income',
+                status: 'pending',
+                dueDate: dueDate.toISOString().split('T')[0],
+                clientId: client.id,
+                clientName: client.name,
+                category: 'Comissão',
+                accountId: '',
+            };
+            batch.set(newTransactionRef, newTransactionData);
+
+            // --- 5. Update client status to Ledger ---
+            const clientRef = doc(firestore, 'clients', client.id);
+            batch.update(clientRef, { status: 'Ledger' });
+            
+            // --- 6. Add timeline events ---
+            const timelineEvents: TimelineEvent[] = [
+                 {
+                    id: `tl-${Date.now()}-signed`,
+                    activity: `Contrato assinado pelo cliente.`,
+                    timestamp: nowISO,
+                    user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+                },
+                {
+                    id: `tl-${Date.now()}-commission`,
+                    activity: `Comissão gerada (Contas a Receber).`,
+                    details: `Valor: R$ ${commissionAmount.toLocaleString('pt-br', {minimumFractionDigits: 2})}. Vencimento: ${dueDate.toLocaleDateString('pt-br')}`,
+                    timestamp: nowISO,
+                    user: { name: 'Sistema' },
+                },
+                {
+                    id: `tl-${Date.now()}-ledger`,
+                    activity: `Status alterado para "Ledger"`,
+                    details: "Cliente enviado para a etapa final de pagamento.",
+                    timestamp: nowISO,
+                    user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+                }
+            ];
+            batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
+
+            // --- 7. Commit batch ---
+            await batch.commit();
+
+            toast({
+                title: "Contrato Confirmado!",
+                description: `A comissão foi gerada e o cliente ${client.name} movido para Ledger.`
+            });
+            
+            // The table will auto-update, no need to manually push to router
+            
+      } catch (error) {
+           console.error("Error confirming signed contract: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao confirmar assinatura',
+                description: error instanceof Error ? error.message : 'Não foi possível completar a operação.',
+            });
+      }
+  };
   
   const clientList = clients || []
 
@@ -312,7 +370,11 @@ export default function ClearancePage() {
       )
     }
     
-    return clientList.map(client => (
+    return clientList.map(client => {
+      const acceptedProposal = client.proposals?.find(p => p.status === 'Finalizada');
+      const hasFormalizationLink = !!acceptedProposal?.formalizationLink;
+
+      return (
       <TableRow key={client.id}>
         <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.name}</TableCell>
         <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.email}</TableCell>
@@ -324,55 +386,35 @@ export default function ClearancePage() {
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
         </TableCell>
         <TableCell>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Ações</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => setClientToFormalize(client)}>
-                <Send className="mr-2 h-4 w-4" /> Enviar para Cliente
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${client.id}`)}>
-                <Users className="mr-2 h-4 w-4" /> Ver Detalhes
-              </DropdownMenuItem>
-               <DropdownMenuSeparator />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta ação não pode ser desfeita. Isso irá deletar permanentemente o cliente <strong>{client.name}</strong>.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => handleDeleteClient(client)}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Sim, excluir
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            {hasFormalizationLink ? (
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                       <Button size="sm">
+                            <Check className="mr-2 h-4 w-4" /> Contrato Assinado
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Assinatura?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           Isso irá gerar a comissão (Contas a Receber) e mover o cliente <strong>{client.name}</strong> para a esteira do Ledger. Deseja continuar?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleContractSigned(client)}>Sim, Confirmar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+            ) : (
+                <Button variant="outline" size="sm" onClick={() => setClientToFormalize(client)}>
+                    <Send className="mr-2 h-4 w-4" /> Enviar para Cliente
+                </Button>
+            )}
         </TableCell>
       </TableRow>
-    ))
+      )
+    })
   }
 
   return (
