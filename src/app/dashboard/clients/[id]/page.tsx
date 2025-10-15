@@ -1259,6 +1259,30 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         }
     };
 
+    const handleReactivateClient = async () => {
+        if (!clientRef || !user) return;
+        toast({ title: 'Reativando cliente...' });
+        try {
+            const timelineEvent: TimelineEvent = {
+                id: `tl-${Date.now()}`,
+                activity: `Cliente reativado da reciclagem`,
+                details: 'Status alterado para "Novo".',
+                timestamp: new Date().toISOString(),
+                user: { name: user.displayName || user.email || "Usuário", avatarUrl: user.photoURL || '' }
+            };
+            await updateDoc(clientRef, { status: 'Novo', timeline: arrayUnion(timelineEvent) });
+            toast({ title: "Cliente Reativado!", description: "O cliente foi movido para a esteira de Discovery." });
+            router.push('/dashboard/pipeline/discovery');
+        } catch (e) {
+            console.error(e);
+            toast({
+                variant: "destructive",
+                title: "Erro ao reativar",
+                description: "Não foi possível reativar o cliente."
+            })
+        }
+    };
+
 
     const clientDataToDisplay = useMemo(() => {
         if (!client) return [];
@@ -1587,6 +1611,12 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     <Button onClick={handleFinalizeClient} disabled={!allSalesOrdersBilled}>
                                         <CheckCircle2 className="h-4 w-4 mr-2" />
                                         Finalizar
+                                    </Button>
+                                )}
+                                {client.status === 'Reciclagem' && (
+                                    <Button onClick={handleReactivateClient}>
+                                        <Recycle className="h-4 w-4 mr-2" />
+                                        Reativar Cliente
                                     </Button>
                                 )}
                                <DropdownMenu>
@@ -2166,3 +2196,5 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
+
+      
