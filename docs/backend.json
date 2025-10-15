@@ -638,13 +638,14 @@
         "stage": {
           "type": "string",
           "description": "The pipeline stage that triggers this message.",
-          "enum": ["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Manual"]
+          "enum": ["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Envio de Proposta", "Formalização", "Manual"]
         },
         "placeholders": {
           "type": "array",
-          "description": "Array of available placeholders for this template (e.g., 'clientName', 'quizLink', 'proposalDetails').",
+          "description": "Array of available placeholders for this template.",
           "items": {
-            "type": "string"
+            "type": "string",
+            "enum": ["clientName", "quizLink", "proposalDetails", "formalizationLink"]
           }
         }
       },
