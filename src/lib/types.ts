@@ -1,4 +1,5 @@
 
+
 type CollectionKey = typeof collections[number];
 
 export type Permissions = Record<CollectionKey, {
@@ -219,7 +220,7 @@ export type ExpenseCategory = {
     costCenterName?: string;
 }
 
-export type WhatsappMessageStage = "Cadastro (Quiz)" | "Documentação" | "Valor" | "Clearance" | "Ledger" | "Manual";
+export type WhatsappMessageStage = "Cadastro (Quiz)" | "Documentação" | "Valor" | "Clearance" | "Ledger" | "Envio de Proposta" | "Formalização" | "Manual";
 
 export type WhatsappMessageTemplate = {
   id: string;

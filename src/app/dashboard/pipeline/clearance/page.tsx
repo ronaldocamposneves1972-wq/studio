@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -10,9 +11,13 @@ import {
   PlusCircle,
   Users,
   Trash2,
-  Pencil
+  Pencil,
+  Send,
+  Loader2,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { format } from "date-fns"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,13 +31,22 @@ import {
 } from "@/components/ui/card"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -42,7 +56,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { Client, ClientStatus } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Transaction, Product, ProposalSummary, WhatsappMessageTemplate } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import {
   AlertDialog,
@@ -55,9 +69,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, where } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking, useUser } from "@/firebase"
+import { collection, doc, query, where, writeBatch, getDoc, addDoc, getDocs, limit, arrayUnion } from "firebase/firestore"
 import { useMemo } from "react"
+import { addBusinessDays, cn } from "@/lib/utils"
+import { sendWhatsappMessage } from "@/lib/whatsapp"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -75,10 +91,183 @@ const getStatusVariant = (status: ClientStatus) => {
   }
 }
 
+function SendFormalizationDialog({
+    client,
+    isOpen,
+    onOpenChange
+}: {
+    client: Client,
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void
+}) {
+    const [formalizationLink, setFormalizationLink] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const firestore = useFirestore();
+    const { user } = useUser();
+    const { toast } = useToast();
+    const router = useRouter();
+
+    const acceptedProposal = useMemo(() => client.proposals?.find(p => p.status === 'Finalizada'), [client]);
+
+    const handleConfirm = async () => {
+        if (!firestore || !client || !user || !formalizationLink || !acceptedProposal) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro de Dados',
+                description: 'Informações da proposta, cliente ou link estão ausentes.',
+            });
+            return;
+        }
+
+        setIsSubmitting(true);
+        toast({ title: 'Processando...' });
+
+        const batch = writeBatch(firestore);
+        const now = new Date();
+        const nowISO = now.toISOString();
+
+        try {
+            // --- 1. Fetch the full product to get commission details ---
+            const productRef = doc(firestore, 'products', acceptedProposal.productId);
+            const productSnap = await getDoc(productRef);
+            if (!productSnap.exists() || productSnap.data()?.behavior !== 'Proposta') {
+                throw new Error("Produto da proposta não encontrado ou inválido.");
+            }
+            const productData = productSnap.data() as Product & { behavior: 'Proposta' };
+
+            // --- 2. Calculate Commission ---
+            let commissionableValue = 0;
+            if (productData.commissionBase === 'bruto' && acceptedProposal.installmentValue && acceptedProposal.installments) {
+                commissionableValue = acceptedProposal.installmentValue * acceptedProposal.installments;
+            } else { // Default to 'liquido'
+                commissionableValue = acceptedProposal.value;
+            }
+            const commissionAmount = commissionableValue * (productData.commissionRate / 100);
+
+            // --- 3. Calculate Due Date (2 business days from now) ---
+            const dueDate = addBusinessDays(now, 2);
+
+            // --- 4. Create Transaction (Contas a Receber) ---
+            const transactionCollection = collection(firestore, 'transactions');
+            const newTransactionRef = doc(transactionCollection);
+            const newTransactionData: Transaction = {
+                id: newTransactionRef.id,
+                description: `Comissão - ${client.name} - Prop. ${acceptedProposal.productName}`,
+                amount: commissionAmount,
+                type: 'income',
+                status: 'pending',
+                dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+                clientId: client.id,
+                clientName: client.name,
+                category: 'Comissão',
+                accountId: '', // Needs to be assigned later
+            };
+            batch.set(newTransactionRef, newTransactionData);
+            
+            // --- 5. Update proposal with formalization link ---
+            const clientRef = doc(firestore, 'clients', client.id);
+            const proposalDocRef = doc(firestore, 'sales_proposals', acceptedProposal.id);
+
+            const updatedProposals = client.proposals?.map(p => 
+                p.id === acceptedProposal.id ? { ...p, formalizationLink } : p
+            );
+
+            batch.update(clientRef, { proposals: updatedProposals });
+            batch.update(proposalDocRef, { formalizationLink });
+
+            // --- 6. Add timeline events ---
+            const timelineEvents: TimelineEvent[] = [
+                {
+                    id: `tl-${Date.now()}-formalization`,
+                    activity: `Link de formalização enviado ao cliente.`,
+                    details: `Link: ${formalizationLink}`,
+                    timestamp: nowISO,
+                    user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+                },
+                {
+                    id: `tl-${Date.now()}-commission`,
+                    activity: `Comissão gerada (Contas a Receber).`,
+                    details: `Valor: R$ ${commissionAmount.toLocaleString('pt-br', {minimumFractionDigits: 2})}. Vencimento: ${dueDate.toLocaleDateString('pt-br')}`,
+                    timestamp: nowISO,
+                    user: { name: 'Sistema' },
+                }
+            ];
+            batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
+
+            // --- 7. Commit batch ---
+            await batch.commit();
+
+            // --- 8. Send WhatsApp Message ---
+            const templatesQuery = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Formalização'), limit(1));
+            const templatesSnap = await getDocs(templatesQuery);
+            if (!templatesSnap.empty) {
+                const template = templatesSnap.docs[0].data() as WhatsappMessageTemplate;
+                await sendWhatsappMessage(template, { clientName: client.name, formalizationLink }, client.phone);
+            }
+            
+            toast({
+                title: "Formalização Enviada e Comissão Gerada!",
+                description: `O link foi enviado para ${client.name} e a conta a receber foi criada.`
+            });
+            onOpenChange(false);
+            setFormalizationLink('');
+
+        } catch (error) {
+            console.error("Error sending formalization: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao enviar formalização',
+                description: error instanceof Error ? error.message : 'Não foi possível completar a operação.',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Enviar Link de Formalização</DialogTitle>
+                    <DialogDescription>
+                        Insira o link do contrato para o cliente <strong>{client.name}</strong> assinar. Uma "Conta a Receber" será gerada para a comissão.
+                    </DialogDescription>
+                </DialogHeader>
+                 <div className="space-y-4 py-2">
+                    <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                        <p><strong>Proposta:</strong> {acceptedProposal?.productName}</p>
+                        <p><strong>Valor:</strong> R$ {acceptedProposal?.value.toLocaleString('pt-br', {minimumFractionDigits: 2})}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="formalization-link" className={cn(!formalizationLink && 'text-destructive')}>Link de Formalização (Obrigatório)</Label>
+                        <Input
+                            id="formalization-link"
+                            value={formalizationLink}
+                            onChange={(e) => setFormalizationLink(e.target.value)}
+                            placeholder="https://banco.com/contrato/assinar/xyz"
+                            className={cn(!formalizationLink && 'border-destructive focus-visible:ring-destructive')}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                    <Button onClick={handleConfirm} disabled={!formalizationLink || isSubmitting}>
+                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Confirmar e Enviar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+
 export default function ClearancePage() {
   const router = useRouter()
   const { toast } = useToast()
   const firestore = useFirestore()
+  const [clientToFormalize, setClientToFormalize] = useState<Client | null>(null);
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -124,40 +313,31 @@ export default function ClearancePage() {
     }
     
     return clientList.map(client => (
-      <TableRow key={client.id} onClick={() => router.push(`/dashboard/clients/${client.id}`)} className="cursor-pointer">
-        <TableCell className="font-medium">
-          <div className="flex items-center gap-3">
-             {client.avatarUrl ? <Image src={client.avatarUrl} alt={client.name} width={24} height={24} className="rounded-full" data-ai-hint="person portrait" /> : <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">{client.name.charAt(0)}</div>}
-             {client.name}
-          </div>
-        </TableCell>
-        <TableCell className="hidden sm:table-cell">{client.email}</TableCell>
-        <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
-        <TableCell>
+      <TableRow key={client.id}>
+        <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.name}</TableCell>
+        <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.email}</TableCell>
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.phone}</TableCell>
+        <TableCell className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
         </TableCell>
-        <TableCell className="hidden md:table-cell">
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
         </TableCell>
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                aria-haspopup="true"
-                size="icon"
-                variant="ghost"
-              >
+              <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
                 <MoreHorizontal className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setClientToFormalize(client)}>
+                <Send className="mr-2 h-4 w-4" /> Enviar para Cliente
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => router.push(`/dashboard/clients/${client.id}`)}>
                 <Users className="mr-2 h-4 w-4" /> Ver Detalhes
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Pencil className="mr-2 h-4 w-4" /> Editar
               </DropdownMenuItem>
                <DropdownMenuSeparator />
               <AlertDialog>
@@ -201,7 +381,7 @@ export default function ClearancePage() {
           <CardHeader>
             <CardTitle>Clearance</CardTitle>
             <CardDescription>
-              Clientes com propostas aceitas aguardando formalização e pagamento.
+              Clientes com propostas aprovadas aguardando formalização e pagamento.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -215,9 +395,7 @@ export default function ClearancePage() {
                   <TableHead className="hidden md:table-cell">
                     Criado em
                   </TableHead>
-                  <TableHead>
-                    <span className="sr-only">Ações</span>
-                  </TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -232,6 +410,13 @@ export default function ClearancePage() {
             </div>
           </CardFooter>
         </Card>
+        {clientToFormalize && (
+            <SendFormalizationDialog
+                client={clientToFormalize}
+                isOpen={!!clientToFormalize}
+                onOpenChange={(open) => !open && setClientToFormalize(null)}
+            />
+        )}
     </>
   )
 }

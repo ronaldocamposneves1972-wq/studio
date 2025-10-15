@@ -81,7 +81,7 @@ const templateSchema = z.object({
   text: z.string().min(10, { message: "O texto da mensagem é obrigatório." }),
   apiUrl: z.string().url({ message: "A URL da API deve ser válida." }),
   sessionName: z.string().min(1, { message: "O nome da sessão é obrigatório." }),
-  stage: z.enum(["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Envio de Proposta", "Manual"], {
+  stage: z.enum(["Cadastro (Quiz)", "Documentação", "Valor", "Clearance", "Ledger", "Envio de Proposta", "Formalização", "Manual"], {
     required_error: "Selecione uma etapa."
   }),
 })
@@ -124,7 +124,7 @@ function TemplateDialog({
       onSave(values, template?.id);
   }
   
-  const availablePlaceholders = ['clientName', 'quizLink', 'proposalDetails'];
+  const availablePlaceholders = ['clientName', 'quizLink', 'proposalDetails', 'formalizationLink'];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,6 +158,7 @@ function TemplateDialog({
                                     <SelectItem value="Valor">Valor</SelectItem>
                                     <SelectItem value="Envio de Proposta">Envio de Proposta</SelectItem>
                                     <SelectItem value="Clearance">Clearance</SelectItem>
+                                    <SelectItem value="Formalização">Formalização</SelectItem>
                                     <SelectItem value="Ledger">Ledger</SelectItem>
                                     <SelectItem value="Manual">Manual</SelectItem>
                                 </SelectContent>
