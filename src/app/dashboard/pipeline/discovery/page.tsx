@@ -1,3 +1,4 @@
+
 'use client'
 
 import Image from "next/image"
@@ -11,6 +12,7 @@ import {
   Trash2,
   Pencil,
   Search,
+  Recycle
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -67,6 +69,7 @@ const getStatusVariant = (status: ClientStatus) => {
     case 'Aprovado':
       return 'default';
     case 'Reprovado':
+    case 'Reciclagem':
       return 'destructive';
     case 'Em análise':
       return 'secondary';
@@ -101,28 +104,44 @@ export default function DiscoveryPage() {
     });
   }
 
-  const handleDeleteSelected = async () => {
+  const handleBulkAction = async (action: 'delete' | 'recycle') => {
     if (!firestore || selectedRows.length === 0) return;
 
     const batch = writeBatch(firestore);
-    selectedRows.forEach(clientId => {
-        const clientRef = doc(firestore, 'clients', clientId);
-        batch.delete(clientRef);
-    });
+    
+    if (action === 'delete') {
+        selectedRows.forEach(clientId => {
+            const clientRef = doc(firestore, 'clients', clientId);
+            batch.delete(clientRef);
+        });
+    } else if (action === 'recycle') {
+        selectedRows.forEach(clientId => {
+            const clientRef = doc(firestore, 'clients', clientId);
+            batch.update(clientRef, { status: 'Reciclagem' });
+        });
+    }
+
 
     try {
         await batch.commit();
-        toast({
-            title: `${selectedRows.length} cliente(s) excluído(s)!`,
-            description: "Os clientes selecionados foram removidos com sucesso.",
-        });
+        const noun = selectedRows.length > 1 ? 'clientes' : 'cliente';
+        if (action === 'delete') {
+            toast({
+                title: `${selectedRows.length} ${noun} excluído(s)!`,
+                description: `Os ${noun} selecionados foram removidos com sucesso.`,
+            });
+        } else {
+             toast({
+                title: `${selectedRows.length} ${noun} movido(s) para reciclagem!`,
+            });
+        }
         setSelectedRows([]);
     } catch (error) {
-        console.error("Error deleting multiple clients:", error);
+        console.error(`Error performing bulk ${action}:`, error);
         toast({
             variant: "destructive",
-            title: "Erro ao excluir",
-            description: "Não foi possível excluir os clientes selecionados.",
+            title: "Erro ao executar ação",
+            description: "Não foi possível completar a operação para os clientes selecionados.",
         });
     }
   }
@@ -157,7 +176,7 @@ export default function DiscoveryPage() {
   
   const numSelected = selectedRows.length;
   const allSelected = numSelected > 0 && numSelected === clientList.length;
-  const someSelected = numSelected > 0 && numSelected < clientList.length;
+  const someSelected = numSelected > 0 && !allSelected;
 
   const renderTableContent = (clientList: Client[]) => {
     if (isLoading) {
@@ -282,9 +301,31 @@ export default function DiscoveryPage() {
                     <span className="text-sm text-muted-foreground">
                         {numSelected} selecionado(s)
                     </span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                             <Button variant="outline" size="sm" className="h-8 gap-1">
+                                <Recycle className="h-3.5 w-3.5" />
+                                Reciclar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Mover para Reciclagem?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Os {numSelected} clientes selecionados serão movidos para a lista de reciclagem.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleBulkAction('recycle')}>
+                                    Sim, mover
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 gap-1">
+                            <Button variant="outline" size="sm" className="h-8 gap-1 border-destructive text-destructive hover:bg-destructive/10">
                                 <Trash2 className="h-3.5 w-3.5" />
                                 Excluir
                             </Button>
@@ -299,7 +340,7 @@ export default function DiscoveryPage() {
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                onClick={handleDeleteSelected}
+                                onClick={() => handleBulkAction('delete')}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                 Sim, excluir

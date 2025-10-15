@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Users, Package, Landmark, FileText, DollarSign, Settings,
   FilePlus, BookUser, Briefcase, Download, Mail, GanttChart, Scale,
-  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart, ChevronRight, Truck, WalletCards, Shapes
+  ClipboardCheck, ClipboardList, TrendingUp, Check, Receipt, CreditCard, LineChart, ChevronRight, Truck, WalletCards, Shapes, Recycle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '../logo';
@@ -55,6 +55,7 @@ export const navItems = [
       { href: '/dashboard/analytics/production', label: 'Analítico de Produção', icon: LineChart },
       { href: '/dashboard/contracts/by-client', label: 'Contratos por Cliente', icon: Users },
       { href: '/dashboard/opportunity-panel', label: 'Painel de oportunidade', icon: Package },
+      { href: '/dashboard/recycling', label: 'Reciclagem', icon: Recycle },
     ]
   },
   {

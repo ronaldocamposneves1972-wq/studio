@@ -31,7 +31,8 @@ import {
   PlusCircle,
   FileWarning,
   Receipt,
-  ShoppingCart
+  ShoppingCart,
+  Recycle
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
@@ -123,6 +124,7 @@ const getStatusVariant = (status: ClientStatus) => {
     case 'Aprovado':
       return 'default';
     case 'Reprovado':
+    case 'Reciclagem':
       return 'destructive';
     case 'Ledger':
         return 'default';
@@ -154,6 +156,7 @@ const getTimelineIcon = (activity: string) => {
     if (activity.toLowerCase().includes('documentos')) return <Upload className="h-4 w-4 text-muted-foreground" />;
     if (activity.toLowerCase().includes('quiz')) return <MessageSquare className="h-4 w-4 text-muted-foreground" />;
     if (activity.toLowerCase().includes('cadastrado')) return <User className="h-4 w-4 text-muted-foreground" />;
+    if (activity.toLowerCase().includes('reciclagem')) return <Recycle className="h-4 w-4 text-muted-foreground" />;
     return <Activity className="h-4 w-4 text-muted-foreground" />;
 }
 
@@ -1158,6 +1161,7 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                       <SelectItem value="Aprovado">Aprovado</SelectItem>
                                       <SelectItem value="Ledger">Ledger</SelectItem>
                                       <SelectItem value="Reprovado">Reprovado</SelectItem>
+                                      <SelectItem value="Reciclagem">Reciclagem</SelectItem>
                                   </SelectContent>
                               </Select>
                                 {client.status === 'Novo' && (

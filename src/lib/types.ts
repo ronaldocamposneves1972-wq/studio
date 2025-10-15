@@ -17,7 +17,7 @@ export type User = {
   permissions?: Permissions;
 };
 
-export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado' | 'Ledger';
+export type ClientStatus = 'Novo' | 'Em análise' | 'Pendente' | 'Aprovado' | 'Reprovado' | 'Ledger' | 'Reciclagem';
 
 export type DocumentStatus = 'pending' | 'validated' | 'rejected';
 
