@@ -1130,18 +1130,9 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                               </div>
                           </div>
                           <div className="flex items-center gap-2">
-                              <Select onValueChange={(val) => handleStatusChange(val as ClientStatus)} value={client.status}>
-                                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Novo">Novo</SelectItem>
-                                      <SelectItem value="Em análise">Em análise</SelectItem>
-                                      <SelectItem value="Pendente">Pendente</SelectItem>
-                                      <SelectItem value="Aprovado">Aprovado</SelectItem>
-                                      <SelectItem value="Ledger">Ledger</SelectItem>
-                                      <SelectItem value="Reprovado">Reprovado</SelectItem>
-                                      <SelectItem value="Reciclagem">Reciclagem</SelectItem>
-                                  </SelectContent>
-                              </Select>
+                                <Badge variant={getStatusVariant(client.status)} className="text-base px-3 py-1">
+                                    {client.status}
+                                </Badge>
                                 {client.status === 'Novo' && (
                                     <Button onClick={handleInitiateDocumentation}>
                                         <Send className="h-4 w-4 mr-2" />
@@ -1460,7 +1451,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                                             <TableCell className="font-mono">{(monthlyRate * 100).toFixed(2)}%</TableCell>
                                                             <TableCell className="font-mono">{(totalRate * 100).toFixed(2)}%</TableCell>
                                                             <TableCell><Badge variant={getProposalStatusVariant(p.status)}>{p.status}</Badge></TableCell>
-                                                            <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                                                            <TableCell>{new Date(p.createdAt).toLocaleDateString('pt-br')}</TableCell>
                                                             <TableCell>{p.approvedAt ? new Date(p.approvedAt).toLocaleDateString('pt-BR') : '—'}</TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
