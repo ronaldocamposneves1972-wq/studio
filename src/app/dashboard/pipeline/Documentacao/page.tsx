@@ -57,8 +57,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, where, updateDoc } from "firebase/firestore"
-import { useMemo } from "react"
+import { collection, doc, query, where, updateDoc, writeBatch } from "firebase/firestore"
+import { useMemo, useState } from "react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -66,6 +67,7 @@ const getStatusVariant = (status: ClientStatus) => {
     case 'Aprovado':
       return 'default';
     case 'Reprovado':
+    case 'Reciclagem':
       return 'destructive';
     case 'Em análise':
       return 'secondary';
@@ -80,6 +82,7 @@ export default function DocumentacaoPage() {
   const router = useRouter()
   const { toast } = useToast()
   const firestore = useFirestore()
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null
@@ -98,31 +101,60 @@ export default function DocumentacaoPage() {
     });
   }
 
-  const handleRecycleClient = async (client: Client) => {
-    if (!firestore) return;
+  const handleBulkRecycle = async () => {
+    if (!firestore || selectedRows.length === 0) return;
+
+    const batch = writeBatch(firestore);
+    selectedRows.forEach(clientId => {
+        const clientRef = doc(firestore, 'clients', clientId);
+        batch.update(clientRef, { status: 'Reciclagem' });
+    });
+
     try {
-      const clientRef = doc(firestore, 'clients', client.id);
-      await updateDoc(clientRef, { status: 'Reciclagem' });
-      toast({
-        title: "Cliente movido para Reciclagem!",
-        description: `${client.name} foi movido para a lista de reciclagem.`,
-      });
+        await batch.commit();
+        toast({
+            title: `${selectedRows.length} cliente(s) movido(s)!`,
+            description: "Os clientes selecionados foram movidos para a reciclagem.",
+        });
+        setSelectedRows([]);
     } catch (error) {
-      console.error("Error moving client to recycling:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível mover o cliente para a reciclagem.",
-      });
+        console.error("Error recycling clients:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao reciclar",
+            description: "Não foi possível mover os clientes selecionados.",
+        });
     }
-  };
+  }
   
   const clientList = clients || []
+  
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedRows(clientList.map(client => client.id));
+    } else {
+      setSelectedRows([]);
+    }
+  }
+  
+  const handleSelectRow = (clientId: string, checked: boolean) => {
+    if (checked) {
+        setSelectedRows(prev => [...prev, clientId]);
+    } else {
+        setSelectedRows(prev => prev.filter(id => id !== clientId));
+    }
+  }
+
+  const numSelected = selectedRows.length;
+  const allSelected = numSelected > 0 && numSelected === clientList.length;
+  const someSelected = numSelected > 0 && !allSelected;
+
 
   const renderTableContent = (clientList: Client[]) => {
     if (isLoading) {
        return Array.from({ length: 5 }).map((_, i) => (
         <TableRow key={i}>
+          <TableCell><Skeleton className="h-5 w-5"/></TableCell>
           <TableCell><Skeleton className="h-5 w-32"/></TableCell>
           <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-40"/></TableCell>
           <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-28"/></TableCell>
@@ -136,7 +168,7 @@ export default function DocumentacaoPage() {
     if (clientList.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="h-24 text-center">
+          <TableCell colSpan={7} className="h-24 text-center">
             Nenhum cliente em fase de documentação.
           </TableCell>
         </TableRow>
@@ -144,19 +176,26 @@ export default function DocumentacaoPage() {
     }
     
     return clientList.map(client => (
-      <TableRow key={client.id} onClick={() => router.push(`/dashboard/clients/${client.id}`)} className="cursor-pointer">
-        <TableCell className="font-medium">
+      <TableRow key={client.id} data-state={selectedRows.includes(client.id) && "selected"}>
+        <TableCell>
+            <Checkbox
+                checked={selectedRows.includes(client.id)}
+                onCheckedChange={(checked) => handleSelectRow(client.id, !!checked)}
+                aria-label={`Selecionar cliente ${client.name}`}
+            />
+        </TableCell>
+        <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           <div className="flex items-center gap-3">
              {client.avatarUrl ? <Image src={client.avatarUrl} alt={client.name} width={24} height={24} className="rounded-full" data-ai-hint="person portrait" /> : <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">{client.name.charAt(0)}</div>}
              {client.name}
           </div>
         </TableCell>
-        <TableCell className="hidden sm:table-cell">{client.email}</TableCell>
-        <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
-        <TableCell>
+        <TableCell className="hidden sm:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.email}</TableCell>
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>{client.phone}</TableCell>
+        <TableCell className="cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           <Badge variant={getStatusVariant(client.status)}>{client.status}</Badge>
         </TableCell>
-        <TableCell className="hidden md:table-cell">
+        <TableCell className="hidden md:table-cell cursor-pointer" onClick={() => router.push(`/dashboard/clients/${client.id}`)}>
           {client.createdAt ? new Date(client.createdAt).toLocaleDateString('pt-BR') : '-'}
         </TableCell>
         <TableCell onClick={(e) => e.stopPropagation()}>
@@ -198,7 +237,7 @@ export default function DocumentacaoPage() {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => handleRecycleClient(client)}
+                      onClick={() => updateDoc(doc(firestore, 'clients', client.id), { status: 'Reciclagem' })}
                     >
                       Sim, mover
                     </AlertDialogAction>
@@ -247,12 +286,46 @@ export default function DocumentacaoPage() {
             <CardTitle>Documentação</CardTitle>
             <CardDescription>
               Clientes aguardando o envio e validação de documentos.
+               {numSelected > 0 && (
+                <div className="mt-4 flex items-center gap-2 bg-muted/50 p-2 rounded-md border">
+                    <span className="text-sm font-medium pl-2">{numSelected} selecionado(s)</span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                             <Button variant="outline" size="sm" className="h-8 gap-1">
+                                <Recycle className="h-3.5 w-3.5" />
+                                Reciclar Selecionados
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Mover selecionados para Reciclagem?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Os {numSelected} clientes selecionados serão movidos para a lista de reciclagem.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleBulkRecycle}>
+                                    Sim, mover
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            )}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                   <TableHead className="w-12">
+                     <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Selecionar todos"
+                      />
+                  </TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Email</TableHead>
                   <TableHead className="hidden md:table-cell">Telefone</TableHead>
