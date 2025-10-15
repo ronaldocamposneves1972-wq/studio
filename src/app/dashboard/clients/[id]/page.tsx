@@ -82,7 +82,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product, WhatsappMessageTemplate, ExpenseCategory } from "@/lib/types"
+import type { Client, ClientStatus, TimelineEvent, Proposal, ClientDocument, DocumentStatus, ProposalStatus, ProposalSummary, SalesOrder, SalesOrderSummary, Transaction, Product, WhatsappMessageTemplate, ExpenseCategory, SalesOrderStatus } from "@/lib/types"
 import {
   Select,
   SelectContent,
@@ -123,6 +123,7 @@ import { ProposalDialog } from "@/components/dashboard/proposal-dialog"
 import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const clientSchema = z.object({
     name: z.string().min(3, "O nome completo é obrigatório."),
@@ -172,6 +173,17 @@ const getProposalStatusVariant = (status: ProposalStatus) => {
       return 'outline';
   }
 }
+
+const getSalesOrderStatusVariant = (status: SalesOrderStatus) => {
+  switch (status) {
+    case 'Faturado':
+      return 'default';
+    case 'Pendente':
+    default:
+      return 'outline';
+  }
+};
+
 
 const getTimelineIcon = (activity: string) => {
     if (activity.toLowerCase().includes('proposta')) return <FileText className="h-4 w-4 text-muted-foreground" />;
@@ -379,6 +391,67 @@ function CompleteRequestDialog({
     )
 }
 
+function AttachGuideDialog({
+    isOpen,
+    onOpenChange,
+    onConfirm,
+    pendingSalesOrders,
+}: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: (salesOrderId: string) => void;
+    pendingSalesOrders: SalesOrderSummary[];
+}) {
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+
+    const handleContinue = () => {
+        if (selectedOrderId) {
+            onConfirm(selectedOrderId);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Anexar Guia de Pagamento</DialogTitle>
+                    <DialogDescription>
+                        Selecione a qual Pedido de Venda esta guia de pagamento pertence.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <RadioGroup
+                        value={selectedOrderId || ""}
+                        onValueChange={setSelectedOrderId}
+                        className="space-y-2"
+                    >
+                        {pendingSalesOrders.map(order => (
+                            <Label
+                                key={order.id}
+                                htmlFor={order.id}
+                                className="flex items-center gap-4 rounded-md border p-4 cursor-pointer hover:bg-accent/50"
+                            >
+                                <RadioGroupItem value={order.id} id={order.id} />
+                                <div className="flex-1">
+                                    <p className="font-medium">Pedido #{order.id.substring(0, 6)}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Vencimento: {new Date(order.dueDate).toLocaleDateString('pt-br')} - Total: R$ {order.totalValue.toLocaleString('pt-br', { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                            </Label>
+                        ))}
+                    </RadioGroup>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                    <Button onClick={handleContinue} disabled={!selectedOrderId}>
+                        Continuar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 
 export default function ClientDetailPage() {
@@ -402,6 +475,8 @@ export default function ClientDetailPage() {
   const [viewingDocument, setViewingDocument] = useState<ClientDocument | null>(null);
   const [isCompleteRequestDialogOpen, setIsCompleteRequestDialogOpen] = useState(false);
   const [isCompletingRequest, setIsCompletingRequest] = useState(false);
+  const [isAttachGuideDialogOpen, setIsAttachGuideDialogOpen] = useState(false);
+  const [selectedSalesOrderIdForGuide, setSelectedSalesOrderIdForGuide] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -568,10 +643,22 @@ export default function ClientDetailPage() {
   }
 
   const handleFileSelect = () => {
-    fileInputRef.current?.click();
+      const pendingOrders = client?.salesOrders?.filter(o => o.status === 'Pendente') || [];
+      if (pendingOrders.length > 0) {
+          setIsAttachGuideDialogOpen(true);
+      } else {
+        toast({ variant: 'destructive', title: 'Nenhum Pedido Pendente', description: 'Não há pedidos de venda pendentes para anexar uma guia.'});
+      }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'document' | 'payment_guide' = 'document') => {
+  const handleAttachGuideConfirm = (salesOrderId: string) => {
+      setSelectedSalesOrderIdForGuide(salesOrderId);
+      setIsAttachGuideDialogOpen(false);
+      fileInputRef.current?.click();
+  };
+
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, category: 'document' | 'payment_guide' = 'document', salesOrderId?: string) => {
     const file = event.target.files?.[0];
     if (!file || !clientId || !clientRef || !user) return;
 
@@ -579,70 +666,85 @@ export default function ClientDetailPage() {
     toast({ title: 'Enviando arquivo...', description: 'Por favor, aguarde.' });
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('clientId', clientId);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('clientId', clientId);
       
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+        const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+        });
 
-      if (!uploadResponse.ok) {
-        let errorData;
-        try {
-            errorData = await uploadResponse.json();
-        } catch (e) {
-             throw new Error(`O servidor respondeu com status ${uploadResponse.status}`);
+        if (!uploadResponse.ok) {
+            let errorData;
+            try {
+                errorData = await uploadResponse.json();
+            } catch (e) {
+                throw new Error(`O servidor respondeu com status ${uploadResponse.status}`);
+            }
+            throw new Error(errorData.error || 'Falha no upload do servidor.');
         }
-        throw new Error(errorData.error || 'Falha no upload do servidor.');
-      }
 
-      const uploadData = await uploadResponse.json();
+        const uploadData = await uploadResponse.json();
 
-      const newDocument: ClientDocument = {
-        id: uploadData.id,
-        clientId: clientId,
-        fileName: uploadData.fileName,
-        secureUrl: uploadData.secureUrl,
-        unsterilePublicId: uploadData.unsterilePublicId,
-        fileType: uploadData.fileType,
-        uploadedAt: new Date().toISOString(),
-        validationStatus: 'pending',
-        category: category,
-      };
+        const newDocument: ClientDocument = {
+            id: uploadData.id,
+            clientId: clientId,
+            fileName: uploadData.fileName,
+            secureUrl: uploadData.secureUrl,
+            unsterilePublicId: uploadData.unsterilePublicId,
+            fileType: uploadData.fileType,
+            uploadedAt: new Date().toISOString(),
+            validationStatus: 'pending',
+            category: category,
+            ...(salesOrderId && { salesOrderId: salesOrderId })
+        };
       
-      const timelineEvent: TimelineEvent = {
-        id: `tl-${Date.now()}`,
-        activity: `Documento "${file.name}" (${category === 'payment_guide' ? 'Guia de Pag.' : 'Doc.'}) enviado`,
-        timestamp: new Date().toISOString(),
-        user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
-      };
+        const timelineEvent: TimelineEvent = {
+            id: `tl-${Date.now()}`,
+            activity: `Documento "${file.name}" (${category === 'payment_guide' ? `Guia de Pag. para Pedido #${salesOrderId?.substring(0,6)}` : 'Doc.'}) enviado`,
+            timestamp: new Date().toISOString(),
+            user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
+        };
+        
+        const batch = writeBatch(firestore);
+        
+        batch.update(clientRef, {
+            documents: arrayUnion(newDocument),
+            timeline: arrayUnion(timelineEvent)
+        });
 
-      await updateDoc(clientRef, {
-        documents: arrayUnion(newDocument),
-        timeline: arrayUnion(timelineEvent)
-      });
+        // If it's a payment guide, update the sales order status
+        if (category === 'payment_guide' && salesOrderId && client?.salesOrders) {
+            const updatedSalesOrders = client.salesOrders.map(order => 
+                order.id === salesOrderId ? { ...order, status: 'Faturado' as SalesOrderStatus } : order
+            );
+            batch.update(clientRef, { salesOrders: updatedSalesOrders });
+        }
 
-      toast({
-        title: 'Arquivo enviado!',
-        description: `${file.name} foi adicionado com sucesso.`,
-      });
+        await batch.commit();
+
+        toast({
+            title: 'Arquivo enviado!',
+            description: `${file.name} foi adicionado com sucesso.`,
+        });
 
     } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro no Upload',
-        description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
-      });
+        console.error('Upload error:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Erro no Upload',
+            description: error instanceof Error ? error.message : 'Não foi possível enviar o arquivo.',
+        });
     } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+        setIsUploading(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+        setSelectedSalesOrderIdForGuide(null); // Reset selection
     }
   };
+
 
   const handleDeleteDocument = async (docToDelete: ClientDocument) => {
     if (!clientRef || !client?.documents || !docToDelete.unsterilePublicId) return;
@@ -999,6 +1101,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 dueDate: data.dueDate,
                 items: data.items,
                 totalValue: data.totalValue,
+                status: 'Pendente'
             };
             batch.set(newSalesOrderRef, newSalesOrderData);
     
@@ -1009,6 +1112,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                 dueDate: data.dueDate,
                 totalValue: data.totalValue,
                 itemCount: data.items.length,
+                status: 'Pendente'
             };
     
             // 3. Create the timeline event
@@ -1295,6 +1399,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
   const salesOrders = client.salesOrders || [];
   const allDocumentsValidated = documents.length > 0 && documents.every(doc => doc.validationStatus === 'validated');
   const hasAcceptedProposal = proposals.some(p => p.status === 'Finalizada');
+  const allSalesOrdersBilled = salesOrders.length > 0 && salesOrders.every(o => o.status === 'Faturado');
 
 
   return (
@@ -1434,6 +1539,14 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         onConfirm={handleCompleteRequest}
         isSubmitting={isCompletingRequest}
       />
+       {client && (
+          <AttachGuideDialog
+            isOpen={isAttachGuideDialogOpen}
+            onOpenChange={setIsAttachGuideDialogOpen}
+            onConfirm={handleAttachGuideConfirm}
+            pendingSalesOrders={client.salesOrders?.filter(o => o.status === 'Pendente') || []}
+          />
+       )}
       
       <div className="grid flex-1 auto-rows-max items-start gap-4 lg:grid-cols-3 lg:gap-8">
           <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-3">
@@ -1685,7 +1798,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                             <CardFooter className="border-t px-6 py-4 flex justify-between items-center flex-wrap gap-4">
                                 <div className="flex-grow flex items-center gap-2 min-w-[300px]">
                                     <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'document')} className="hidden" />
-                                    <Button onClick={handleFileSelect} disabled={isUploading}>
+                                    <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                         {isUploading ? 'Enviando...' : 'Adicionar Arquivo'}
                                     </Button>
@@ -1867,6 +1980,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>ID Pedido</TableHead>
+                                                    <TableHead>Status</TableHead>
                                                     <TableHead>Data</TableHead>
                                                     <TableHead>Vencimento</TableHead>
                                                     <TableHead>Itens</TableHead>
@@ -1878,6 +1992,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                                 {salesOrders.map(order => (
                                                     <TableRow key={order.id}>
                                                         <TableCell className="font-mono">{order.id.substring(0, 8)}...</TableCell>
+                                                         <TableCell><Badge variant={getSalesOrderStatusVariant(order.status)}>{order.status}</Badge></TableCell>
                                                         <TableCell>{new Date(order.createdAt).toLocaleDateString('pt-br')}</TableCell>
                                                         <TableCell>{new Date(order.dueDate).toLocaleDateString('pt-br')}</TableCell>
                                                         <TableCell>{order.itemCount}</TableCell>
@@ -1919,7 +2034,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                         </>
                                     )}
                                 </CardContent>
-                                {client.status === 'Ledger' && salesOrders.length > 0 && (
+                                {client.status === 'Ledger' && salesOrders.length > 0 && !allSalesOrdersBilled && (
                                      <CardFooter className="border-t px-6 py-4 flex justify-end">
                                         <Button onClick={handleSendToBilling}>
                                             <Send className="mr-2 h-4 w-4" />
@@ -1951,6 +2066,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Nome do Arquivo</TableHead>
+                                                    <TableHead>Pedido Vinculado</TableHead>
                                                     <TableHead>Data de Envio</TableHead>
                                                     <TableHead className="text-right">Ações</TableHead>
                                                 </TableRow>
@@ -1962,6 +2078,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                                             <FileText className="h-4 w-4 text-muted-foreground" />
                                                             {doc.fileName}
                                                         </TableCell>
+                                                        <TableCell className="font-mono text-xs">{doc.salesOrderId ? `#${doc.salesOrderId.substring(0,6)}` : 'N/A'}</TableCell>
                                                         <TableCell>{new Date(doc.uploadedAt).toLocaleString('pt-BR')}</TableCell>
                                                         <TableCell className="text-right">
                                                             <DropdownMenu>
@@ -1989,8 +2106,13 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     )}
                                 </CardContent>
                                 <CardFooter className="border-t px-6 py-4 flex justify-between">
-                                     <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'payment_guide')} className="hidden" />
-                                     <Button onClick={handleFileSelect} disabled={isUploading}>
+                                     <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={(e) => handleFileUpload(e, 'payment_guide', selectedSalesOrderIdForGuide)}
+                                        className="hidden"
+                                    />
+                                     <Button onClick={handleFileSelect} disabled={isUploading || allSalesOrdersBilled}>
                                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                                         {isUploading ? 'Enviando...' : 'Anexar Guia'}
                                     </Button>

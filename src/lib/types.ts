@@ -35,6 +35,7 @@ export type ClientDocument = {
   validatedBy?: string;
   validatedAt?: string;
   category: 'document' | 'payment_guide';
+  salesOrderId?: string; // Link to the sales order
 };
 
 export type ProposalSummary = {
@@ -51,12 +52,15 @@ export type ProposalSummary = {
   formalizationLink?: string;
 }
 
+export type SalesOrderStatus = 'Pendente' | 'Faturado';
+
 export type SalesOrderSummary = {
   id: string;
   createdAt: string;
   dueDate: string;
   totalValue: number;
   itemCount: number;
+  status: SalesOrderStatus;
 }
 
 export type Client = {
@@ -271,6 +275,7 @@ export type SalesOrder = {
   dueDate: string;
   items: SalesOrderItem[];
   totalValue: number;
+  status: SalesOrderStatus;
 }
 
 export const collections = [

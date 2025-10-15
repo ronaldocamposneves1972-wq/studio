@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState } from 'react';
@@ -21,7 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import type { Product } from '@/lib/types';
+import type { Product, SalesOrderStatus } from '@/lib/types';
 import Link from 'next/link';
 import { DialogFooter } from '../ui/dialog';
 import { cn } from '@/lib/utils';
@@ -91,7 +92,8 @@ export function SalesOrderForm({ onSave }: SalesOrderFormProps) {
                 ...item,
                 productName: product?.name || 'N/A'
             }
-        })
+        }),
+        status: 'Pendente' as SalesOrderStatus,
     }
     await onSave(orderData);
     setIsSubmitting(false);
