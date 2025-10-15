@@ -1275,10 +1275,10 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             <DialogHeader>
                 <DialogTitle>{viewingDocument?.fileName}</DialogTitle>
                 <DialogDescription>
-                    Visualização do documento.
+                    Visualização do documento. Ações de validação podem ser tomadas no rodapé.
                 </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 rounded-md overflow-hidden">
+            <div className="flex-1 rounded-md overflow-hidden border">
                 {viewingDocument && (
                     <iframe
                         src={viewingDocument.secureUrl}
@@ -1287,10 +1287,22 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                     />
                 )}
             </div>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button>Fechar</Button>
-                </DialogClose>
+            <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setViewingDocument(null)}>Fechar</Button>
+                <Button variant="destructive" onClick={() => {
+                    handleValidationStatusChange(viewingDocument!, 'rejected');
+                    setViewingDocument(null);
+                }}>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Rejeitar
+                </Button>
+                <Button className="bg-green-600 hover:bg-green-700" onClick={() => {
+                    handleValidationStatusChange(viewingDocument!, 'validated');
+                    setViewingDocument(null);
+                }}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Validar
+                </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
