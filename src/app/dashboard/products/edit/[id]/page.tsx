@@ -70,7 +70,10 @@ const proposalSchema = baseSchema.extend({
     (a) => parseFloat(String(a).replace(",", ".")),
     z.number().min(0, "A taxa não pode ser negativa.")
   ),
-  terms: z.string().min(1, "Informe ao menos um prazo.").transform(value => value.split(',').map(term => Number(term.trim()))),
+  terms: z.preprocess(
+    (val) => String(val),
+    z.string().min(1, "Informe ao menos um prazo.")
+  ),
   commissionRate: z.preprocess(
     (a) => parseFloat(String(a).replace(",", ".")),
     z.number().min(0, "A comissão não pode ser negativa.")
@@ -342,3 +345,5 @@ export default function EditProductPage() {
     </div>
   )
 }
+
+    
