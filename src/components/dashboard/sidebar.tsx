@@ -67,9 +67,7 @@ export const navItems = [
     label: 'Financeiro', icon: DollarSign, children: [
       { href: '/dashboard/financials/accounts-payable', label: 'Contas a Pagar', icon: ClipboardList },
       { href: '/dashboard/financials/accounts-receivable', label: 'Contas a Receber', icon: FileText },
-      { href: '/dashboard/financials/cash-flow', label: 'Fluxo de Caixa', icon: FileText },
       { href: '/dashboard/financials/bank-reconciliation', label: 'Conciliação Bancária', icon: FileText },
-      { href: '/dashboard/financials/financial-planning', label: 'Planejamento Financeiro', icon: FileText },
       { href: '/dashboard/financials/billing', label: 'Faturamento e Cobrança', icon: FileText },
     ]
   },
