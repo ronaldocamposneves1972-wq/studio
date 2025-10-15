@@ -1585,7 +1585,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
                                     </Button>
                                 )}
                                  {client.status === 'Ledger' && (
-                                    <Button onClick={handleFinalizeClient}>
+                                    <Button onClick={handleFinalizeClient} disabled={!allSalesOrdersBilled}>
                                         <CheckCircle2 className="h-4 w-4 mr-2" />
                                         Finalizar
                                     </Button>
