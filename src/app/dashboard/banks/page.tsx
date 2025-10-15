@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   PlusCircle,
   MoreHorizontal,
@@ -98,12 +98,19 @@ function BankDialog({
     },
   })
 
-  useState(() => {
-    reset({
-      name: bank?.name || '',
-      logoUrl: bank?.logoUrl || '',
-    })
-  })
+  useEffect(() => {
+    if (bank) {
+        reset({
+            name: bank.name || '',
+            logoUrl: bank.logoUrl || '',
+        })
+    } else {
+         reset({
+            name: '',
+            logoUrl: '',
+        })
+    }
+  }, [bank, reset, open])
 
   const handleFormSubmit = (values: BankFormValues) => {
     onSave(values, bank?.id)
