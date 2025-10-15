@@ -10,9 +10,9 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, Edit, Trash2, Landmark, Percent } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useDoc, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase'
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase'
 import type { Product } from '@/lib/types'
-import { doc } from 'firebase/firestore'
+import { doc, deleteDoc } from 'firebase/firestore'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,14 +76,22 @@ export default function ProductDetailPage() {
 
   const { data: product, isLoading, error } = useDoc<Product>(productRef);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!productRef) return;
-    deleteDocumentNonBlocking(productRef);
-    toast({
-      title: "Produto Excluído",
-      description: `O produto "${product?.name}" foi removido.`
-    })
-    router.push('/dashboard/products');
+    try {
+      await deleteDoc(productRef);
+      toast({
+        title: "Produto Excluído",
+        description: `O produto "${product?.name}" foi removido.`
+      })
+      router.push('/dashboard/products');
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: "Não foi possível remover o produto."
+      })
+    }
   }
 
   if (isLoading) {
@@ -238,3 +246,5 @@ export default function ProductDetailPage() {
     </div>
   )
 }
+
+    

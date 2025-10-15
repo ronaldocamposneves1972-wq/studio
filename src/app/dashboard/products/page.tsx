@@ -31,9 +31,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCollection, useFirestore, useMemoFirebase, useUser, deleteDocumentNonBlocking } from "@/firebase"
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
 import type { Product } from "@/lib/types"
-import { collection, query, doc } from "firebase/firestore"
+import { collection, query, doc, deleteDoc } from "firebase/firestore"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,13 +61,21 @@ export default function ProductsPage() {
 
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
-  const handleDelete = (product: Product) => {
+  const handleDelete = async (product: Product) => {
     if(!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'products', product.id));
-    toast({
-      title: "Produto Excluído",
-      description: `O produto "${product.name}" foi removido.`
-    });
+    try {
+      await deleteDoc(doc(firestore, 'products', product.id));
+      toast({
+        title: "Produto Excluído",
+        description: `O produto "${product.name}" foi removido.`
+      });
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao Excluir",
+        description: "Não foi possível remover o produto."
+      });
+    }
   }
 
   const renderProductRows = () => {
@@ -202,3 +210,5 @@ export default function ProductsPage() {
     </div>
   )
 }
+
+    

@@ -61,8 +61,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useCollection, useFirestore, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
-import { collection, doc, query, writeBatch } from "firebase/firestore"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, doc, query, writeBatch, deleteDoc } from "firebase/firestore"
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -97,14 +97,22 @@ export default function ClientsPage() {
   
   const { data: clients, isLoading } = useCollection<Client>(clientsQuery)
   
-  const handleDeleteClient = (client: Client) => {
+  const handleDeleteClient = async (client: Client) => {
     if(!firestore) return;
-    deleteDocumentNonBlocking(doc(firestore, 'clients', client.id));
-    toast({
-      title: "Cliente excluído!",
-      description: `O cliente "${client.name}" foi removido com sucesso.`,
-    });
-    setSelectedRows(prev => prev.filter(id => id !== client.id));
+    try {
+      await deleteDoc(doc(firestore, 'clients', client.id));
+      toast({
+        title: "Cliente excluído!",
+        description: `O cliente "${client.name}" foi removido com sucesso.`,
+      });
+      setSelectedRows(prev => prev.filter(id => id !== client.id));
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: `Não foi possível excluir o cliente "${client.name}".`,
+      });
+    }
   }
 
   const handleDeleteSelected = async () => {
@@ -266,7 +274,7 @@ export default function ClientsPage() {
   
     const numSelected = selectedRows.length;
     const allSelected = numSelected > 0 && numSelected === clientList.length;
-    const someSelected = numSelected > 0 && numSelected < clientList.length;
+    const someSelected = numSelected > 0 && !allSelected;
 
   return (
     <Tabs defaultValue="all" onValueChange={setActiveTab}>
@@ -391,3 +399,5 @@ export default function ClientsPage() {
     </Tabs>
   )
 }
+
+    
