@@ -642,7 +642,7 @@
         },
         "placeholders": {
           "type": "array",
-          "description": "Array of available placeholders for this template (e.g., 'clientName', 'quizLink').",
+          "description": "Array of available placeholders for this template (e.g., 'clientName', 'quizLink', 'proposalDetails').",
           "items": {
             "type": "string"
           }

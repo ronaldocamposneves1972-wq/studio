@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from "next/image"
@@ -32,7 +33,8 @@ import {
   FileWarning,
   Receipt,
   ShoppingCart,
-  Recycle
+  Recycle,
+  Whatsapp
 } from "lucide-react"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams } from 'next/navigation'
@@ -976,6 +978,45 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
 
     }, [client]);
 
+    const handleSendProposalWhatsApp = async (proposal: ProposalSummary) => {
+        if (!firestore || !client?.phone || !client?.name) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Cliente ou telefone não encontrado.' });
+            return;
+        }
+
+        toast({ title: 'Enviando WhatsApp...' });
+
+        try {
+            const q = query(collection(firestore, 'whatsapp_templates'), where('stage', '==', 'Envio de Proposta'), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                toast({ variant: 'destructive', title: 'Template não encontrado', description: 'Crie um modelo para "Envio de Proposta" nas configurações.' });
+                return;
+            }
+
+            const template = querySnapshot.docs[0].data() as WhatsappMessageTemplate;
+
+            const proposalDetails = `
+*${proposal.productName} (${proposal.bankName})*
+Valor: R$ ${proposal.value.toLocaleString('pt-br', { minimumFractionDigits: 2 })}
+Parcelas: ${proposal.installments}x de R$ ${proposal.installmentValue?.toLocaleString('pt-br', { minimumFractionDigits: 2 })}
+`;
+            
+            const placeholders = {
+                clientName: client.name,
+                proposalDetails: proposalDetails,
+            };
+
+            await sendWhatsappMessage(template, placeholders, client.phone);
+
+            toast({ title: 'Proposta enviada!', description: 'A proposta foi enviada para o WhatsApp do cliente.' });
+        } catch (error) {
+            console.error("Error sending WhatsApp proposal:", error);
+            toast({ variant: 'destructive', title: 'Erro ao enviar', description: 'Não foi possível enviar a mensagem.' });
+        }
+    };
+
 
   if (isLoadingClient) {
      return (
@@ -1495,6 +1536,9 @@ const handleAcceptProposal = async (acceptedProposal: ProposalSummary, link: str
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem onSelect={() => setProposalToAccept(p)} disabled={hasAcceptedProposal || p.status !== 'Aberta'}>
                                                                             <CheckCircle2 className="mr-2 h-4 w-4" /> Aceitar Proposta
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuItem onSelect={() => handleSendProposalWhatsApp(p)}>
+                                                                            <MessageSquare className="mr-2 h-4 w-4" /> Enviar por WhatsApp
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuSeparator />
                                                                         <AlertDialog>
