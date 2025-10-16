@@ -25,6 +25,7 @@ interface UserData {
   st?: string[]; // State (2-letter abbreviation)
   zp?: string[]; // Zip Code
   country?: string[]; // Country (2-letter ISO code)
+  external_id?: string[]; // Your system's user ID
   client_ip_address?: string; // Non-hashed
   client_user_agent?: string; // Non-hashed
 }
@@ -43,7 +44,7 @@ interface CustomData {
  * @returns The SHA-256 hashed string.
  */
 function hash(value: string): string {
-  return createHash('sha256').update(value.toLowerCase()).digest('hex');
+  return createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
 }
 
 /**
@@ -72,6 +73,7 @@ export async function sendServerEvent(
   if (userData.country) hashedUserData.country = userData.country.map(hash);
   
   // Keep non-PII fields as they are
+  if (userData.external_id) hashedUserData.external_id = userData.external_id;
   if (userData.client_ip_address) hashedUserData.client_ip_address = userData.client_ip_address;
   if (userData.client_user_agent) hashedUserData.client_user_agent = userData.client_user_agent;
   

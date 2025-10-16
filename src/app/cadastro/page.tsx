@@ -142,7 +142,7 @@ function CadastroContent() {
     try {
         if (!firestore) throw new Error("Firestore not available");
         const clientsCollection = collection(firestore, 'clients');
-        await addDoc(clientsCollection, newClient);
+        const docRef = await addDoc(clientsCollection, newClient);
         
         toast({
             title: 'Cadastro recebido!',
@@ -158,10 +158,12 @@ function CadastroContent() {
                 ph: newClient.phone ? [newClient.phone.replace(/\D/g, '')] : undefined,
                 fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
                 ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
+                db: newClient.birthDate ? [newClient.birthDate.replace(/-/g, '')] : undefined, // YYYY-MM-DD to YYYYMMDD
                 ct: newClient.city ? [newClient.city] : undefined,
                 st: newClient.state ? [newClient.state] : undefined,
                 zp: newClient.cep ? [newClient.cep.replace(/\D/g, '')] : undefined,
                 country: ['br'],
+                external_id: [docRef.id],
             };
             // Send both Lead and CompleteRegistration events
             sendServerEvent('Lead', userData, undefined, window.location.href);

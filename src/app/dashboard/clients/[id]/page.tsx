@@ -1055,13 +1055,20 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
 
         // --- Send Facebook Pixel InitiateCheckout Event ---
         if (client.email || client.phone) {
-            const nameParts = client.name?.split(' ') || [];
-            sendServerEvent('InitiateCheckout', {
+             const nameParts = client.name?.split(' ') || [];
+             const userData = {
                 em: client.email ? [client.email] : undefined,
                 ph: client.phone ? [client.phone.replace(/\D/g, '')] : undefined,
                 fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
                 ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
-            }, {
+                db: client.birthDate ? [client.birthDate.replace(/-/g, '')] : undefined,
+                ct: client.city ? [client.city] : undefined,
+                st: client.state ? [client.state] : undefined,
+                zp: client.cep ? [client.cep.replace(/\D/g, '')] : undefined,
+                country: ['br'],
+                external_id: [client.id],
+            };
+            sendServerEvent('InitiateCheckout', userData, {
                 value: acceptedProposal.value,
                 currency: 'BRL',
             }, window.location.href);
