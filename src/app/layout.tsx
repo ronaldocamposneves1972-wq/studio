@@ -6,8 +6,8 @@ import { FirebaseClientProvider } from '@/firebase';
 
 
 export const metadata: Metadata = {
-  title: 'Safecred',
-  description: 'Sistema completo de consórcio e crédito',
+  title: 'Safecred 💚',
+  description: 'Crédito pré-aprovado no seu nome, rápido, seguro e sem consulta complicada! 🚀',
 };
 
 export default function RootLayout({
