@@ -24,7 +24,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from '@/lib/utils';
-import { sendServerEvent } from '@/lib/facebook-pixel';
+
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -39,11 +39,19 @@ export default function CreditoCLTPage() {
   const [statsCount, setStatsCount] = useState(0);
 
   useEffect(() => {
-    // Fire ViewContent event when the page loads
-    sendServerEvent('ViewContent', {}, {
-      content_name: 'Crédito CLT',
-      content_type: 'product_page'
-    }, window.location.href);
+    // Fire ViewContent event when the page loads by sending it to our own API route
+    fetch('/api/pixel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName: 'ViewContent',
+        customData: {
+          content_name: 'Crédito CLT',
+          content_type: 'product_page'
+        },
+        eventSourceUrl: window.location.href,
+      }),
+    });
   }, []);
 
   useEffect(() => {

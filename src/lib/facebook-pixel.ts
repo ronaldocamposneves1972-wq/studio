@@ -15,7 +15,7 @@ export type FacebookEventName =
   | 'CompleteRegistration'
   | 'Search';
 
-interface UserData {
+export interface UserData {
   em?: string[]; // Email
   ph?: string[]; // Phone
   fn?: string[]; // First Name
@@ -30,7 +30,7 @@ interface UserData {
   client_user_agent?: string; // Non-hashed
 }
 
-interface CustomData {
+export interface CustomData {
   value?: number;
   currency?: string;
   content_name?: string;
