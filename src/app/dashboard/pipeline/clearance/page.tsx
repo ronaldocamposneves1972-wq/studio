@@ -76,6 +76,7 @@ import { collection, doc, query, where, writeBatch, getDoc, addDoc, getDocs, lim
 import { useMemo } from "react"
 import { addBusinessDays, cn } from "@/lib/utils"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
+import { sendServerEvent } from "@/lib/facebook-pixel";
 
 
 const getStatusVariant = (status: ClientStatus) => {
@@ -281,6 +282,19 @@ export default function ClearancePage() {
                 }
             ];
             batch.update(clientRef, { timeline: arrayUnion(...timelineEvents) });
+
+            // --- Send Facebook Pixel Purchase Event ---
+            const nameParts = client.name?.split(' ') || [];
+            sendServerEvent('Purchase', {
+                em: client.email ? [client.email] : undefined,
+                ph: client.phone ? [client.phone.replace(/\D/g, '')] : undefined,
+                fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
+                ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
+            }, {
+                value: acceptedProposal.value,
+                currency: 'BRL'
+            });
+
             
             // --- Commit batch ---
             await batch.commit();

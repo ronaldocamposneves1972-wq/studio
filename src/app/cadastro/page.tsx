@@ -19,6 +19,7 @@ import { useForm } from 'react-hook-form';
 import { sendWhatsappMessage } from '@/lib/whatsapp';
 import Image from 'next/image';
 import { maskCPF } from '@/lib/utils';
+import { sendServerEvent } from '@/lib/facebook-pixel';
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -149,6 +150,17 @@ function CadastroContent() {
         });
         setIsSubmitted(true);
         
+        // --- Send Facebook Pixel Lead Event ---
+        if (newClient.email || newClient.phone) {
+            const nameParts = newClient.name?.split(' ') || [];
+            sendServerEvent('Lead', {
+                em: newClient.email ? [newClient.email] : undefined,
+                ph: newClient.phone ? [newClient.phone.replace(/\D/g, '')] : undefined,
+                fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
+                ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
+            });
+        }
+
         // --- Send WhatsApp Message ---
         if (quiz?.whatsappTemplateId && newClient.name && newClient.phone) {
             const templateRef = doc(firestore, 'whatsapp_templates', quiz.whatsappTemplateId);
