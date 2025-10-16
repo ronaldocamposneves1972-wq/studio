@@ -4,18 +4,37 @@ import { createHash } from 'crypto';
 const PIXEL_ID = '1828278851415383';
 const ACCESS_TOKEN = 'EAAR03ZAfCxhcBPl2dXrNNfdjRFGdaksxLLZApBiu9NnFrZC9M4vgszUBmQQYo2atwFxNODXGaLhLkcBEqVOermu1W5A9Gfcvh4ZBITPKZCgZB5ZAUqNvnVkfTJWA0q2Y7yhmlXQZARrGbsHEEZAEH5sYYXRCzFtC0MP7sRvLYodf51rYWtrUDTsobmDXyJ1DjxRKRAgZDZD';
 
+// As per Facebook's documentation for server events
+export type FacebookEventName =
+  | 'Purchase'
+  | 'Lead'
+  | 'AddToCart'
+  | 'InitiateCheckout'
+  | 'AddPaymentInfo'
+  | 'ViewContent'
+  | 'CompleteRegistration'
+  | 'Search';
+
 interface UserData {
   em?: string[]; // Email
   ph?: string[]; // Phone
   fn?: string[]; // First Name
   ln?: string[]; // Last Name
-  client_ip_address?: string;
-  client_user_agent?: string;
+  db?: string[]; // Date of Birth (YYYYMMDD)
+  ct?: string[]; // City
+  st?: string[]; // State (2-letter abbreviation)
+  zp?: string[]; // Zip Code
+  country?: string[]; // Country (2-letter ISO code)
+  client_ip_address?: string; // Non-hashed
+  client_user_agent?: string; // Non-hashed
 }
 
 interface CustomData {
   value?: number;
   currency?: string;
+  content_name?: string;
+  content_type?: string;
+  content_ids?: string[];
 }
 
 /**
@@ -24,26 +43,33 @@ interface CustomData {
  * @returns The SHA-256 hashed string.
  */
 function hash(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+  return createHash('sha256').update(value.toLowerCase()).digest('hex');
 }
 
 /**
  * Sends a server-side event to the Facebook Conversions API.
- * @param eventName The name of the event (e.g., 'Lead', 'Purchase', 'AddToCart').
- * @param userData An object containing user data. This data will be hashed before sending.
+ * @param eventName The name of the event.
+ * @param userData An object containing user data. PII fields will be hashed.
  * @param customData Optional data for the event, like value and currency.
+ * @param eventSourceUrl The URL where the event occurred.
  */
 export async function sendServerEvent(
-  eventName: 'Lead' | 'Purchase' | 'AddToCart',
+  eventName: FacebookEventName,
   userData: UserData,
   customData?: CustomData,
+  eventSourceUrl?: string
 ) {
-  // Hash all the PII fields in userData
+  // Hash all the PII fields in userData as required by Facebook
   const hashedUserData: UserData = {};
   if (userData.em) hashedUserData.em = userData.em.map(hash);
   if (userData.ph) hashedUserData.ph = userData.ph.map(hash);
   if (userData.fn) hashedUserData.fn = userData.fn.map(hash);
   if (userData.ln) hashedUserData.ln = userData.ln.map(hash);
+  if (userData.db) hashedUserData.db = userData.db.map(hash);
+  if (userData.ct) hashedUserData.ct = userData.ct.map(hash);
+  if (userData.st) hashedUserData.st = userData.st.map(hash);
+  if (userData.zp) hashedUserData.zp = userData.zp.map(hash);
+  if (userData.country) hashedUserData.country = userData.country.map(hash);
   
   // Keep non-PII fields as they are
   if (userData.client_ip_address) hashedUserData.client_ip_address = userData.client_ip_address;
@@ -53,7 +79,8 @@ export async function sendServerEvent(
     event_name: eventName,
     event_time: Math.floor(Date.now() / 1000),
     action_source: 'website',
-    user_data: hashedUserData, // Use the hashed data
+    event_source_url: eventSourceUrl,
+    user_data: hashedUserData,
     custom_data: customData,
   };
 
@@ -79,10 +106,10 @@ export async function sendServerEvent(
       throw new Error(responseData.error?.message || 'Failed to send event to Facebook Pixel.');
     }
 
-    console.log('Facebook Pixel event sent successfully:', responseData);
+    console.log(`Facebook Pixel event '${eventName}' sent successfully:`, responseData);
     return responseData;
   } catch (error) {
-    console.error('Error sending event to Facebook Pixel:', error);
+    console.error(`Error sending event '${eventName}' to Facebook Pixel:`, error);
     // Don't re-throw to avoid breaking the user-facing flow
   }
 }

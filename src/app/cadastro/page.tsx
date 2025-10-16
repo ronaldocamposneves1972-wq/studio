@@ -150,15 +150,22 @@ function CadastroContent() {
         });
         setIsSubmitted(true);
         
-        // --- Send Facebook Pixel Lead Event ---
+        // --- Send Facebook Pixel Events ---
         if (newClient.email || newClient.phone) {
             const nameParts = newClient.name?.split(' ') || [];
-            sendServerEvent('Lead', {
+            const userData = {
                 em: newClient.email ? [newClient.email] : undefined,
                 ph: newClient.phone ? [newClient.phone.replace(/\D/g, '')] : undefined,
                 fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
                 ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
-            });
+                ct: newClient.city ? [newClient.city] : undefined,
+                st: newClient.state ? [newClient.state] : undefined,
+                zp: newClient.cep ? [newClient.cep.replace(/\D/g, '')] : undefined,
+                country: ['br'],
+            };
+            // Send both Lead and CompleteRegistration events
+            sendServerEvent('Lead', userData, undefined, window.location.href);
+            sendServerEvent('CompleteRegistration', userData, undefined, window.location.href);
         }
 
         // --- Send WhatsApp Message ---

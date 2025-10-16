@@ -1053,10 +1053,10 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
         };
         batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
 
-        // --- Send Facebook Pixel AddToCart Event ---
+        // --- Send Facebook Pixel InitiateCheckout Event ---
         if (client.email || client.phone) {
             const nameParts = client.name?.split(' ') || [];
-            sendServerEvent('AddToCart', {
+            sendServerEvent('InitiateCheckout', {
                 em: client.email ? [client.email] : undefined,
                 ph: client.phone ? [client.phone.replace(/\D/g, '')] : undefined,
                 fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
@@ -1064,7 +1064,7 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             }, {
                 value: acceptedProposal.value,
                 currency: 'BRL',
-            });
+            }, window.location.href);
         }
 
         // Commit all writes
