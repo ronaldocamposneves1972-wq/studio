@@ -24,6 +24,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from '@/lib/utils';
+import { sendServerEvent } from '@/lib/facebook-pixel';
 
 const appName = 'Safecred';
 const logoUrl = 'https://ik.imagekit.io/bpsmw0nyu/logo.png';
@@ -36,6 +37,14 @@ export default function CreditoPessoalPage() {
   const [statsCurrent, setStatsCurrent] = useState(0);
   const [productCount, setProductCount] = useState(0);
   const [statsCount, setStatsCount] = useState(0);
+
+  useEffect(() => {
+    // Fire ViewContent event when the page loads
+    sendServerEvent('ViewContent', {}, {
+      content_name: 'Crédito Pessoal',
+      content_type: 'product_page'
+    }, window.location.href);
+  }, []);
 
   useEffect(() => {
     if (!productCarouselApi) return;
@@ -378,3 +387,5 @@ export default function CreditoPessoalPage() {
     </div>
   );
 }
+
+    

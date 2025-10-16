@@ -124,7 +124,7 @@ import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { sendServerEvent } from "@/lib/facebook-pixel"
+import { sendServerEvent } from '@/lib/facebook-pixel'
 
 const clientSchema = z.object({
     name: z.string().min(3, "O nome completo é obrigatório."),
@@ -984,8 +984,32 @@ export default function ClientDetailPage() {
                 proposals: arrayUnion(proposalSummary),
                 timeline: arrayUnion(timelineEvent)
             });
+            
+            // 5. Send Facebook Pixel AddToCart Event
+            if (client.email || client.phone) {
+                const nameParts = client.name?.split(' ') || [];
+                const userData = {
+                    em: client.email ? [client.email] : undefined,
+                    ph: client.phone ? [client.phone.replace(/\D/g, '')] : undefined,
+                    fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
+                    ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
+                    db: client.birthDate ? [client.birthDate.replace(/-/g, '')] : undefined,
+                    ct: client.city ? [client.city] : undefined,
+                    st: client.state ? [client.state] : undefined,
+                    zp: client.cep ? [client.cep.replace(/\D/g, '')] : undefined,
+                    country: ['br'],
+                    external_id: [client.id],
+                };
+                sendServerEvent('AddToCart', userData, {
+                    value: data.value,
+                    currency: 'BRL',
+                    content_name: data.productName,
+                    content_type: 'product',
+                    content_ids: [data.productId],
+                }, window.location.href);
+            }
     
-            // 5. Commit all writes at once
+            // 6. Commit all writes at once
             await batch.commit();
     
             toast({
@@ -2218,3 +2242,5 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
+
+    
