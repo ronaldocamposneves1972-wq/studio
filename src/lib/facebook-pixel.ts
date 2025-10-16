@@ -1,5 +1,7 @@
 
 
+import { createHash } from 'crypto';
+
 const PIXEL_ID = '1828278851415383';
 const ACCESS_TOKEN = 'EAAR03ZAfCxhcBPl2dXrNNfdjRFGdaksxLLZApBiu9NnFrZC9M4vgszUBmQQYo2atwFxNODXGaLhLkcBEqVOermu1W5A9Gfcvh4ZBITPKZCgZB5ZAUqNvnVkfTJWA0q2Y7yhmlXQZARrGbsHEEZAEH5sYYXRCzFtC0MP7sRvLYodf51rYWtrUDTsobmDXyJ1DjxRKRAgZDZD';
 
@@ -18,9 +20,18 @@ interface CustomData {
 }
 
 /**
+ * Hashes a string using SHA-256.
+ * @param value The string to hash.
+ * @returns The SHA-256 hashed string.
+ */
+function hash(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/**
  * Sends a server-side event to the Facebook Conversions API.
  * @param eventName The name of the event (e.g., 'Lead', 'Purchase').
- * @param userData An object containing hashed user data.
+ * @param userData An object containing user data. This data will be hashed before sending.
  * @param customData Optional data for the event, like value and currency.
  */
 export async function sendServerEvent(
@@ -28,11 +39,22 @@ export async function sendServerEvent(
   userData: UserData,
   customData?: CustomData,
 ) {
+  // Hash all the PII fields in userData
+  const hashedUserData: UserData = {};
+  if (userData.em) hashedUserData.em = userData.em.map(hash);
+  if (userData.ph) hashedUserData.ph = userData.ph.map(hash);
+  if (userData.fn) hashedUserData.fn = userData.fn.map(hash);
+  if (userData.ln) hashedUserData.ln = userData.ln.map(hash);
+  
+  // Keep non-PII fields as they are
+  if (userData.client_ip_address) hashedUserData.client_ip_address = userData.client_ip_address;
+  if (userData.client_user_agent) hashedUserData.client_user_agent = userData.client_user_agent;
+  
   const eventData = {
     event_name: eventName,
     event_time: Math.floor(Date.now() / 1000),
     action_source: 'website',
-    user_data: userData,
+    user_data: hashedUserData, // Use the hashed data
     custom_data: customData,
   };
 
