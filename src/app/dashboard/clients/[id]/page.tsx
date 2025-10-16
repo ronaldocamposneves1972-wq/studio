@@ -124,6 +124,7 @@ import { SalesOrderDialog } from "@/components/dashboard/sales-order-dialog"
 import { sendWhatsappMessage } from "@/lib/whatsapp"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { sendServerEvent } from "@/lib/facebook-pixel"
 
 const clientSchema = z.object({
     name: z.string().min(3, "O nome completo é obrigatório."),
@@ -1051,6 +1052,20 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
             user: { name: user.displayName || user.email || 'Usuário', avatarUrl: user.photoURL || '' },
         };
         batch.update(clientRef, { timeline: arrayUnion(timelineEvent) });
+
+        // --- Send Facebook Pixel AddToCart Event ---
+        if (client.email || client.phone) {
+            const nameParts = client.name?.split(' ') || [];
+            sendServerEvent('AddToCart', {
+                em: client.email ? [client.email] : undefined,
+                ph: client.phone ? [client.phone.replace(/\D/g, '')] : undefined,
+                fn: nameParts.length > 0 ? [nameParts[0]] : undefined,
+                ln: nameParts.length > 1 ? [nameParts.slice(1).join(' ')] : undefined,
+            }, {
+                value: acceptedProposal.value,
+                currency: 'BRL',
+            });
+        }
 
         // Commit all writes
         await batch.commit();
@@ -2196,5 +2211,3 @@ const handleSendToCreditDesk = async (acceptedProposal: ProposalSummary) => {
     </>
   )
 }
-
-      

@@ -1,5 +1,4 @@
 
-
 import { createHash } from 'crypto';
 
 const PIXEL_ID = '1828278851415383';
@@ -30,12 +29,12 @@ function hash(value: string): string {
 
 /**
  * Sends a server-side event to the Facebook Conversions API.
- * @param eventName The name of the event (e.g., 'Lead', 'Purchase').
+ * @param eventName The name of the event (e.g., 'Lead', 'Purchase', 'AddToCart').
  * @param userData An object containing user data. This data will be hashed before sending.
  * @param customData Optional data for the event, like value and currency.
  */
 export async function sendServerEvent(
-  eventName: 'Lead' | 'Purchase',
+  eventName: 'Lead' | 'Purchase' | 'AddToCart',
   userData: UserData,
   customData?: CustomData,
 ) {
