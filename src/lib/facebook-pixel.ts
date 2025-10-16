@@ -2,7 +2,7 @@
 import { createHash } from 'crypto';
 
 const PIXEL_ID = '1828278851415383';
-const ACCESS_TOKEN = 'EAAR03ZAfCxhcBPl2dXrNNfdjRFGdaksxLLZApBiu9NnFrZC9M4vgszUBmQQYo2atwFxNODXGaLhLkcBEqVOermu1W5A9Gfcvh4ZBITPKZCgZB5ZAUqNvnVkfTJWA0q2Y7yhmlXQZARrGbsHEEZAEH5sYYXRCzFtC0MP7sRvLYodf51rYWtrUDTsobmDXyJ1DjxRKRAgZDZD';
+const ACCESS_TOKEN = 'EAAR03ZAfCxhcBPm8Md0wSVDZAqX8JnVHtAmK0HxzPNisQyVFwGqMnEkp1Fd6lDvUbaDwIDBrv7x8Q1tBGW1F6ZBPV1lXZC0Uu5ZAbDxy9NZCaoPiV1BWVVc0p0ecgLtLPT67gSZBtTcHZAj09ueZAhvpGWl1yA3K7frY14PZCOZCoxGl6n2lZBaFfE6dVlkf6M0YMIIk6QZDZD';
 
 // As per Facebook's documentation for server events
 export type FacebookEventName =
